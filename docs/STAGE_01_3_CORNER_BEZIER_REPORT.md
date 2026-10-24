@@ -110,7 +110,7 @@ Screenshots show raster | planar baseline | adaptive SVG at 100/400/1000%, same
 128px source and scale, in ignored benchmark-results/stage13/. Raw measurements and
 screenshots are archived by CI, not committed. No Vector Magic parity is claimed.
 
-| Fixture | Chamfer old → new px | Robust boundary p95 old → new px | Literal endpoints old → new | Corner P/R | Mean corner error px | Rollback | Trace ms old → new |
+| Fixture | Chamfer old → new px | Robust boundary p95 old → new px | Literal endpoints old → new | Candidate P/R | Mean corner error px | Rollback | Trace ms old → new |
 |---|---|---|---|---|---|---|
 | ../coverage/circle.png | 0.254 → 0.254 | 0.519 → 0.519 | 87 → 87 | N/A | N/A | YES | 387.9 → 39.0 |
 | ../coverage/oval.png | 0.253 → 0.224 | 0.470 → 0.376 | 65 → 15 | N/A | N/A | no | 36.2 → 24.3 |
@@ -132,7 +132,7 @@ screenshots are archived by CI, not committed. No Vector Magic parity is claimed
 | curve.jpg | 1.407 → 1.407 | 7.661 → 7.661 | 1865 → 1865 | N/A | N/A | YES | 37.5 → 44.9 |
 | curve.webp | 0.717 → 0.717 | 2.347 → 2.347 | 300 → 300 | N/A | N/A | YES | 21.5 → 23.5 |
 
-All new exported shared boundaries match exactly and all sampled gap/overlap checks pass. These are topology gates, not quality certification. Corner scores refer to recorded candidates, including proposals rejected by rollback; missed corners are penalized by nearest-candidate position error.
+All new exported shared boundaries match exactly and all sampled gap/overlap checks pass. These are topology gates, not quality certification. Corner scores refer to recorded candidates, including proposals rejected by rollback; multi-region inputs may have only an analyzed prefix before rollback, so those figures are not whole-image detector precision/recall; missed corners are penalized by nearest-candidate position error.
 
 ../coverage/circle.png: ellipse accuracy old → new (center error px, normalized radial RMS px, x/y radius errors px): [{"centerError":0.259782343634952,"radialRms":0.24949174348259215,"radiusXError":0.017001557617184915,"radiusYError":0.038194866985556075},{"centerError":0.259782343634952,"radialRms":0.24949174348259215,"radiusXError":0.017001557617184915,"radiusYError":0.038194866985556075}].
 
@@ -176,9 +176,17 @@ node scripts/corner-benchmark.mjs
 
 Local browser is Chromium 154; CI uses Playwright Chromium. Set
 NEXORA_CHROMIUM_PATH=/usr/bin/chromium and NEXORA_TEST_PORT=4175 here.
-GitHub status: pending branch push/CI. No merge to main is claimed.
+GitHub: branch pushed at `caf8f88`. [CI run 40141616890](https://github.com/akidwush/vector-magic-bydika/actions/runs/40141616890)
+completed SUCCESS, observed on the public GitHub Actions page. This verifies build,
+43 native Rust tests, 32 TypeScript tests and 15 browser tests plus benchmark export;
+it does not certify Stage 1.3 visual/geometric acceptance. No merge to main occurred.
+The main branch remains at `3f37c6e` because quality acceptance is incomplete.
 
 The ellipse model uses a robust median radius scale; the measured oval improves
 while the circle candidate is rejected and rolls back. Candidate recall on triangle
 and star remains below acceptance. Final rollback avoids the earlier node explosion
 and jagged-face regression; it does not turn rejection into fitting success.
+
+The full local suite passed after freezing build artifacts. One earlier local
+cancellation run overlapped a dist rebuild and was invalidated; the subsequent
+stable full run and remote CI both pass the unchanged cancellation assertions.
