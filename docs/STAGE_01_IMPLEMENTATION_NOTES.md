@@ -1,5 +1,8 @@
 # Stage 01 implementation notes / ADR
 
+Historical Stage 1 baseline below. Stage 1.1 supersedes precision 6/7 with 5 for
+Logo/Illustration, and fallback palette/stroke settings. See STAGE_01_QUALITY_HOTFIX_REPORT.md.
+
 ## Audit and authorization
 
 Starting remote main: `0c6b6976c0c270e58adbc2e605363d0acc557f22`.

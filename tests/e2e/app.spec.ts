@@ -20,10 +20,7 @@ test("real WASM traces fixtures, exports editable SVG, and records baseline", as
   let wasm = false;
   page.on("pageerror", (error) => errors.push(error.message));
   page.on("request", (r) => {
-    if (
-      r.url().startsWith("http") &&
-      !r.url().startsWith("http://127.0.0.1:4173")
-    )
+    if (r.url().startsWith("http") && !r.url().startsWith("http://127.0.0.1:"))
       network.push(r.url());
   });
   page.on("response", (r) => {
@@ -231,13 +228,11 @@ test("decode guardrails, downscale consent, alpha and forced fallback", async ({
     .jpeg()
     .withMetadata({ orientation: 6 })
     .toBuffer();
-  await page
-    .getByLabel("Pilih gambar", { exact: true })
-    .setInputFiles({
-      name: "rotated.jpg",
-      mimeType: "image/jpeg",
-      buffer: rotated,
-    });
+  await page.getByLabel("Pilih gambar", { exact: true }).setInputFiles({
+    name: "rotated.jpg",
+    mimeType: "image/jpeg",
+    buffer: rotated,
+  });
   await page.getByRole("button", { name: "Konversi ke SVG" }).click();
   await expect(page.locator(".result")).toContainText("32 × 64");
 

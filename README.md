@@ -5,6 +5,16 @@ a tested ImageTracerJS fallback, three presets, original/vector comparison and l
 No account, tracing API, server upload, or paid runtime. Not affiliated with Vector Magic.
 Quality equivalence is not claimed; Photo is a baseline, and clean-vector improvement is future work.
 
+## Quality hotfix 1.1
+
+Logo/Illustration use upstream precision 5 before segmentation for statistically flat
+inputs; complex inputs retain precision 6/7 and Photo retains 8. Effective precision
+is shown in result metadata. ImageTracerJS
+uses a source-derived palette for these presets and no stroke cover-up.
+[Hotfix evidence and remaining failures](docs/STAGE_01_QUALITY_HOTFIX_REPORT.md)
+include pixel gates, before/after comparisons and unresolved partial-alpha behavior.
+The exact user image remains unverified until the original raster and exported SVG are supplied.
+
 ## Status
 
 Local production build and Chromium workflow verified; see [Stage 1 report](docs/STAGE_01_REPORT.md)

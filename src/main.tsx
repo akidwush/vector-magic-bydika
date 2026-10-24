@@ -407,7 +407,10 @@ function App() {
                     {result.engine} · {result.version}
                   </strong>
                   <p>
-                    {result.preset} · {result.width} × {result.height} px ·{" "}
+                    {result.preset}{" "}
+                    {result.effectivePrecision &&
+                      `· precision ${result.effectivePrecision}`}{" "}
+                    · {result.width} × {result.height} px ·{" "}
                     {result.elapsedMs.toFixed(0)} ms trace ·{" "}
                     {result.totalMs.toFixed(0)} ms total
                     <br />

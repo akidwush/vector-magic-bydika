@@ -9,6 +9,7 @@ export interface TraceResult {
   svg: string;
   engine: EngineId;
   elapsedMs: number;
+  effectivePrecision?: number;
   version: string;
   capabilities: {
     wasm: boolean;
@@ -32,7 +33,6 @@ export const presets: Record<
     title: string;
     description: string;
     colors: number;
-    precision: number;
     speckle: number;
     mode: string;
   }
@@ -41,7 +41,6 @@ export const presets: Record<
     title: "Logo · Clean",
     description: "Warna terbatas, sudut tegas",
     colors: 8,
-    precision: 6,
     speckle: 2,
     mode: "polygon",
   },
@@ -49,7 +48,6 @@ export const presets: Record<
     title: "Illustration · Balanced",
     description: "Warna seimbang, kurva halus",
     colors: 24,
-    precision: 7,
     speckle: 2,
     mode: "spline",
   },
@@ -57,7 +55,6 @@ export const presets: Record<
     title: "Photo · Detailed",
     description: "Baseline detail foto, bukan hasil fotorealistis",
     colors: 64,
-    precision: 8,
     speckle: 4,
     mode: "spline",
   },

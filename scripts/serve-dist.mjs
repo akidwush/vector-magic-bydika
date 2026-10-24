@@ -12,6 +12,30 @@ const types = {
   ".txt": "text/plain",
 };
 createServer(async (req, res) => {
+  if (process.env.NEXORA_RESEARCH === "1" && req.url.startsWith("/research/")) {
+    const name = req.url.slice(10);
+    const file =
+      name === "imagetracer.js"
+        ? "node_modules/imagetracerjs/imagetracer_v1.2.6.js"
+        : ["nexora_wasm.js", "nexora_wasm_bg.wasm"].includes(name)
+          ? "benchmark-results/quality/wasm/" + name
+          : null;
+    if (!file) {
+      res.writeHead(404).end();
+      return;
+    }
+    try {
+      res.writeHead(200, {
+        "Content-Type": name.endsWith(".wasm")
+          ? "application/wasm"
+          : "text/javascript",
+      });
+      res.end(await readFile(file));
+    } catch {
+      res.writeHead(404).end();
+    }
+    return;
+  }
   const pathname = new URL(req.url, "http://localhost").pathname;
   if (!pathname.startsWith(prefix)) {
     res.writeHead(404).end();
@@ -34,4 +58,4 @@ createServer(async (req, res) => {
   } catch {
     res.writeHead(404).end();
   }
-}).listen(4173, "127.0.0.1");
+}).listen(Number(process.env.NEXORA_PORT || 4173), "127.0.0.1");
