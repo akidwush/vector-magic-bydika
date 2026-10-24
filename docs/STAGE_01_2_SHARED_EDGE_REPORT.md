@@ -125,6 +125,8 @@ visioncortex 0.9.3, flo_curves 0.8.0. No new dependency is introduced.
 
 ## Metric definitions and benchmark protocol
 
+Local measurements use system Chromium 154.0.8037.57. Remote CI additionally passes
+on Playwright Chromium 156.0.8078.4; its own results are archived separately.
 Original CC0 source SVGs and supersampled PNG/JPEG/WebP fixtures live in
 `tests/fixtures/shared-edge/`. Ten sources × Stage 1.2 Auto / old Mosaic / locked
 planar = 30 actual browser conversions and downloaded SVGs. Raster-vs-vector metrics
@@ -321,7 +323,13 @@ continues to be reused.
   confirmed all quality/topology tests passed; the existing mobile no-horizontal-scroll
   assertion failed on Chromium 156 because the new long native select option expanded
   the layout. The control now has bounded width, and the same test also checks 320px.
-  No test is disabled or weakened. Remote verification of that fix is pending.
+  No test is disabled or weakened.
+  [CI run 40118874167](https://github.com/akidwush/vector-magic-bydika/actions/runs/40118874167)
+  completed **SUCCESS** in 1m48s for mobile-fix commit `d11e4c9`. This was observed
+  from GitHub's public Actions page. It includes all 13 browser tests, 41 native
+  Rust tests, TypeScript checks, builds and comparison screenshot generation.
+  Local full-browser rerun also passes all 13 tests including 320px/390px layout.
+
   Validation capture explicitly uses bash/pipefail, so tee cannot mask failure. The
   logging-only success run 40118045828 is not accepted as validation evidence.
   Authenticated logs/PR API returned Forbidden; bounded public failure annotations
