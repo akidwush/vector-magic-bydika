@@ -1,0 +1,21 @@
+[package]
+name = "vtracer"
+description = "A vectorization framework that converts raster images into vector graphics: pluggable frontends, curve fitters, color fitting, and output optimization."
+version = "1.0.0-alpha.4"
+authors = ["Chris Tsang"]
+edition = "2024"
+license = "MIT OR Apache-2.0"
+homepage = "https://www.visioncortex.org/vtracer"
+repository = "https://github.com/visioncortex/vtracer"
+categories = ["graphics", "computer-vision"]
+keywords = ["svg", "vectorization", "computer-graphics"]
+
+
+[lib]
+name = "vtracer"
+path = "src/lib.rs"
+
+[dependencies]
+visioncortex = "=0.9.3"
+flo_curves = "=0.8.0"
+

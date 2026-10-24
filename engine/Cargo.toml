@@ -1,0 +1,12 @@
+[package]
+name = "nexora-wasm"
+version = "0.1.0"
+edition = "2024"
+[lib]
+crate-type = ["cdylib"]
+[dependencies]
+vtracer = { path = "../vendor/vtracer" }
+wasm-bindgen = "=0.2.126"
+[profile.release]
+opt-level = "s"
+lto = true
