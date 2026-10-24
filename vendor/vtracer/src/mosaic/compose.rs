@@ -56,9 +56,20 @@ pub fn compose_mosaic(
         })
         .collect();
 
-    let mut doc = VectorDoc::new(seg.width, seg.height);
-    for face in &faces {
-        let path = build_path(face, &fitted, &graph);
+    compose_fitted(&map, &graph, &faces, &fitted)
+}
+
+/// Assemble previously fitted shared edges without any per-face geometry pass.
+/// Exposed for integrations that validate/constrain the cached graph before export.
+pub fn compose_fitted(
+    map: &LabelMap,
+    graph: &BoundaryGraph,
+    faces: &[Face],
+    fitted: &[FittedSegment],
+) -> VectorDoc {
+    let mut doc = VectorDoc::new(map.width, map.height);
+    for face in faces {
+        let path = build_path(face, fitted, graph);
         if !path.is_empty() {
             doc.shapes.push(Shape {
                 paint: map.paints[face.region as usize],

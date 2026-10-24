@@ -7,8 +7,12 @@
 - Core package: 1.0.0-alpha.4, from `crates/vtracer` at that commit.
 - Upstream declares MIT OR Apache-2.0. This distribution uses the supplied MIT grant;
   its LICENSE is retained in vendor/vtracer/LICENSE and distribution notices.
-- Integration: unchanged Rust core source in vendor/vtracer/src; flattened standalone
-  Cargo manifest; project-owned thin wasm-bindgen binding in engine/.
+- Integration: Rust core source in vendor/vtracer/src; flattened standalone Cargo
+  manifest; project-owned wasm-bindgen binding in engine/. Stage 1.2B adds a small
+  API exposure patch in mosaic.rs and mosaic/compose.rs: public face assembly and
+  compose_fitted reuse the original composer for already validated cached edges.
+  No upstream segmentation, graph extraction or fitting algorithm is replaced.
+  See STAGE_01_2_SHARED_EDGE_REPORT.md.
 - Dependency checksums/versions: engine/Cargo.lock. visioncortex 0.9.3 and
   flo_curves 0.8.0 pinned; transitive flo_curves 0.3.1 belongs to upstream visioncortex.
 - Build instructions and preset mapping: STAGE_01_IMPLEMENTATION_NOTES.md.

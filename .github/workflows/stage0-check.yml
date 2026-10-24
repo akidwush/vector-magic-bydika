@@ -1,7 +1,7 @@
 name: NEXORA Stage 1
 on:
   push:
-    branches: [main, feat/stage-1-2-subpixel-coverage]
+    branches: [main, feat/stage-1-2-subpixel-coverage, feat/stage-1-2b-locked-shared-edges]
   pull_request:
 jobs:
   validate:
@@ -23,12 +23,14 @@ jobs:
       - run: npm ci
       - run: npm run build:wasm
       - run: cargo test --manifest-path engine/Cargo.toml --locked
+      - run: cargo test --manifest-path engine/Cargo.toml --locked -p vtracer --lib
       - run: npm run lint && npm run typecheck && npm run test
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
       - run: node scripts/stage12-screenshots.mjs
       - run: node scripts/coverage-screenshots.mjs
+      - run: node scripts/shared-edge-screenshots.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:

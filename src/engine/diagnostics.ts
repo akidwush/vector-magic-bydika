@@ -88,8 +88,9 @@ export function analyzeInput(input: TraceInput): InputDiagnostics {
 export function chooseProfile(
   d: InputDiagnostics,
   preset: string,
-  quality: "auto" | "legacy" | "shared" | "previous" = "auto",
-): "adaptive" | "shared" | "legacy" | "blend" {
+  quality: "auto" | "legacy" | "shared" | "previous" | "planar" = "auto",
+): "adaptive" | "shared" | "legacy" | "blend" | "planar" {
+  if (quality === "planar") return "planar";
   if (quality === "legacy" || preset === "photo") return "legacy";
   if (quality === "shared") return "shared";
   if (d.classification === "blended-flat" && d.alphaZeroFraction === 0)

@@ -98,3 +98,14 @@ The GitHub and GitLab pipelines build WASM, run checks and publish evidence.
 The owner has not selected a license for original NEXORA code. Third-party licenses
 remain intact; see [upstream lock](docs/UPSTREAM_LOCKFILE.md) and THIRD_PARTY_NOTICES.txt,
 which is included in the build. Fixture artwork is separately dedicated to CC0-1.0.
+
+### Stage 1.2B: locked shared edges (review branch)
+
+Select **Shared edge · locked graph (eksperimental)** to use the validated upstream
+Mosaic graph route. Each internal boundary is fitted/quantized once and reused in
+reverse by its neighbor. Auto retains Stage 1.2 routing. Real geometric cracks are
+removed on the test corpus, but SVG antialias hairlines and some pixel fallbacks
+remain; this is not a universal visual-gapless claim.
+
+See [the shared-edge report](docs/STAGE_01_2_SHARED_EDGE_REPORT.md) for geometry,
+renderer, feature and runtime comparisons at 100%, 400% and 1000%.

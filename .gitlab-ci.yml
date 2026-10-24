@@ -20,6 +20,7 @@ validate:
     - npm ci
     - npm run build:wasm
     - cargo test --manifest-path engine/Cargo.toml --locked
+    - cargo test --manifest-path engine/Cargo.toml --locked -p vtracer --lib
     - npm run lint
     - npm run typecheck
     - npm run test
@@ -28,6 +29,7 @@ validate:
     - npm run test:e2e
     - node scripts/stage12-screenshots.mjs
     - node scripts/coverage-screenshots.mjs
+    - node scripts/shared-edge-screenshots.mjs
   artifacts:
     when: always
     paths: [dist/, benchmark-results/, test-results/, playwright-report/]

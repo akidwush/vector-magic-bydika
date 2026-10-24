@@ -132,7 +132,7 @@ export async function decode(file: File, allowResize: boolean) {
       sourceFormat: info.mime,
       decodeMs: performance.now() - started,
       quality: undefined as
-        "auto" | "legacy" | "shared" | "previous" | undefined,
+        "auto" | "legacy" | "shared" | "previous" | "planar" | undefined,
     };
   } finally {
     bitmap.close();

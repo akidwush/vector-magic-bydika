@@ -2,7 +2,7 @@ export type Preset = "logo" | "illustration" | "photo";
 export type EngineId = "vtracer-wasm" | "imagetracerjs";
 export interface TraceInput {
   sourceFormat?: string;
-  quality?: "auto" | "legacy" | "shared" | "previous";
+  quality?: "auto" | "legacy" | "shared" | "previous" | "planar";
   rgba: Uint8ClampedArray;
   width: number;
   height: number;
@@ -13,6 +13,20 @@ export interface TraceResult {
   elapsedMs: number;
   timings?: { startupMs: number; workerTotalMs: number; warm: boolean };
   effectivePrecision?: number;
+  topology?: {
+    vertices: number;
+    edges: number;
+    faces: number;
+    shared: number;
+    contours: number;
+    incidenceErrors: number;
+    repaired: number;
+    crossingsBefore: number;
+    crossingsAfter: number;
+    maxDrift: number;
+    pixelFallback: boolean;
+    validationBudgetFallback: boolean;
+  };
   coverage?: {
     accepted: number;
     rejected: number;

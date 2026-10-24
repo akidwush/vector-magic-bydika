@@ -15,7 +15,7 @@ function App() {
   const [preset, setPreset] = useState<Preset>("illustration"),
     [preferred, setPreferred] = useState<"auto" | "fallback">("auto");
   const [quality, setQuality] = useState<
-    "auto" | "legacy" | "shared" | "previous"
+    "auto" | "legacy" | "shared" | "previous" | "planar"
   >("auto");
   const [result, setResult] = useState<
       TraceResult & {
@@ -260,7 +260,10 @@ function App() {
                   <option value="auto">Otomatis · coverage</option>
                   <option value="previous">Baseline sebelum subpixel</option>
                   <option value="legacy">Baseline Stage 1.1</option>
-                  <option value="shared">Batas bersama · eksperimental</option>
+                  <option value="planar">
+                    Shared edge · locked graph (eksperimental)
+                  </option>
+                  <option value="shared">Mosaic upstream · pembanding</option>
                 </select>
               </label>
               <button
@@ -434,6 +437,7 @@ function App() {
                   ...result.stages,
                   profile: result.profile,
                   coverage: result.coverage,
+                  topology: result.topology,
                   transitions: result.transitions,
                   diagnostics: result.diagnostics,
                 })}
@@ -478,6 +482,20 @@ function App() {
                             {result.coverage.rejected} ditolak · sRGB{" "}
                             {result.coverage.srgb} / linear{" "}
                             {result.coverage.linear}
+                            <br />
+                          </>
+                        )}
+                        {result.topology && (
+                          <>
+                            <span>
+                              Graph: {result.topology.faces} face ·{" "}
+                              {result.topology.shared} shared edge · drift{" "}
+                              {result.topology.maxDrift.toFixed(3)} px ·{" "}
+                              {result.topology.repaired} repair
+                              {result.topology.pixelFallback
+                                ? " · pixel fallback"
+                                : ""}
+                            </span>
                             <br />
                           </>
                         )}

@@ -1,5 +1,6 @@
 mod alpha;
 mod coverage;
+mod planar;
 use vtracer::{ColorImage, Config, FitMode};
 use wasm_bindgen::prelude::*;
 
@@ -57,6 +58,11 @@ thread_local! { static LAST_TIMING: std::cell::Cell<[f64;5]> = const {std::cell:
 pub fn last_stage_timings() -> Vec<f64> {
     LAST_TIMING.with(|t| t.get().to_vec())
 }
+thread_local! {static LAST_TOPOLOGY:std::cell::RefCell<Vec<f64>>=const {std::cell::RefCell::new(Vec::new())};}
+#[wasm_bindgen]
+pub fn last_topology() -> Vec<f64> {
+    LAST_TOPOLOGY.with(|s| s.borrow().clone())
+}
 
 fn run_pipeline(
     config: Config,
@@ -90,17 +96,35 @@ fn run_pipeline(
         (None, 0)
     };
     let mut segmented = start;
-    let mut doc = pipeline
-        .run_with_progress(
-            prepared.as_ref().unwrap_or(&img),
-            &vtracer::CancelToken::new(),
-            &mut |p| {
-                if p.phase == vtracer::Phase::Segment && p.fraction >= 1.0 {
-                    segmented = now();
-                }
-            },
-        )
-        .map_err(|e| JsValue::from_str(&e.to_string()))?;
+    LAST_TOPOLOGY.with(|s| s.borrow_mut().clear());
+    let mut doc = if profile == "planar" {
+        let mut seg = pipeline
+            .segment(&img)
+            .map_err(|e| JsValue::from_str(&e.to_string()))?;
+        segmented = now();
+        for fitter in &pipeline.color_fitters {
+            fitter.fit(&mut seg);
+        }
+        let (doc, stats) = planar::compose(&seg).map_err(|e| JsValue::from_str(&e))?;
+        LAST_TOPOLOGY.with(|s| *s.borrow_mut() = stats.values());
+        // Absolute, pre-quantized shared coordinates. No per-face optimizer pass.
+        pipeline.writer.relative = false;
+        pipeline.writer.shorthands = false;
+        pipeline.writer.precision = Some(6);
+        doc
+    } else {
+        pipeline
+            .run_with_progress(
+                prepared.as_ref().unwrap_or(&img),
+                &vtracer::CancelToken::new(),
+                &mut |p| {
+                    if p.phase == vtracer::Phase::Segment && p.fraction >= 1.0 {
+                        segmented = now();
+                    }
+                },
+            )
+            .map_err(|e| JsValue::from_str(&e.to_string()))?
+    };
     let fitted_at = now();
     let mut evidence = coverage::Evidence::default();
     if profile.starts_with("coverage") {
@@ -117,7 +141,7 @@ fn run_pipeline(
     let refined_at = now();
     let mut svg = pipeline.writer.write(&doc);
     let exported_at = now();
-    if profile.starts_with("coverage") || profile == "alpha" {
+    if profile.starts_with("coverage") || profile == "alpha" || profile == "planar" {
         svg = alpha::apply(svg, &img).map_err(|e| JsValue::from_str(&e.to_string()))?;
     }
     LAST_TIMING.with(|t| {
@@ -159,7 +183,11 @@ pub fn trace_quality(
         .strip_prefix("coverage-clean-")
         .or_else(|| profile.strip_prefix("coverage-"))
         .unwrap_or(profile);
-    if !["adaptive", "shared", "legacy", "blend", "coverage", "alpha"].contains(&base) {
+    if ![
+        "adaptive", "shared", "legacy", "blend", "coverage", "alpha", "planar",
+    ]
+    .contains(&base)
+    {
         return Err(JsValue::from_str("Invalid quality profile"));
     }
     let mut config = Config::default();
