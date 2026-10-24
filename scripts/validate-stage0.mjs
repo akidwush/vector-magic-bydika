@@ -31,7 +31,7 @@ if (failures === 0) {
     console.error('Landing page must explicitly disclose Stage 0 placeholder state.');
     failures += 1;
   }
-  if (!readme.includes('No raster-to-vector engine') || !readme.includes('not implemented yet')) {
+  if (!readme.includes('No raster-to-vector engine') || !readme.includes('foundation only')) {
     console.error('README must say Stage 0 does not include a functional tracer.');
     failures += 1;
   }
