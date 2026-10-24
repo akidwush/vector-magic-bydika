@@ -164,6 +164,12 @@ test("fallback, failed WASM initialization, reset, mobile and invalid file", asy
     path: testInfo.outputPath("mobile.png"),
     fullPage: true,
   });
+  await page.setViewportSize({ width: 320, height: 844 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
   await page.getByRole("button", { name: "Reset", exact: true }).click();
   await expect(page.getByRole("link", { name: "Download SVG" })).toHaveCount(0);
   await page.getByLabel("Pilih gambar", { exact: true }).setInputFiles({

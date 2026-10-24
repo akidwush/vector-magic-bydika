@@ -283,6 +283,9 @@ committed. The tables here summarize actual observations, as requested.
 - Evidence: shared-edge fixture generator, metric definitions/types, screenshot tool,
   unit tests, browser topology/alpha/runtime gates and CC0 fixtures.
 - Both CI definitions, README, upstream provenance and this report.
+- Responsive select widths in src/style.css and an added 320px assertion in the
+  existing mobile E2E test: the longer profile option exposed native select overflow
+  on Chromium 156 CI. This controls layout, not vector rendering.
 
 ```bash
 npm ci
@@ -313,8 +316,17 @@ continues to be reused.
 - Quality FAIL / incomplete: universal visually seamless/smooth output at high zoom.
 - GitHub: implementation commit `1ef5afd40a1a8864747ffd85934848edecb68bde` pushed.
   Initial [CI run 40117710537](https://github.com/akidwush/vector-magic-bydika/actions/runs/40117710537)
-  failed. Local success is not claimed as remote success. Authenticated logs/PR API
-  returned Forbidden; validation log summaries are added to diagnose the failed run.
+  failed. Public annotations from
+  [40118574595](https://github.com/akidwush/vector-magic-bydika/actions/runs/40118574595)
+  confirmed all quality/topology tests passed; the existing mobile no-horizontal-scroll
+  assertion failed on Chromium 156 because the new long native select option expanded
+  the layout. The control now has bounded width, and the same test also checks 320px.
+  No test is disabled or weakened. Remote verification of that fix is pending.
+  Validation capture explicitly uses bash/pipefail, so tee cannot mask failure. The
+  logging-only success run 40118045828 is not accepted as validation evidence.
+  Authenticated logs/PR API returned Forbidden; bounded public failure annotations
+  now expose actual errors without credentials. Local browser 154 tests pass; trying
+  to download browser 156 here was blocked by the environment's CDN policy.
   Draft PR creation failed with `Post https://api.github.com/graphql: Forbidden`.
   No PR exists and main is not merged. This branch stacks on the pending Stage 1.2
   coverage branch; both need review before main. The

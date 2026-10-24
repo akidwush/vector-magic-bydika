@@ -125,6 +125,12 @@ h1 span {
   padding: 22px;
   margin-bottom: 18px;
 }
+.panel select {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
 h2 {
   font-size: 15px;
   margin: 0 0 22px;
