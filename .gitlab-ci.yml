@@ -1,22 +1,42 @@
-# Stage 0 only: honest static placeholder. Stage 1 agent MUST change this
-# job to build + publish a real Vite/Rust-WASM app.
-stages:
-  - validate
-  - deploy
-
-validate-stage0:
-  image: node:22-alpine
+# GitHub main is canonical. This pipeline needs a separately configured GitLab project.
+image: rust:1.99.1-bookworm
+stages: [validate, deploy]
+variables:
+  CARGO_HOME: "$CI_PROJECT_DIR/.cargo-cache"
+cache:
+  paths:
+    - .cargo-cache/
+    - engine/target/
+validate:
   stage: validate
+  before_script:
+    - apt-get update && apt-get install -y curl ca-certificates xz-utils
+    - curl --fail --silent --show-error https://deb.nodesource.com/setup_24.x -o /tmp/nodesource.sh
+    - bash /tmp/nodesource.sh
+    - apt-get install -y nodejs
+    - rustup target add wasm32-unknown-unknown
+    - cargo install wasm-bindgen-cli --version 0.2.126 --locked
   script:
-    - node scripts/validate-stage0.mjs
-
-deploy-pages-placeholder:
-  image: alpine:3.20
+    - npm ci
+    - npm run build:wasm
+    - npm run lint
+    - npm run typecheck
+    - npm run test
+    - npm run build
+    - npx playwright install --with-deps chromium
+    - npm run test:e2e
+  artifacts:
+    when: always
+    paths: [dist/, benchmark-results/, test-results/, playwright-report/]
+    expire_in: 7 days
+pages:
+  image: alpine:3.22
   stage: deploy
+  needs: [validate]
   script:
-    - mkdir -p public
-    - cp -R landing/. public/
-    - test -s public/index.html
-  pages: true
+    - test -s dist/index.html
+    - test -n "$(find dist -name '*.wasm' -print -quit)"
+  pages:
+    publish: dist
   rules:
-    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+    - if: "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH"

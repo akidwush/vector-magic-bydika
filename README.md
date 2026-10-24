@@ -1,41 +1,74 @@
 # NEXORA Vector Engine
 
-**Image → clean, editable SVG.** A 28-day, zero-cost-first project aiming for Vector Magic-like quality on logos, flat-color illustrations, cartoons and line art. This repository is the development home; it is **not affiliated with Vector Magic**.
+**Local image → editable SVG.** Stage 1 browser converter with VTracer Rust/WASM,
+a tested ImageTracerJS fallback, three presets, original/vector comparison and local download.
+No account, tracing API, server upload, or paid runtime. Not affiliated with Vector Magic.
+Quality equivalence is not claimed; Photo is a baseline, and clean-vector improvement is future work.
 
-> **Current status — Stage 0 (foundation only).** No raster-to-vector engine, WASM build, editor, or converter is implemented yet. Stage 1 will be developed separately by the owner's coding agent.
+## Status
 
-## Project decisions
+Local production build and Chromium workflow verified; see [Stage 1 report](docs/STAGE_01_REPORT.md)
+and [measured baseline](docs/STAGE_01_BENCHMARK.md). GitLab hosting is **not configured or deployed**.
+GitHub main remains canonical. Historical Stage 0 docs and landing/ are retained;
+landing/ is an archived placeholder and is not the application build target.
 
-- Primary upstream candidate: [VTracer](https://github.com/visioncortex/vtracer) (Rust).
-- Fallback/comparison: [ImageTracerJS](https://github.com/jankovicsandras/imagetracerjs).
-- Optional postprocessing: [SVGO](https://github.com/svg/svgo), only when proven safe.
-- Target architecture: browser-first tracing through WebAssembly/Web Workers; no paid GPU or persistent tracing API.
-- Source of truth: **GitHub `main`**. Target hosting: **GitLab Pages Free** after a separate GitLab project exists.
-- No Netlify, Vercel, Cloudflare or Supabase required.
-- Optimize **visual fidelity before speed or UI effects**; quantify claims against real fixtures.
+## Develop
 
-## Where to start
+Prerequisites: Node 24.19.0 (minimum 24.15.0 for the selected tools), Rust
+1.99.1 with wasm32-unknown-unknown, and wasm-bindgen-cli 0.2.126.
+From the repository root:
 
-1. Read [AGENTS.md](AGENTS.md) and [Stage 1 handoff](docs/STAGE_01_HANDOFF.md).
-2. Review [project charter](docs/00_PROJECT_CHARTER.md), [architecture](docs/02_ARCHITECTURE.md), [quality standards](docs/03_QUALITY_AND_TEST_PLAN.md), and [upstream research](docs/01_UPSTREAM_RESEARCH.md).
-3. For the GitLab Pages placeholder, follow [deployment instructions](docs/DEPLOY_GITLAB_PAGES.md). GitLab deployment **has not been executed**.
-4. Run `node scripts/validate-stage0.mjs` to validate the documentation and temporary landing site.
+```bash
+rustup toolchain install 1.99.1 --profile minimal --target wasm32-unknown-unknown
+cargo install wasm-bindgen-cli --version 0.2.126 --locked
+npm ci
+npm run build:wasm
+npm run dev
+```
 
-## Stage 0 preview
+Generated WASM is ignored; build it before typechecking, testing, or Vite builds.
+Browser assets (including WASM) are bundled locally; no runtime CDN is used.
+Live processes must restart after cloud snapshot restoration. Use the existing checkout;
+cloud tasks are already isolated and do not require a worktree.
 
-`landing/` contains an honest, static project-status page, **not a fake working converter**. GitLab Pages CI is prepared to publish this placeholder. In Stage 1 the coding agent should replace it with a functional browser implementation and update the Pages build job accordingly.
+## Checks and benchmark
 
-## Roadmap
+```bash
+npm run lint
+npm run typecheck
+npm run test
+npm run build
+npx playwright install --with-deps chromium
+npm run test:e2e
+```
 
-- **Week 1 (Stage 1):** real upload → trace → SVG preview → download; basic tests; browser verification.
-- **Week 2:** edge-aware segmentation, anti-aliasing handling, and quality experiments.
-- **Week 3:** Bézier optimization, corner preservation, editable paths and layering.
-- **Week 4:** controlled benchmarks, Android performance, bug fixes and public release candidate.
+If Chromium is already installed, skip the download and use
+`NEXORA_CHROMIUM_PATH=/usr/bin/chromium npm run test:e2e`.
+Browser tests serve actual dist/ at `/nexora/` to verify project-subpath JS/worker/WASM
+loading. They exercise real engines, download, mobile layout, cancellation, malformed
+files, consented downscaling and resource cleanup. They produce screenshots, SVG exports
+and raw benchmark observations in ignored test-results/ and benchmark-results/.
+CI retains these artifacts. `node scripts/fixtures.mjs` regenerates the self-authored fixtures.
 
-See [full roadmap](docs/04_ROADMAP.md).
+## Limits and architecture
 
-## Licensing
+PNG/JPEG/WebP, maximum 10 MiB and 16 MP source. Tracing is capped at 2 MP; larger
+sources require explicit downscaling consent. Original bitmap can occupy ~64 MB,
+tracing RGBA ~8 MB; engine memory is additional and not a guaranteed mobile peak limit.
+All heavy tracing runs in a disposable worker. Cancel terminates that worker.
+SVG must pass structural/security validation before preview and download.
 
-This new repository currently has **no project-wide license selected**. The owner must choose one before public code reuse is permitted. Imported third-party source and distributed dependencies must retain their respective upstream licensing and attribution; review this before shipping. Branding must not suggest ownership of Vector Magic.
+Three presets map to real engine settings; mappings, fallback behavior, provenance,
+alpha limitations and decisions are in [implementation notes](docs/STAGE_01_IMPLEMENTATION_NOTES.md).
+Android-size viewport tests are emulation, **not physical Android-device tests**.
+No Inkscape verification or Vector Magic comparative benchmark has been performed.
 
-**Maintainer:** repository owner `akidwush`.
+## Hosting and licenses
+
+[GitLab Pages instructions](docs/DEPLOY_GITLAB_PAGES.md) describe the prepared free static
+pipeline. A GitLab project/access is required for an actual deployment; no production URL exists yet.
+The GitHub and GitLab pipelines build WASM, run checks and publish evidence.
+
+The owner has not selected a license for original NEXORA code. Third-party licenses
+remain intact; see [upstream lock](docs/UPSTREAM_LOCKFILE.md) and THIRD_PARTY_NOTICES.txt,
+which is included in the build. Fixture artwork is separately dedicated to CC0-1.0.

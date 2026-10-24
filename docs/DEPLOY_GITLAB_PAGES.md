@@ -1,28 +1,23 @@
-# GitLab Pages (Free) deployment — Stage 0 and Stage 1
+# GitLab Pages deployment — prepared, not deployed
 
-This repository currently lives on GitHub. A GitLab Pages site **does not exist yet**. GitLab Pages is a static host; actual browser processing must run locally.
+GitHub main is the canonical source. GitLab is only a static deployment destination.
+No GitLab project or authenticated account was available during implementation.
 
-## Stage 0 placeholder
-1. Create a GitLab Free account and a blank **GitLab project** (private or public as desired).
-2. Push/import the **GitHub Stage 0 contents** to that GitLab project. Initial import is not a promise of ongoing sync.
-3. GitLab CI reads `.gitlab-ci.yml`, runs `node scripts/validate-stage0.mjs`, copies `landing/` to `public/`, and publishes via `pages: true`.
-4. Check **Build > Pipelines** and **Deploy > Pages** for the actual project URL. Do not assume a URL format or claim it is deployed before checking.
-5. The published HTML is explicitly a placeholder, **not** a converter.
+1. Create/import a GitLab project from the GitHub repository using your account.
+   Keep a single upstream history; do not develop a separate implementation there.
+2. Enable CI and ensure free shared runner quota is available for Rust compilation
+   and Chromium tests. Configure one-way synchronization outside browser code if desired;
+   credentials belong only in protected provider settings, never source or chat.
+3. Run the supplied .gitlab-ci.yml on the default branch. Its validation job installs
+   Node 24 and pinned Rust/WASM tools, runs frozen installs, checks, build and real browser tests.
+   Pages publishes dist/ only after validation succeeds. Pipeline artifacts include evidence.
+4. Verify the actual Pages URL supplied by GitLab. Vite uses relative base './'; test
+   coverage serves the build under /nexora/. Check JS, CSS, worker imports and .wasm
+   return 200, with application/wasm for WASM, on the actual host.
+5. Perform upload → trace → comparison → download on the live URL. Check there are
+   no console/network errors or outgoing image requests before reporting deployment verified.
 
-GitLab docs: https://docs.gitlab.com/ci/yaml/#pages
-
-## Keep GitHub canonical
-- For now, owner manually pushes/imports GitHub changes into GitLab (or configures a proper, authenticated one-way sync later).
-- No automatic GitHub→GitLab mirroring has been configured by Stage 0.
-- If configuring a future GitHub Action mirror, store a narrowly scoped GitLab token in GitHub Actions secrets, never source files; use normal fast-forward pushes and fail safely on divergence.
-
-## Stage 1 migration
-- Agent replaces the temporary CI copy operation with build commands appropriate for Vite:
-  `npm ci`, validation/test, and `npm run build`.
-- Publish the resulting `dist/` folder using GitLab's `pages.publish` or copy it into `public/` then use `pages: true`.
-- Configure the bundler base path for the **actual GitLab Pages URL** (project path vs unique domain/custom domain).
-- Confirm real URLs for bundled `.wasm` assets, proper MIME, relative asset routing and Android/browser runtime execution.
-- Recheck CI quota and current Free terms before running frequent builds.
-
-## Budget guardrail
-No billing data, paid compute, deployment secrets in committed files, or background server. GitLab account and deployment require separate owner action.
+Local `npm run build` emits the real application plus WASM and redistribution notices.
+No server, COOP/COEP headers, external tracing API, or paid host is required.
+The existing pipeline uses Pages `publish: dist`, not the historical landing/ copy.
+GitLab pipeline syntax and live hosting have not been verified against a configured GitLab project.

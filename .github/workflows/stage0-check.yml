@@ -1,18 +1,37 @@
-name: Stage 0 validation
-
+name: NEXORA Stage 1
 on:
   push:
     branches: [main]
   pull_request:
-
 jobs:
-  stage0:
-    name: Validate bootstrap documents and site
+  validate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
-      - name: Check Stage 0
-        run: node scripts/validate-stage0.mjs
+          node-version: "24"
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.99.1"
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: engine
+      - run: cargo install wasm-bindgen-cli --version 0.2.126 --locked
+      - run: npm ci
+      - run: npm run build:wasm
+      - run: npm run lint && npm run typecheck && npm run test
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: stage-01-evidence
+          path: |
+            benchmark-results/
+            test-results/
+            playwright-report/
+            dist/
