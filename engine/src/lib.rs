@@ -1,6 +1,11 @@
 mod alpha;
+mod corners;
 mod coverage;
 mod planar;
+#[wasm_bindgen]
+pub fn last_corner_evidence() -> Vec<f64> {
+    corners::evidence()
+}
 use vtracer::{ColorImage, Config, FitMode};
 use wasm_bindgen::prelude::*;
 
@@ -97,7 +102,8 @@ fn run_pipeline(
     };
     let mut segmented = start;
     LAST_TOPOLOGY.with(|s| s.borrow_mut().clear());
-    let mut doc = if profile == "planar" {
+    corners::reset();
+    let mut doc = if profile == "planar" || profile == "intelligent" {
         let mut seg = pipeline
             .segment(&img)
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
@@ -105,7 +111,8 @@ fn run_pipeline(
         for fitter in &pipeline.color_fitters {
             fitter.fit(&mut seg);
         }
-        let (doc, stats) = planar::compose(&seg).map_err(|e| JsValue::from_str(&e))?;
+        let (doc, stats) = planar::compose_mode(&seg, profile == "intelligent", Some(&img))
+            .map_err(|e| JsValue::from_str(&e))?;
         LAST_TOPOLOGY.with(|s| *s.borrow_mut() = stats.values());
         // Absolute, pre-quantized shared coordinates. No per-face optimizer pass.
         pipeline.writer.relative = false;
@@ -141,7 +148,11 @@ fn run_pipeline(
     let refined_at = now();
     let mut svg = pipeline.writer.write(&doc);
     let exported_at = now();
-    if profile.starts_with("coverage") || profile == "alpha" || profile == "planar" {
+    if profile.starts_with("coverage")
+        || profile == "alpha"
+        || profile == "planar"
+        || profile == "intelligent"
+    {
         svg = alpha::apply(svg, &img).map_err(|e| JsValue::from_str(&e.to_string()))?;
     }
     LAST_TIMING.with(|t| {
@@ -184,7 +195,14 @@ pub fn trace_quality(
         .or_else(|| profile.strip_prefix("coverage-"))
         .unwrap_or(profile);
     if ![
-        "adaptive", "shared", "legacy", "blend", "coverage", "alpha", "planar",
+        "adaptive",
+        "shared",
+        "legacy",
+        "blend",
+        "coverage",
+        "alpha",
+        "planar",
+        "intelligent",
     ]
     .contains(&base)
     {

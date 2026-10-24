@@ -25,7 +25,10 @@ export async function createEngine(
               (input.quality ?? "auto") === "auto" &&
               preset !== "photo" &&
               diagnostics.dominantCoverage >= 0.85;
-            const alphaSupported = refine || baseProfile === "planar";
+            const alphaSupported =
+              refine ||
+              baseProfile === "planar" ||
+              baseProfile === "intelligent";
             const profile = refine ? `coverage-${baseProfile}` : baseProfile;
             const transitions =
               preset === "photo" ? undefined : analyzeTransitions(input);
@@ -63,6 +66,7 @@ export async function createEngine(
                 srgb: wasm.last_coverage_evidence()[2],
                 linear: wasm.last_coverage_evidence()[3],
               },
+              corners: Array.from(wasm.last_corner_evidence()),
               topology: topologyData.length
                 ? {
                     vertices: topologyData[0],
@@ -77,6 +81,7 @@ export async function createEngine(
                     maxDrift: topologyData[9],
                     pixelFallback: !!topologyData[10],
                     validationBudgetFallback: !!topologyData[11],
+                    adaptiveRollback: !!topologyData[12],
                   }
                 : undefined,
               stages: {

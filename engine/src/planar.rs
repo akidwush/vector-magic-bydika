@@ -23,6 +23,7 @@ pub struct Stats {
     pub max_drift: f64,
     pub pixel_fallback: bool,
     pub validation_budget_fallback: bool,
+    pub adaptive_rollback: bool,
 }
 impl Stats {
     pub fn values(&self) -> Vec<f64> {
@@ -39,6 +40,7 @@ impl Stats {
             self.max_drift,
             self.pixel_fallback as u8 as f64,
             self.validation_budget_fallback as u8 as f64,
+            self.adaptive_rollback as u8 as f64,
         ]
     }
 }
@@ -444,13 +446,37 @@ fn constrained(
     }
 }
 
-pub fn compose(seg: &Segmentation) -> Result<(VectorDoc, Stats), String> {
-    let mut map = LabelMap::from_segmentation(seg);
-    // Merge only identical paints; never erase a real color to hide a seam.
-    map.merge_similar(0);
-    compose_map(&map)
-}
+#[cfg(test)]
 fn compose_map(map: &LabelMap) -> Result<(VectorDoc, Stats), String> {
+    compose_map_mode(map, false, None)
+}
+fn rollback(
+    map: &LabelMap,
+    img: Option<&vtracer::ColorImage>,
+) -> Result<(VectorDoc, Stats), String> {
+    let records = crate::corners::evidence();
+    let result = compose_map_mode(map, false, img);
+    crate::corners::restore(records);
+    result.map(|(d, mut s)| {
+        s.adaptive_rollback = true;
+        (d, s)
+    })
+}
+pub fn compose_mode(
+    seg: &Segmentation,
+    adaptive: bool,
+    img: Option<&vtracer::ColorImage>,
+) -> Result<(VectorDoc, Stats), String> {
+    let mut map = LabelMap::from_segmentation(seg);
+    map.merge_similar(0);
+    compose_map_mode(&map, adaptive, img)
+}
+fn compose_map_mode(
+    map: &LabelMap,
+    adaptive: bool,
+    img: Option<&vtracer::ColorImage>,
+) -> Result<(VectorDoc, Stats), String> {
+    crate::corners::reset();
     // Preflight before allocating graph/fitting. Source cap remains 2MP.
     let mut cracks = 0usize;
     for y in 0..map.height as i32 {
@@ -523,10 +549,19 @@ fn compose_map(map: &LabelMap) -> Result<(VectorDoc, Stats), String> {
         }
     };
     let mut fitted = Vec::new();
-    for s in &graph.segments {
-        let mut f = fit(s, &spline);
+    for (edge, s) in graph.segments.iter().enumerate() {
+        let mut f = if adaptive {
+            crate::corners::fit(s, edge, img)
+                .map(|geom| FittedSegment { geom })
+                .unwrap_or_else(|| fit(s, &spline))
+        } else {
+            fit(s, &spline)
+        };
         quantize(&mut f.geom);
         if drift(s, &f.geom, map.width, map.height).is_none() {
+            if adaptive {
+                return rollback(map, img);
+            }
             stats.repaired += 1;
             f = constrained(s, &spline, map.width, map.height, 0, Some(f));
         }
@@ -536,6 +571,9 @@ fn compose_map(map: &LabelMap) -> Result<(VectorDoc, Stats), String> {
         match collisions(&graph, &fitted) {
             Ok(bad) if bad.is_empty() => break,
             result => {
+                if adaptive {
+                    return rollback(map, img);
+                }
                 if attempt == 0 {
                     stats.crossings_before = result.as_ref().map_or(0, |b| b.len())
                 }

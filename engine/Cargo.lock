@@ -89,6 +89,7 @@ dependencies = [
 name = "nexora-wasm"
 version = "0.1.0"
 dependencies = [
+ "flo_curves 0.8.0",
  "vtracer",
  "wasm-bindgen",
 ]

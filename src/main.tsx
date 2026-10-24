@@ -15,7 +15,7 @@ function App() {
   const [preset, setPreset] = useState<Preset>("illustration"),
     [preferred, setPreferred] = useState<"auto" | "fallback">("auto");
   const [quality, setQuality] = useState<
-    "auto" | "legacy" | "shared" | "previous" | "planar"
+    "auto" | "legacy" | "shared" | "previous" | "planar" | "intelligent"
   >("auto");
   const [result, setResult] = useState<
       TraceResult & {
@@ -260,6 +260,7 @@ function App() {
                   <option value="auto">Otomatis · coverage</option>
                   <option value="previous">Baseline sebelum subpixel</option>
                   <option value="legacy">Baseline Stage 1.1</option>
+                  <option value="intelligent">Corner & Bézier · uji</option>
                   <option value="planar">
                     Shared edge · locked graph (eksperimental)
                   </option>
@@ -438,6 +439,7 @@ function App() {
                   profile: result.profile,
                   coverage: result.coverage,
                   topology: result.topology,
+                  corners: result.corners,
                   transitions: result.transitions,
                   diagnostics: result.diagnostics,
                 })}
