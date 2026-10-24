@@ -284,8 +284,18 @@ Actual local/generated artifacts (ignored by Git and reproduced/archived by CI):
 
 Both CI pipelines now run the six native Rust math/budget tests as well as the
 TypeScript/browser suites and generate the new comparison screenshots. GitHub push
-CI is enabled on this working branch. Remote CI/PR creation depends on GitHub access;
-local passing checks are never reported as an observed remote CI pass.
+CI is enabled on this working branch. GitHub Actions run
+[40110493700](https://github.com/akidwush/vector-magic-bydika/actions/runs/40110493700)
+completed **SUCCESS** in 1m31s for implementation commit
+`9d8377ee5c19e31239a7c80810c6dbeed39c4667`. This status was read from GitHub's public
+Actions page, not inferred from local checks. GitLab execution is not verified.
+
+The branch was pushed successfully. Draft PR creation with `gh pr create` failed
+because GitHub's GraphQL endpoint returned **Forbidden** in this environment.
+No PR was created and no merge occurred. The
+[PR creation link](https://github.com/akidwush/vector-magic-bydika/pull/new/feat/stage-1-2-subpixel-coverage)
+opens the pushed branch for review; it is not an existing PR. Independent review
+remains pending before any merge to main.
 
 Files changed: project Rust coverage/alpha modules and binding, TypeScript diagnostics/
 adapter/result metadata, tightly constrained SVG-mask validator, fixtures/provenance,
@@ -293,12 +303,13 @@ unit/real-browser regression gates, screenshot/research tools, CI and this repor
 Vendor tracing algorithms, dependencies and original user files remain untouched.
 Self-review checked displacement/corner bounds, color-space ordering, original-data
 ownership, local-reference SVG safety, alpha complexity limits and unchanged worker
-cancellation/privacy. Independent review and CI verification are required before merge.
+cancellation/privacy. Independent review is required before merge.
 
 ## Acceptance accounting
 
 - PASS locally: 6 Rust tests, 30 TypeScript tests, 10 real-browser tests; lint,
   typecheck and production WASM/static build.
+- PASS remotely: GitHub Actions run 40110493700 for implementation commit 9d8377e.
 - PASS: specified partial-alpha 128px fixture >=.980, independently rasterized and
   checked in Chromium; no threshold reduction. 512/1024 prior gates retained.
 - PASS: true editable vector geometry, opacity-aware masks, intentional pink retention,
@@ -306,5 +317,6 @@ cancellation/privacy. Independent review and CI verification are required before
 - PASS with measured tradeoffs: current regression corpus and original benchmark suite;
   residual ambiguity and small numerical regressions are shown above.
 - NOT VERIFIED: physical Android, total peak memory, exact owner's source/SVG,
-  remote CI outcome and vector-editor compatibility.
-- PENDING: branch review/PR and merge; main is intentionally unchanged.
+  GitLab execution and vector-editor compatibility.
+- PENDING: independent branch review/PR and merge; main is intentionally unchanged.
+  Automatic PR creation is blocked by the GitHub API Forbidden response.
