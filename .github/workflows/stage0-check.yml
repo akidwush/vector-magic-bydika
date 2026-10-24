@@ -21,16 +21,27 @@ jobs:
           workspaces: engine
       - run: cargo install wasm-bindgen-cli --version 0.2.126 --locked
       - run: npm ci
-      - run: npm run build:wasm
-      - run: cargo test --manifest-path engine/Cargo.toml --locked
-      - run: cargo test --manifest-path engine/Cargo.toml --locked -p vtracer --lib
-      - run: npm run lint && npm run typecheck && npm run test
-      - run: npm run build
+      - run: npm run build:wasm 2>&1 | tee -a "$RUNNER_TEMP/nexora-validation.log"
+      - run: cargo test --manifest-path engine/Cargo.toml --locked 2>&1 | tee -a "$RUNNER_TEMP/nexora-validation.log"
+      - run: cargo test --manifest-path engine/Cargo.toml --locked -p vtracer --lib 2>&1 | tee -a "$RUNNER_TEMP/nexora-validation.log"
+      - run: (npm run lint && npm run typecheck && npm run test) 2>&1 | tee -a "$RUNNER_TEMP/nexora-validation.log"
+      - run: npm run build 2>&1 | tee -a "$RUNNER_TEMP/nexora-validation.log"
       - run: npx playwright install --with-deps chromium
-      - run: npm run test:e2e
-      - run: node scripts/stage12-screenshots.mjs
-      - run: node scripts/coverage-screenshots.mjs
-      - run: node scripts/shared-edge-screenshots.mjs
+      - run: npm run test:e2e 2>&1 | tee -a "$RUNNER_TEMP/nexora-validation.log"
+      - run: node scripts/stage12-screenshots.mjs 2>&1 | tee -a "$RUNNER_TEMP/nexora-validation.log"
+      - run: node scripts/coverage-screenshots.mjs 2>&1 | tee -a "$RUNNER_TEMP/nexora-validation.log"
+      - run: node scripts/shared-edge-screenshots.mjs 2>&1 | tee -a "$RUNNER_TEMP/nexora-validation.log"
+      - name: Publish failed validation details
+        if: failure()
+        run: |
+          python3 - <<'PYCODE'
+          import os
+          from pathlib import Path
+          log = Path(os.environ['RUNNER_TEMP']) / 'nexora-validation.log'
+          lines = log.read_text(errors='replace').splitlines()[-250:] if log.exists() else ['Failure occurred before validation logging.']
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
+              summary.write('## Failed validation output\n\n```text\n' + '\n'.join(lines) + '\n```\n')
+          PYCODE
       - uses: actions/upload-artifact@v4
         if: always()
         with:

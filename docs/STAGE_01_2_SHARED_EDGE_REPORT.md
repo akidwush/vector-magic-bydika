@@ -311,7 +311,15 @@ continues to be reused.
 - Quality PASS: exact shared geometry and sampled geometric partition gates on the
   ten-source corpus; feature and partial-alpha gates retained.
 - Quality FAIL / incomplete: universal visually seamless/smooth output at high zoom.
-- GitHub: working branch prepared; push, remote CI and draft PR status pending below.
+- GitHub: implementation commit `1ef5afd40a1a8864747ffd85934848edecb68bde` pushed.
+  Initial [CI run 40117710537](https://github.com/akidwush/vector-magic-bydika/actions/runs/40117710537)
+  failed. Local success is not claimed as remote success. Authenticated logs/PR API
+  returned Forbidden; validation log summaries are added to diagnose the failed run.
+  Draft PR creation failed with `Post https://api.github.com/graphql: Forbidden`.
+  No PR exists and main is not merged. This branch stacks on the pending Stage 1.2
+  coverage branch; both need review before main. The
+  [PR creation link](https://github.com/akidwush/vector-magic-bydika/compare/feat/stage-1-2-subpixel-coverage...feat/stage-1-2b-locked-shared-edges?expand=1)
+  is a comparison/creation page, not an existing PR.
   GitLab execution and physical Android remain NOT VERIFIED.
 
 Implementation includes self-review of edge ownership, oriented reverse serialization,
