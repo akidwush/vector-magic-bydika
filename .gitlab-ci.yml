@@ -1,0 +1,22 @@
+# Stage 0 only: honest static placeholder. Stage 1 agent MUST change this
+# job to build + publish a real Vite/Rust-WASM app.
+stages:
+  - validate
+  - deploy
+
+validate-stage0:
+  image: node:22-alpine
+  stage: validate
+  script:
+    - node scripts/validate-stage0.mjs
+
+deploy-pages-placeholder:
+  image: alpine:3.20
+  stage: deploy
+  script:
+    - mkdir -p public
+    - cp -R landing/. public/
+    - test -s public/index.html
+  pages: true
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'

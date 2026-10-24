@@ -1,0 +1,15 @@
+# Future TypeScript/Vite and Rust/WASM build outputs
+node_modules/
+dist/
+public/
+target/
+pkg/
+.wasm-pack/
+coverage/
+playwright-report/
+test-results/
+*.log
+.env
+.env.*
+!.env.example
+.DS_Store

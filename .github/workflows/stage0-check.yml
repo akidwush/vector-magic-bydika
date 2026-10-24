@@ -1,0 +1,18 @@
+name: Stage 0 validation
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  stage0:
+    name: Validate bootstrap documents and site
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check Stage 0
+        run: node scripts/validate-stage0.mjs
