@@ -1,0 +1,95 @@
+import type { TraceInput } from "./types";
+export interface TransitionEvidence {
+  sampled: number;
+  interior: number;
+  twoColorEdges: number;
+  thirdOrAmbiguous: number;
+  compressionResidual: number;
+  partialAlpha: number;
+  directionRejected: number;
+}
+/** Local evidence only; does not declare that a particular hue is antialiasing. */
+export function analyzeTransitions({
+  rgba,
+  width,
+  height,
+  sourceFormat,
+}: TraceInput): TransitionEvidence {
+  const result = {
+    sampled: 0,
+    interior: 0,
+    twoColorEdges: 0,
+    thirdOrAmbiguous: 0,
+    compressionResidual: 0,
+    partialAlpha: 0,
+    directionRejected: 0,
+  };
+  const step = Math.max(1, Math.ceil(Math.sqrt((width * height) / 8192)));
+  const color = (x: number, y: number) => {
+    const i = (y * width + x) * 4;
+    return [rgba[i], rgba[i + 1], rgba[i + 2]];
+  };
+  const dist = (a: number[], b: number[]) =>
+    Math.hypot(...a.map((v, k) => v - b[k]));
+  for (let y = 3; y < height - 3; y += step)
+    for (let x = 3; x < width - 3; x += step) {
+      result.sampled++;
+      const alpha = rgba[(y * width + x) * 4 + 3];
+      if (alpha > 0 && alpha < 255) {
+        result.partialAlpha++;
+        continue;
+      }
+      if (!alpha) continue;
+      const c = color(x, y),
+        neighbors = [
+          color(x - 1, y),
+          color(x + 1, y),
+          color(x, y - 1),
+          color(x, y + 1),
+        ];
+      if (neighbors.every((p) => dist(c, p) < 6)) {
+        result.interior++;
+        continue;
+      }
+      const horizontal =
+        dist(color(x - 2, y), color(x + 2, y)) >=
+        dist(color(x, y - 2), color(x, y + 2));
+      const axis = (s: number, t: number) =>
+        horizontal ? color(x + s, y + t) : color(x + t, y + s);
+      const a = axis(-2, 0),
+        b = axis(2, 0),
+        d = a.map((v, k) => v - b[k]),
+        norm = d.reduce((s, v) => s + v * v, 0);
+      if (
+        norm < 32 ** 2 ||
+        [-1, 1].some(
+          (t) => dist(axis(-2, t), a) > 12 || dist(axis(2, t), b) > 12,
+        )
+      ) {
+        result.thirdOrAmbiguous++;
+        continue;
+      }
+      const coverage = (p: number[]) =>
+        p.reduce((s, v, k) => s + (v - b[k]) * d[k], 0) / norm;
+      const t = coverage(c),
+        residual = dist(
+          c,
+          b.map((v, k) => v + t * d[k]),
+        );
+      const directional = [-1, 0, 1].map(
+        (offset) => coverage(axis(1, offset)) - coverage(axis(-1, offset)),
+      );
+      if (directional.some((v) => v > -0.1)) {
+        result.directionRejected++;
+        continue;
+      }
+      if (t > 0.05 && t < 0.95 && residual < 10) {
+        result.twoColorEdges++;
+      } else {
+        result.thirdOrAmbiguous++;
+        if (/jpeg|webp/.test(sourceFormat ?? "") && residual >= 10)
+          result.compressionResidual++;
+      }
+    }
+  return result;
+}

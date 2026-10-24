@@ -8,10 +8,15 @@ Quality equivalence is not claimed; Photo is a baseline, and clean-vector improv
 ## Stage 1.2 — contour quality and worker startup
 
 [Issue #2 evidence, measurements and remaining failures](docs/STAGE_01_2_REPORT.md).
+Stage 1.2 adds bounded local coverage fitting to upstream contours.
+It compares encoded-sRGB and linear-light hypotheses and preserves ambiguous regions.
+Partial-alpha flat art uses editable vector opacity contours (quantized, not exact
+continuous alpha); Photo/fallback limitations remain explicit.
 The default contour policy uses upstream spline fitting on disk-like components;
 blended opaque flat art uses shared boundaries. Baseline Stage 1.1 remains selectable.
 Diagnostics show heuristic input class, alpha coverage, effective profile and stage times.
-Partial-alpha fidelity remains **unsupported**, with a visible warning; it is not fixed.
+The 128px partial-alpha regression now requires IoU >=0.980 in both browser and
+independent rendering. Continuous-alpha fidelity is still not guaranteed.
 Workers are reused between completed jobs and released on cancel/reset/unmount or
 30 seconds idle. Images remain local and each click performs one trace.
 No Android-device speed or full Vector Magic parity is claimed.
@@ -93,3 +98,14 @@ The GitHub and GitLab pipelines build WASM, run checks and publish evidence.
 The owner has not selected a license for original NEXORA code. Third-party licenses
 remain intact; see [upstream lock](docs/UPSTREAM_LOCKFILE.md) and THIRD_PARTY_NOTICES.txt,
 which is included in the build. Fixture artwork is separately dedicated to CC0-1.0.
+
+### Stage 1.2B: locked shared edges
+
+Select **Shared edge · locked graph (eksperimental)** to use the validated upstream
+Mosaic graph route. Each internal boundary is fitted/quantized once and reused in
+reverse by its neighbor. Auto retains Stage 1.2 routing. Real geometric cracks are
+removed on the test corpus, but SVG antialias hairlines and some pixel fallbacks
+remain; this is not a universal visual-gapless claim.
+
+See [the shared-edge report](docs/STAGE_01_2_SHARED_EDGE_REPORT.md) for geometry,
+renderer, feature and runtime comparisons at 100%, 400% and 1000%.

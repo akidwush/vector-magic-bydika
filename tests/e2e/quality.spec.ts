@@ -27,9 +27,10 @@ test("clean cat pixel gates across scale and alpha; no cosmetic strokes", async 
       expect(m.earsConnected).toBe(true);
       expect(m.maxHole).toBeLessThanOrEqual(2);
       expect(m.details).toEqual([true, true, true]);
-      expect((svg.match(/<path/g) || []).length).toBeLessThanOrEqual(12);
-      // Partial alpha is explicitly tracked as a remaining limitation, not certified .98.
-      if (alpha !== "partial") expect(m.iou).toBeGreaterThanOrEqual(0.98);
+      expect((svg.match(/<path/g) || []).length).toBeLessThanOrEqual(
+        alpha === "partial" ? 24 : 12,
+      );
+      expect(m.iou).toBeGreaterThanOrEqual(0.98);
       await info.attach(`cat-${size}-${alpha}-metrics`, {
         body: JSON.stringify(m),
         contentType: "application/json",

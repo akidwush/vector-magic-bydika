@@ -15,11 +15,11 @@
 //! pixel corners. Only fitting (stage 3) is floating point.
 
 mod compose;
-mod face;
+pub mod face;
 mod fit;
 mod graph;
 
-pub use compose::compose_mosaic;
+pub use compose::{compose_mosaic, compose_fitted};
 pub use fit::{
     FittedGeom, FittedSegment, PixelSegmentFitter, PolygonSegmentFitter, SegmentFitter,
     SplineSegmentFitter,

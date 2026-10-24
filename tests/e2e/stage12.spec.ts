@@ -72,11 +72,11 @@ test("production profiles improve eyes and blended boundaries; worker stays warm
       expect(actual.symmetricContourDistance).toBeLessThan(
         base.symmetricContourDistance,
       );
-      expect(actual.perf.profile).toBe("blend");
+      expect(actual.perf.profile).toBe("coverage-blend");
       expect(Math.min(...actual.eyeIoU!)).toBeGreaterThan(0.9);
     }
     if (name.includes("openmoji"))
-      await expect(page.locator(".result")).toContainText("BELUM DIDUKUNG");
+      await expect(page.locator(".result")).toContainText("mask kontur vektor");
     if (name.includes("openmoji")) {
       await page.getByLabel("Profil kontur").selectOption("shared");
       await page.getByRole("button", { name: "Konversi ke SVG" }).click();

@@ -1,5 +1,7 @@
 const elements = new Set([
   "svg",
+  "defs",
+  "mask",
   "g",
   "path",
   "rect",
@@ -42,6 +44,8 @@ const attributes = new Set([
   "ry",
   "points",
   "id",
+  "mask",
+  "maskUnits",
 ]);
 export function validateSvg(svg: string) {
   if (svg.length > 32 * 1024 * 1024 || /<!DOCTYPE|<!ENTITY/i.test(svg))
@@ -57,12 +61,20 @@ export function validateSvg(svg: string) {
   for (const el of Array.from(root.querySelectorAll("*")).concat(root)) {
     if (!elements.has(el.localName) || el.namespaceURI !== root.namespaceURI)
       throw new Error("SVG berisi elemen tidak aman.");
-    for (const attr of Array.from(el.attributes))
-      if (
+    for (const attr of Array.from(el.attributes)) {
+      if (attr.name === "mask") {
+        if (
+          el.localName !== "g" ||
+          el.closest("defs") ||
+          !/^url\(#[A-Za-z][\w.-]*\)$/.test(attr.value)
+        )
+          throw new Error("Referensi mask tidak aman.");
+      } else if (
         !attributes.has(attr.name) ||
         /url\s*\(|javascript:|data:|[<>]/i.test(attr.value)
       )
         throw new Error("SVG berisi atribut tidak aman.");
+    }
   }
   const width = Number(root.getAttribute("width")),
     height = Number(root.getAttribute("height"));
@@ -84,9 +96,37 @@ export function validateSvg(svg: string) {
     )
       throw new Error("viewBox tidak valid.");
   } else root.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  const masks = Array.from(root.querySelectorAll("mask"));
+  if (masks.length > 1 || root.querySelectorAll("defs").length > 1)
+    throw new Error("Terlalu banyak mask.");
+  const ids = new Set<string>();
+  for (const el of Array.from(root.querySelectorAll("[id]")).concat(
+    root.hasAttribute("id") ? [root] : [],
+  )) {
+    const id = el.getAttribute("id")!;
+    if (ids.has(id)) throw new Error("ID SVG duplikat.");
+    ids.add(id);
+  }
+  for (const mask of masks) {
+    if (
+      mask.parentElement?.localName !== "defs" ||
+      mask.parentElement.parentElement !== root ||
+      mask.getAttribute("maskUnits") !== "userSpaceOnUse" ||
+      Number(mask.getAttribute("x")) !== 0 ||
+      Number(mask.getAttribute("y")) !== 0 ||
+      Number(mask.getAttribute("width")) !== width ||
+      Number(mask.getAttribute("height")) !== height
+    )
+      throw new Error("Batas mask tidak valid.");
+  }
+  for (const el of Array.from(root.querySelectorAll("[mask]"))) {
+    const id = el.getAttribute("mask")!.slice(5, -1);
+    if (!masks.some((m) => m.id === id))
+      throw new Error("Mask tidak ditemukan.");
+  }
   const geometry = Array.from(
     root.querySelectorAll("path,rect,circle,ellipse,polygon,polyline,line"),
-  );
+  ).filter((el) => !el.closest("defs"));
   if (
     !geometry.length ||
     !geometry.some(

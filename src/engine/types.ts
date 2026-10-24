@@ -2,7 +2,7 @@ export type Preset = "logo" | "illustration" | "photo";
 export type EngineId = "vtracer-wasm" | "imagetracerjs";
 export interface TraceInput {
   sourceFormat?: string;
-  quality?: "auto" | "legacy" | "shared";
+  quality?: "auto" | "legacy" | "shared" | "previous" | "planar";
   rgba: Uint8ClampedArray;
   width: number;
   height: number;
@@ -13,10 +13,34 @@ export interface TraceResult {
   elapsedMs: number;
   timings?: { startupMs: number; workerTotalMs: number; warm: boolean };
   effectivePrecision?: number;
+  topology?: {
+    vertices: number;
+    edges: number;
+    faces: number;
+    shared: number;
+    contours: number;
+    incidenceErrors: number;
+    repaired: number;
+    crossingsBefore: number;
+    crossingsAfter: number;
+    maxDrift: number;
+    pixelFallback: boolean;
+    validationBudgetFallback: boolean;
+  };
+  coverage?: {
+    accepted: number;
+    rejected: number;
+    srgb: number;
+    linear: number;
+  };
+  transitions?: import("./transitions").TransitionEvidence;
   stages?: {
     segmentationMs: number;
     postprocessMs: number;
     diagnosticsMs: number;
+    refinementMs?: number;
+    alphaMs?: number;
+    exportMs?: number;
     wasmLinearBytes?: number;
   };
   diagnostics?: import("./diagnostics").InputDiagnostics;
@@ -25,7 +49,7 @@ export interface TraceResult {
   capabilities: {
     wasm: boolean;
     cancellation: "terminate-worker";
-    partialAlpha: "not-guaranteed" | "unsupported";
+    partialAlpha: "not-guaranteed" | "unsupported" | "quantized-vector";
   };
   preset: Preset;
   warning?: string;
