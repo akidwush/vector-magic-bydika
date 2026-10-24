@@ -1,7 +1,7 @@
 name: NEXORA Stage 1
 on:
   push:
-    branches: [main]
+    branches: [main, feat/stage-1-2-subpixel-coverage]
   pull_request:
 jobs:
   validate:
@@ -22,11 +22,13 @@ jobs:
       - run: cargo install wasm-bindgen-cli --version 0.2.126 --locked
       - run: npm ci
       - run: npm run build:wasm
+      - run: cargo test --manifest-path engine/Cargo.toml --locked
       - run: npm run lint && npm run typecheck && npm run test
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
       - run: node scripts/stage12-screenshots.mjs
+      - run: node scripts/coverage-screenshots.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:

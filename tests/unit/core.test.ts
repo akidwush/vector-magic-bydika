@@ -122,3 +122,20 @@ describe("worker lifecycle", () => {
     expect(workers[1].terminate).toHaveBeenCalled();
   });
 });
+describe("local vector opacity masks", () => {
+  const mask =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="10"><defs><mask id="alpha" maskUnits="userSpaceOnUse" x="0" y="0" width="20" height="10"><path fill="#FFFFFF" d="M0 0L20 0L20 10Z"/></mask></defs><g mask="url(#alpha)"><path d="M0 0L20 10Z"/></g></svg>';
+  it("permits bounded inert masks with real visible geometry", () =>
+    expect(validateSvg(mask).pathCount).toBe(2));
+  it.each([
+    mask.replace("url(#alpha)", "url(https://bad/mask)"),
+    mask.replace("url(#alpha)", "url(#missing)"),
+    mask
+      .replace("<path fill=", '<g mask="url(#alpha)"><path fill=')
+      .replace("</mask>", "</g></mask>"),
+    mask.replace('maskUnits="userSpaceOnUse"', 'maskUnits="objectBoundingBox"'),
+    mask.replace("</g></svg>", '</g><g id="alpha"/></svg>'),
+  ])("rejects external, cyclic, invalid or duplicate mask references", (svg) =>
+    expect(() => validateSvg(svg)).toThrow(),
+  );
+});

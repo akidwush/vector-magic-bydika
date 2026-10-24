@@ -15,3 +15,5 @@ test-results/
 .DS_Store
 src/engine/wasm/
 benchmark-results/
+!tests/fixtures/coverage/
+!tests/fixtures/coverage/**

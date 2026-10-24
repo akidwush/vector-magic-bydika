@@ -14,7 +14,9 @@ function App() {
     [vector, setVector] = useState("");
   const [preset, setPreset] = useState<Preset>("illustration"),
     [preferred, setPreferred] = useState<"auto" | "fallback">("auto");
-  const [quality, setQuality] = useState<"auto" | "legacy" | "shared">("auto");
+  const [quality, setQuality] = useState<
+    "auto" | "legacy" | "shared" | "previous"
+  >("auto");
   const [result, setResult] = useState<
       TraceResult & {
         width: number;
@@ -255,7 +257,8 @@ function App() {
                   value={quality}
                   onChange={(e) => setQuality(e.target.value as typeof quality)}
                 >
-                  <option value="auto">Otomatis</option>
+                  <option value="auto">Otomatis · coverage</option>
+                  <option value="previous">Baseline sebelum subpixel</option>
                   <option value="legacy">Baseline Stage 1.1</option>
                   <option value="shared">Batas bersama · eksperimental</option>
                 </select>
@@ -430,6 +433,8 @@ function App() {
                   ...result.timings,
                   ...result.stages,
                   profile: result.profile,
+                  coverage: result.coverage,
+                  transitions: result.transitions,
                   diagnostics: result.diagnostics,
                 })}
               >
@@ -467,12 +472,37 @@ function App() {
                         {result.diagnostics.megapixels.toFixed(3)} MP ·{" "}
                         {result.diagnostics.sourceFormat}
                         <br />
+                        {result.coverage && (
+                          <>
+                            Coverage fits: {result.coverage.accepted} diterima /{" "}
+                            {result.coverage.rejected} ditolak · sRGB{" "}
+                            {result.coverage.srgb} / linear{" "}
+                            {result.coverage.linear}
+                            <br />
+                          </>
+                        )}
+                        {result.transitions && (
+                          <>
+                            Sampel lokal: interior {result.transitions.interior}
+                            , edge dua warna {result.transitions.twoColorEdges},
+                            ambigu/warna ketiga{" "}
+                            {result.transitions.thirdOrAmbiguous}
+                            <br />
+                          </>
+                        )}
                         Decode {result.decodeMs.toFixed(1)} ms · startup{" "}
                         {result.timings?.startupMs.toFixed(1)} ms (
                         {result.timings?.warm ? "warm" : "cold"})<br />
-                        Segmentasi {result.stages?.segmentationMs.toFixed(1) ?? "N/A"} ms
-                        · fitting/warna/optimasi{" "}
+                        Segmentasi{" "}
+                        {result.stages?.segmentationMs.toFixed(1) ?? "N/A"} ms ·
+                        fitting/warna/optimasi{" "}
                         {result.stages?.postprocessMs.toFixed(1) ?? "N/A"} ms
+                        <br />
+                        Coverage{" "}
+                        {result.stages?.refinementMs?.toFixed(1) ?? "N/A"} ms ·
+                        Alpha {result.stages?.alphaMs?.toFixed(1) ?? "N/A"} ms ·
+                        SVG export{" "}
+                        {result.stages?.exportMs?.toFixed(1) ?? "N/A"} ms
                       </p>
                     </details>
                   )}

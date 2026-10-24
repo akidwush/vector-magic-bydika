@@ -1,274 +1,310 @@
-# Stage 1.2 — Issue #2 implementation and evidence
+# Stage 1.2 — anti-aliasing coverage and vector opacity refinement
 
-## Status: PARTIAL; measured improvements shipped, full clean-vector quality not certified
+## Status and review boundary
 
-Issue: https://github.com/akidwush/vector-magic-bydika/issues/2
-Starting main: `5a22e2954f5ff31a6f605a53f705c66016f43a45`, clean and matched remote.
-The issue was read from GitHub's public HTML after the existing GitHub API route
-returned Forbidden. Existing earlier owner instruction to work directly on main
-was retained; no force push, unrelated edits, issue comment or premature issue closure.
-Remote CI status cannot be verified through the blocked API. Local results are separate.
+Implemented on **feat/stage-1-2-subpixel-coverage**, starting from main
+`1e0af0d7e32401fa5d4931df7f52d33a7730b50a`. Main is left unchanged pending review.
+[Previous Stage 1.2 report](STAGE_01_2_BASELINE_REPORT.md) preserves the unchanged
+baseline and its failures. This report supersedes its partial-alpha status for the
+new primary-engine route, not for Photo, ImageTracerJS, or arbitrary translucent art.
 
-The exact owner's original raster and exported SVG remain **NOT VERIFIED**; neither
-file is available. Screenshots do not establish source alpha, dimensions or active engine.
-No user-specific fix, physical Android speed result, or Vector Magic parity is claimed.
+The real owner's original raster/exported SVG are still unavailable: **NOT VERIFIED**.
+No Vector Magic equivalence, physical Android performance, deployed URL or unobserved
+CI success is claimed. The changes are geometry/opacity operations, not preview CSS.
 
-## What changed
+## Audit: confirmed causes and retained upstream
 
-- The existing VTracer pipeline is reused unchanged. The project binding selects an
-  upstream `SplineFitter` with 90° corner threshold for connected components whose
-  binary masks have >=.94 IoU with an inscribed ellipse, dimensions >=4, aspect ratio
-  .5–2. Other components retain their original fitter (Polygon for Logo, Spline for
-  Illustration). Component splitting delegates to upstream binary clustering; no new
-  contour/curve algorithm, analytic replacement shapes, or coordinate-specific fixture
-  logic is used. This avoids smoothing triangle noses and ear outlines as if circles.
-- Non-destructive diagnostics measure alpha zero/partial coverage, RGB-bin coverage,
-  approximate color-bin count covering 95%, horizontal low-contrast edge fraction and
-  tiny-difference noise proxy, source MIME, dimensions/MP, effective profile and engine.
-  These are heuristic statistics, not semantic or AI classification. Encoded-flat is
-  distinguished using actual JPEG/WebP format; it does not prove noise is present.
-- Auto uses the ellipse-aware stacked fitter for statistically flat inputs. Opaque
-  blended-flat inputs (eight bins >=85% visible mass, low-contrast neighbor fraction
-  >.65, PNG/nonlossy encoding, no partial or zero alpha) use upstream Watershed detail
-  96, Cutout, Spline, corner 90°, length 2 and simplify .25px. This restricted route is
-  **not** enabled on partial alpha, JPEG/WebP, complex images or Photo.
-- Complex inputs and Photo retain the baseline pipeline. Existing thin-line fixture
-  gets no palette denoise and retains baseline geometry. Presets stay visible; the
-  contour selector provides Auto, Baseline Stage 1.1 and explicit shared-boundary
-  experimentation. Photo keeps the detail pipeline and disables that selector.
-- Partial alpha is explicitly reported **quality unsupported**, including a prominent
-  output warning. No opaque background flattening is applied to hide the limitation.
-  Native opaque RGB paint cannot faithfully reproduce arbitrary alpha. The optional
-  shared-boundary route improves the licensed sample, but does not certify alpha.
-- Completed jobs reuse one initialized worker and engine promise. Cancel/active job
-  replacement terminate the worker; stale replies AND stale worker errors are ignored.
-  Reset, unmount and 30s idle release it. Changing files retains an idle worker safely;
-  input buffers are transferred, not cached for later conversions. There is one trace
-  per click, never a runtime candidate sweep.
-- Instrumentation separates decode, initialization, diagnostics, upstream segmentation
-  completion and downstream fitting/color/composition/optimization. The segmentation
-  timestamp uses upstream progress callbacks; postprocess includes serialization and
-  residual bookkeeping. WASM linear memory bytes are recorded separately from timings;
-  they are not process RSS or total browser/Android peak memory.
+The audit covered all three presets, ColorCluster/Watershed/Binary frontends,
+Stacked/Cutout compositors, Spline/Polygon fitting, simplification, color fitting,
+RGBA decoding, SVG validation, workers and existing pixel gates.
 
-## Provenance and fixtures
+- ColorCluster sees transition RGBs as segmentation input. AutoQuantize is downstream
+  of segmentation, so a palette cap does not restore the original boundary location.
+- Integer mask boundaries and corner thresholds can move/flatten small features.
+  Previous per-component upstream fitter selection is retained; sharp corners are
+  not globally rounded by a new smoothing setting.
+- Fully transparent keying and opaque native RGB paint are insufficient for actual
+  partial alpha. Simply ignoring alpha made the 128px cat silhouette IoU ~.960.
+- The prior local palette cleanup sometimes reduced color error but regressed
+  silhouettes. It is not a safe global fix for JPEG/WebP, gradients or genuine pink.
 
-VTracer core remains **1.0.0-alpha.4**, commit
-`e71343fbcbf469b8a72a255030408a39939162eb`, supplied MIT grant. Vendor source unchanged.
-ImageTracerJS stays 1.2.6/Unlicense. The development-only `svg-path-parser@1.1.0` (MIT)
-is lockfile-pinned for actual SVG anchor/control-point counting; not bundled at runtime.
-Original NEXORA licensing remains undecided. No new runtime service or paid dependency.
+VTracer core remains **1.0.0-alpha.4**, exact upstream
+`e71343fbcbf469b8a72a255030408a39939162eb`, MIT grant retained. **No vendor source
+changed.** Segmentation, connected components, contours and initial Bézier fitting
+remain upstream algorithms. ImageTracerJS 1.2.6/Unlicense fallback is unchanged.
+The project adds bounded fitting/refinement of the existing VectorDoc plus opacity
+composition from upstream binary contours; it does not replace raster tracing.
 
-New fixture family has legal vector ground truth: project-owned CC0 cat at 128/512,
-synthetic blended edges (.7px test-input blur only), JPEG/WebP quality 60 encodes,
-and the existing binary/partial-alpha, thin-line, corner and gradient fixtures.
-Production does **not** blur/upscale/flatten these inputs. Real artwork is OpenMoji
-cat 1F431 by OpenMoji contributors, **CC BY-SA 4.0**, pinned to
-`aeb8bb3a59e2de39c754ac79180c8131c906acea`. Source SVG, resized PNGs, attribution and
-full license are retained under tests/fixtures/stage12/. Those derivatives retain
-CC BY-SA 4.0; this does not relicense the application. No competitor artwork used.
+## Algorithm and mathematical assumptions
 
-## Experiments and rejected candidates
+### Local two-color evidence, not a global hue rule
 
-Initial offline browser matrix: 13 global fitter/simplify/Watershed configurations on
-five sources = 65 traces. Additional paired matrices tested component-aware fitting,
-shared boundaries and localized palette denoise, then final policy on 20 sources
-(40 unchanged-baseline/final comparisons). Research executes WASM in a browser page;
-production tests separately prove worker execution. Research exports are feature-gated
-and generated outside the production WASM directory.
+`src/engine/transitions.ts` examines bounded local samples: neighbor gradients,
+stable colors on both sides, projected mixture residual, three parallel directional
+profiles, alpha and actual encoding. It reports interior, two-color edge evidence,
+ambiguous/third-color evidence, compression residuals and alpha separately. These
+are measured heuristics, not an oracle for intent. A flat pink patch is interior;
+it is not removed just because its RGB lies between red and white. Tests preserve
+an actual pink region and do not mutate the source buffers. Histogram statistics
+still route the broad preset but are not the evidence for a subpixel displacement.
 
-- Global 90/120/180° smoothing improves circularity but can harm body/ear boundaries.
-- Simplify .25/.5/.75 can improve silhouettes yet square small eyes: clean-eye IoU
-  falls .889 → .850/.800 for the global candidates. Not enabled globally.
-- Watershed on partial alpha/transparent art fails badly in some candidates. Only
-  the tested opaque blended route is auto-enabled. Shared boundaries remain an
-  explicit opt-in for other inputs rather than a mandatory global preset switch.
-- Palette-guided compression cleanup was implemented and tested OFFLINE: only opaque
-  3×3 neighborhoods agreeing on the nearest source-palette color, delta <=12, no alpha
-  or boundary rewrite. It was **rejected**: 512px lossy JPEG boundary F1 .980 → .940,
-  and ~30ms preprocessing in that run. It remains a research utility, never imported
-  into the application. There is no runtime global blur or stroke cover-up.
-- Cutout alone can increase opaque RGBA MAE from antialiased shared edges, despite
-  better boundary alignment. All tradeoffs below remain visible; RGB MAE is not used
-  alone as a quality certification.
+### Coverage fitting on existing paths
 
-## Actual production geometry checks (same source, matching resolution)
+For candidate smooth anchors/support lines, the model is
 
-Ground truth for cat shape metrics is the known clean vector rasterization, not a
-competitor output. Edge F1 uses 1px Euclidean tolerance; symmetric contour distance
-is in pixels, capped at 8px in the search (large errors saturate). Eye radial CV is
-boundary-radius deviation around its centroid (lower roundness error is better).
-It is pixel-scale dependent, not an analytic circularity claim. Muzzle overlap uses
-its known color/ROI. Thin details, interior holes and connected ears are independently
-gated by the earlier quality tests. Background-only/gradient masks can have no contour;
-those edge metrics are N/A, not evidence of perfect fidelity.
+`C ≈ t A + (1-t) B`, with `t = dot(C-B,A-B) / ||A-B||²`.
 
-| Source | Contour mode | Edge F1 before → after | Eye IoU before → after | Eye radial CV before → after | Muzzle IoU before → after |
-|---|---|---|---|---|---|
-| quality/cat-128-opaque.png | adaptive | 0.9984 → 0.9984 | 0.8889 → 0.9157 | 0.0802 → 0.0550 | 0.9857 → 0.9857 |
-| stage12/cat-128-blended.png | blend | 0.8930 → 0.9984 | 0.8478 → 0.9198 | 0.0799 → 0.0676 | 0.9759 → 0.9870 |
-| stage12/cat-128-lossy.jpg | adaptive | 0.9479 → 0.9479 | 0.8569 → 0.9067 | 0.0971 → 0.0781 | 0.9636 → 0.9640 |
-| stage12/cat-128-lossy.webp | adaptive | 0.9968 → 0.9968 | 0.8964 → 0.9084 | 0.0696 → 0.0628 | 0.9800 → 0.9800 |
-| stage12/openmoji-cat-128.png | adaptive | 0.7749 → 0.7749 | N/A → N/A | N/A → N/A | N/A → N/A |
+A/B are component-wise medians of three neighboring samples 2.5px on either side.
+They must be locally stable and adequately separated. Fifteen samples span five
+normal positions and three tangent offsets. A local coverage-vs-distance regression
+locates `t=.5`; excessive residual, weak/implausible slope, inconsistent color or
+cross-model position disagreement causes rejection. Inputs are sampled at pixel
+centers `(x+.5,y+.5)`; fractional sampling is bilinear in the hypothesis color space.
 
-OpenMoji auto deliberately retains its alpha warning and mostly baseline geometry.
-Explicit shared-boundary mode improves browser-tested boundary F1 to **0.9759**;
-partial-alpha fidelity remains unsupported. It is not reported as an auto-policy gain.
-Logo also has a production test requiring eye IoU >.90 and muzzle IoU >.97.
+Encoded-sRGB and IEC sRGB linear-light hypotheses are both tested. An early test
+caught interpolation in the wrong space: linear-light conversion now occurs **before**
+interpolation, and the known linear-light fixture/unit test passes. Relative color
+residual plus coverage regression error chooses among consistent hypotheses.
+If the inferred positions disagree by >.25px, the site is rejected. This is an
+ambiguity guard, **not a calibrated confidence interval or proof of source gamma**.
+Compression, intentional narrow stripes, shadows, gamma and filtering can remain
+fundamentally ambiguous; ambiguous evidence leaves the existing geometry alone.
 
-## All-source baseline → final policy tradeoffs
+Accepted displacement is <=.65px. Adjacent Bézier handles translate with their anchor,
+preserving endpoint tangent directions and path continuity. Direct shifts at sharp
+corners are rejected. Long straight edges use three separated support-line probes;
+intersections of translated supports preserve corner angles rather than rounding
+corners. The canvas frame remains fixed. No contours are generated by this module.
+Native ground-truth tests cover sRGB/linear fractional edges, genuine pink, partial
+alpha exclusion and corner handling. The analytic edge is x=63.25; one recorded
+export moves the old x=63.00 support to x≈63.17, improving but not exactly recovering
+it. We do not claim uniquely correct hidden geometry from an ambiguous raster.
 
-Chromium 154.0.8037.57, Linux cloud; single-run engine times, no downscaling.
-RGBA MAE uses premultiplied channels 0–255 against the actual encoded/blended source.
-Geometry metrics compare known clean ground truth where available; improvements can
-therefore coexist with increased source MAE. Extra metrics in full.json: global luma
-SSIM (one global window, **not** multiscale SSIM), sampled CIE76 Lab delta-E on subject
-pixels, eye/ear/muzzle measures, holes, paths, explicit anchor endpoints/control points,
-SVG bytes, stage config, timings and allocated WASM linear memory. Endpoint counts
-include repeated endpoints, excluding close commands; control points are separate.
+Refinement is bounded to 65,536 path commands and 8,192 fit sites. Very complex
+geometry skips/bounds refinement rather than running an unbounded search. Photo and
+complex auto inputs retain the old route. Auto flat inputs use coverage refinement;
+**Baseline before subpixel** reproduces main's previous auto routing for comparison.
+The older Stage 1.1 baseline and explicit shared-boundary option remain selectable.
 
-| Source | Edge F1 | Source RGBA MAE | Paths | SVG bytes | Anchor endpoints / controls after | Engine ms |
+### Actual partial-alpha reconstruction
+
+For eligible partial-alpha flat art, native RGB geometry is combined with an SVG
+opacity mask consisting only of upstream-generated vector paths. There are no
+embedded bitmaps, filters, opaque white overlays or background flattening.
+
+Nine alpha level sets (1/32/64/96/128/160/192/224/255) are traced with upstream Binary
+frontend + Polygon, speckle 0, preserving small alpha regions. For ascending opacity
+representatives `a_i`, nested mask opacity increments are
+
+`q_i = (a_i-a_(i-1)) / (1-a_(i-1))`.
+
+Source-over composition yields the representative opacity in each covered band.
+The scalar quantization is at most 16/255 **before contour-fitting and rasterization
+error**, not a bound on total reconstructed per-pixel alpha. The .5 threshold starts
+at alpha 128 and opaque 255 has its own exact-opacity band. True opacity remains an
+independent signal and is not fitted as an opaque RGB mixture.
+
+Three mask fitters were compared. Spline misses the 128px target; Pixel reproduces
+alpha closely but adds many nodes. Polygon meets the target with far fewer nodes.
+The result remains fully vector geometry; masks themselves are editable contours.
+Quantized vector opacity is reported explicitly, not described as exact continuous
+alpha. Photo/complex inputs and ImageTracerJS may still report unsupported alpha.
+
+These are nine deterministic opacity contours, not nine candidate conversions or
+runtime parameter sweeps. Extra alpha work is measured separately, in the worker.
+Level-set transitions are capped at 65,536 and mask text at 8MiB. Pathological alpha
+returns an explicit complexity error; it does not silently substitute opaque output.
+
+### SVG safety and privacy
+
+The validator permits one bounded, local vector mask in root defs and only inert
+geometry. It requires unique IDs, same-canvas mask bounds and local fragment URLs.
+External, missing, recursive or nested mask references, raster images, scripts,
+events and active content remain rejected. Visible geometry must exist outside defs.
+Unit tests cover these cases. Original caps, cancellation, stale-result/error rejection,
+worker reuse/idle cleanup, consented resizing and local-only processing are retained.
+
+## Production and renderer evidence
+
+The new browser suite compares **previous main routing** vs the new route on the
+same input, downloads the actual SVG, and rasterizes it independently with libvips.
+The partial-alpha target is also checked from the actual Chromium image preview.
+No assertions are disabled and the >=.980 threshold is applied to partial alpha.
+The path budget for that case explicitly includes its new opacity contours.
+
+| Production fixture | IoU old → new | RGBA MAE old → new | Max interior hole px² new |
+|---|---|---|---:|
+| quality/cat-128-opaque.png | 0.98491 → 0.99111 | 1.204 → 1.043 | 0 |
+| quality/cat-128-partial.png | 0.96001 → 0.98360 | 3.517 → 1.502 | 0 |
+| coverage/circle.png | 0.98107 → 0.98710 | 1.155 → 0.988 | 0 |
+| coverage/oval.png | 0.97334 → 0.98291 | 1.245 → 1.070 | 0 |
+| coverage/diagonal.png | 0.80000 → 0.80000 | 1.732 → 1.732 | 0 |
+| coverage/triangle.png | 0.95663 → 0.97277 | 1.463 → 0.975 | 0 |
+| coverage/pink.png | 1.00000 → 1.00000 | 1.878 → 1.363 | 0 |
+| coverage/edge-srgb.png | 1.00000 → 1.00000 | 0.521 → 0.330 | 0 |
+| coverage/edge-linear.png | 1.00000 → 1.00000 | 0.662 → 0.523 | 0 |
+
+### Alpha fitter experiment (unchanged RGB baseline)
+
+| Size | Mask fitter | Silhouette IoU | Alpha MAE (0–255) | Explicit endpoints / controls | SVG bytes | Total ms |
+|---|---|---:|---:|---|---:|---:|
+| 128 | Spline | 0.97855 | 2.140 | 403 / 778 | 11641 | 45.7 |
+| 128 | Polygon | 0.98360 | 1.581 | 282 / 94 | 3373 | 18.6 |
+| 128 | Pixel | 0.99985 | 0.163 | 1610 / 94 | 8712 | 33.2 |
+| 512 | Spline | 0.99406 | 0.615 | 940 / 1852 | 27124 | 247.4 |
+| 512 | Polygon | 0.99530 | 0.464 | 608 / 206 | 6657 | 306.3 |
+| 512 | Pixel | 0.99999 | 0.051 | 6444 / 206 | 30286 | 248.5 |
+| 1024 | Spline | 0.99733 | 0.282 | 1446 / 2864 | 41979 | 1167.2 |
+| 1024 | Polygon | 0.99774 | 0.232 | 927 / 328 | 10136 | 1066.3 |
+| 1024 | Pixel | 0.99997 | 0.027 | 12889 / 328 | 58739 | 1287.1 |
+
+Spline 128 **FAIL** (.97855 <.980), Polygon 128 **PASS** (.98360 >=.980). Pixel has
+excellent raster fidelity but a substantial node increase, so is not the default.
+These are single-run desktop observations, not a mobile latency promise. Later
+coverage corrections can change RGB MAE slightly without changing this alpha mask.
+
+### Full unchanged-baseline comparison
+
+Offline browser WASM: Chromium 154.0.8037.57, 27 inputs × two variants = 54 traces.
+The report includes all original benchmark assets, new fractional circle/oval,
+diagonal/triangle/pink, known sRGB/linear edges, JPEG/WebP, partial alpha and OpenMoji
+CC BY-SA artwork. Source dimensions are retained. Photo's default pipeline is not
+changed; forcing experimental refinement on a gradient produces no accepted fits.
+
+| Input | IoU | Edge F1 | RGBA MAE | Paths | SVG bytes | Engine ms |
 |---|---|---|---|---|---|---|
-| quality/cat-128-opaque.png | 0.998 → 0.998 | 1.208 → 1.204 | 5 → 5 | 1826 → 1906 | 63 / 114 | 9.6 → 36.9 |
-| quality/cat-512-opaque.png | 0.980 → 0.980 | 0.818 → 0.818 | 5 → 5 | 3497 → 3497 | 112 / 212 | 59.9 → 83.8 |
-| stage12/cat-128-blended.png | 0.893 → 0.998 | 2.275 → 2.662 | 7 → 13 | 2450 → 4588 | 179 / 288 | 4.7 → 22.8 |
-| stage12/cat-128-lossy.jpg | 0.948 → 0.948 | 2.713 → 2.708 | 28 → 28 | 4844 → 4874 | 190 / 324 | 6.9 → 9.7 |
-| stage12/cat-128-lossy.webp | 0.997 → 0.997 | 2.373 → 2.372 | 9 → 9 | 2455 → 2474 | 87 / 156 | 5.6 → 7.1 |
-| stage12/cat-512-blended.png | 0.827 → 0.999 | 0.976 → 0.979 | 9 → 13 | 6269 → 12977 | 465 / 864 | 72.5 → 79.1 |
-| stage12/cat-512-lossy.jpg | 0.980 → 0.976 | 1.094 → 1.095 | 77 → 77 | 19712 → 19814 | 801 / 1410 | 89.0 → 77.5 |
-| stage12/cat-512-lossy.webp | 0.974 → 0.974 | 1.043 → 1.045 | 34 → 34 | 9229 → 9223 | 342 / 610 | 69.1 → 75.4 |
-| quality/cat-128-binary.png | 1.000 → 1.000 | 1.965 → 1.961 | 4 → 4 | 1559 → 1639 | 53 / 96 | 2.4 → 2.8 |
-| quality/cat-128-partial.png | 1.000 → 1.000 | 3.521 → 3.517 | 4 → 4 | 1544 → 1624 | 52 / 94 | 2.1 → 2.8 |
-| stage12/openmoji-cat-128.png | 0.775 → 0.775 | 6.496 → 6.498 | 15 → 15 | 5377 → 5377 | 196 / 362 | 3.9 → 6.1 |
-| stage12/openmoji-cat-512.png | 0.652 → 0.652 | 1.858 → 1.858 | 14 → 14 | 11849 → 11849 | 400 / 770 | 37.5 → 47.1 |
-| icon.png | 0.995 → 0.995 | 0.606 → 0.606 | 3 → 3 | 1113 → 1113 | 35 / 64 | 3.2 → 4.0 |
-| corners.png | 0.997 → 0.997 | 1.815 → 1.815 | 3 → 3 | 1689 → 1689 | 56 / 106 | 5.4 → 6.6 |
-| curves.png | 1.000 → 1.000 | 1.732 → 1.732 | 3 → 3 | 798 → 798 | 21 / 36 | 3.7 → 4.5 |
-| illustration.png | 0.998 → 0.998 | 1.208 → 1.204 | 5 → 5 | 1826 → 1906 | 63 / 114 | 3.7 → 5.6 |
-| illustration.webp | 0.989 → 0.989 | 2.079 → 2.081 | 12 → 12 | 2853 → 2875 | 103 / 182 | 4.3 → 5.3 |
-| lineart.png | 0.965 → 0.965 | 3.410 → 3.410 | 8 → 8 | 2756 → 2756 | 97 / 178 | 4.0 → 5.1 |
-| gradient.jpg | N/A | 8.480 → 8.480 | 223 → 223 | 80811 → 80811 | 3773 / 7092 | 50.4 → 54.0 |
-| transparent.png | 1.000 → 1.000 | 0.000 → 0.000 | 1 → 1 | 369 → 369 | 10 / 16 | 1.9 → 2.7 |
+| quality/cat-128-opaque.png | 0.9849 → 0.9911 | 0.998 → 0.998 | 1.204 → 1.043 | 5 → 5 | 1906 → 1938 | 6.8 → 27.7 |
+| quality/cat-512-opaque.png | 0.9937 → 0.9972 | 0.980 → 1.000 | 0.818 → 0.691 | 5 → 5 | 3497 → 3503 | 84.7 → 76.6 |
+| stage12/cat-128-blended.png | 0.9814 → 0.9823 | 0.998 → 0.998 | 2.662 → 2.673 | 13 → 13 | 4588 → 4659 | 7.3 → 24.5 |
+| stage12/cat-128-lossy.jpg | 0.9634 → 0.9638 | 0.948 → 0.948 | 2.708 → 2.700 | 28 → 28 | 4874 → 4887 | 9.1 → 10.9 |
+| stage12/cat-128-lossy.webp | 0.9765 → 0.9763 | 0.997 → 0.997 | 2.372 → 2.357 | 9 → 9 | 2474 → 2483 | 7.8 → 9.1 |
+| stage12/cat-512-blended.png | 0.9940 → 0.9941 | 0.999 → 0.998 | 0.979 → 0.993 | 13 → 13 | 12977 → 12978 | 83.4 → 105.8 |
+| stage12/cat-512-lossy.jpg | 0.9902 → 0.9902 | 0.976 → 0.980 | 1.095 → 1.090 | 77 → 77 | 19814 → 19856 | 106.1 → 97.1 |
+| stage12/cat-512-lossy.webp | 0.9930 → 0.9932 | 0.974 → 0.974 | 1.045 → 1.029 | 34 → 34 | 9223 → 9263 | 85.1 → 98.3 |
+| quality/cat-128-binary.png | 0.9829 → 0.9827 | 1.000 → 1.000 | 1.961 → 1.961 | 4 → 4 | 1639 → 1659 | 3.2 → 3.2 |
+| quality/cat-128-partial.png | 0.9600 → 0.9836 | 1.000 → 1.000 | 3.517 → 1.502 | 4 → 13 | 1624 → 3384 | 3.7 → 20.5 |
+| stage12/openmoji-cat-128.png | 0.9148 → 0.9629 | 0.775 → 0.984 | 6.498 → 3.947 | 15 → 24 | 5377 → 8536 | 5.6 → 21.7 |
+| stage12/openmoji-cat-512.png | 0.9729 → 0.9896 | 0.652 → 0.980 | 1.858 → 1.013 | 14 → 23 | 11849 → 19191 | 62.6 → 291.8 |
+| coverage/circle.png | 0.9811 → 0.9871 | 1.000 → 1.000 | 1.155 → 0.988 | 2 → 2 | 571 → 567 | 4.3 → 4.6 |
+| coverage/oval.png | 0.9733 → 0.9829 | 1.000 → 1.000 | 1.245 → 1.070 | 2 → 2 | 579 → 585 | 4.0 → 4.5 |
+| coverage/diagonal.png | 0.8000 → 0.8000 | 0.989 → 0.989 | 1.732 → 1.732 | 5 → 5 | 1921 → 1921 | 5.0 → 7.3 |
+| coverage/triangle.png | 0.9566 → 0.9728 | 0.998 → 0.998 | 1.463 → 0.975 | 2 → 2 | 875 → 875 | 4.5 → 4.8 |
+| coverage/pink.png | 1.0000 → 1.0000 | 1.000 → 1.000 | 1.878 → 1.363 | 3 → 3 | 619 → 663 | 7.5 → 6.6 |
+| coverage/edge-srgb.png | 1.0000 → 1.0000 | 0.000 → 0.000 | 0.521 → 0.330 | 2 → 2 | 407 → 419 | 4.4 → 8.8 |
+| coverage/edge-linear.png | 1.0000 → 1.0000 | 0.000 → 0.000 | 0.662 → 0.523 | 2 → 2 | 407 → 419 | 4.6 → 4.5 |
+| icon.png | 0.9943 → 0.9889 | 0.995 → 0.995 | 0.606 → 0.494 | 3 → 3 | 1113 → 1117 | 4.6 → 5.6 |
+| corners.png | 0.9767 → 0.9921 | 0.997 → 0.997 | 1.815 → 1.102 | 3 → 3 | 1689 → 1695 | 6.4 → 7.1 |
+| curves.png | 0.9864 → 0.9940 | 1.000 → 1.000 | 1.732 → 1.366 | 3 → 3 | 798 → 832 | 5.1 → 5.1 |
+| illustration.png | 0.9849 → 0.9911 | 0.998 → 0.998 | 1.204 → 1.043 | 5 → 5 | 1906 → 1938 | 6.3 → 7.2 |
+| illustration.webp | 0.9808 → 0.9827 | 0.989 → 0.989 | 2.081 → 2.050 | 12 → 12 | 2875 → 2878 | 6.5 → 6.9 |
+| lineart.png | 0.8302 → 0.8532 | 0.965 → 0.965 | 3.410 → 3.058 | 8 → 8 | 2756 → 2765 | 5.9 → 7.2 |
+| gradient.jpg | 1.0000 → 1.0000 | N/A | 8.480 → 8.480 | 223 → 223 | 80811 → 80811 | 56.0 → 79.7 |
+| transparent.png | 1.0000 → 1.0000 | 1.000 → 1.000 | 0.000 → 0.000 | 1 → 1 | 369 → 369 | 3.9 → 3.2 |
 
-The 512px JPEG has a small contour-score regression; shared-boundary candidates and
-low-precision denoise do not win universally. Original eight assets retain prior
-structural/pixel gates; Photo has no new smoothing or cleanup. At 400% some contours
-still have facets/bumps and ears may be rounded on blended sources. We do not claim
-"no jagged shapes on every input" or ideal ellipse reconstruction from arbitrary blur.
+Some small threshold-IoU changes regress despite lower color error (notably icon/
+encoded edges), and the thin diagonal is unchanged: insufficient reliable local
+support is rejected. Node count reduction is not used as a success criterion. Full
+JSON includes explicit SVG anchor/control counts, contours, eye/muzzle/ear measures,
+alpha error, holes and accepted/rejected model evidence. A path count including mask
+geometry is not comparable to an RGB-only path count without that qualification.
 
-### Upstream blind fidelity reuse
+## Failed/limited experiments and remaining gaps
 
-The existing upstream crates/vtracer-bench was inspected and built at the same source
-commit (package 1.0.0-alpha.6 at that revision, dssim-core 3.4.0). Its CLI scored 30
-opaque reconstructions. This is a supplemental blind scorer, not a tracing dependency.
-For this RGB-only tool, both original and reconstruction are flattened on the same
-white background; the separate strict RGBA metrics above retain alpha defects.
-Transparency cases are excluded from its score. It reports multiscale DSSIM/SSIM,
-PSNR and coherent missing-patch mass; the raw output is retained, not re-labelled as
-our global-luma proxy or a Vector Magic similarity percentage.
+- Spline opacity contours failed the explicit .980 target at 128px; this is retained
+  as FAIL, not averaged away using the easier 512/1024 cases.
+- Initial linear-light implementation interpolated encoded values first; its native
+  mathematical test failed. That implementation was corrected before accepting it.
+- Pre-segmentation two-color labeling was implemented as a feature-gated experiment:
+  high-confidence edge pixels only, original source retained for subsequent refinement.
+  It improves some color errors/path counts but regresses blended silhouette IoU and
+  some JPEG/WebP contours. **Not enabled or available in production**. Prior palette
+  denoise regressions remain documented in the historical report.
+- Genuine third colors, shadows and compression do not always admit an identifiable
+  two-color coverage model. Conservative rejection is intentional; not every noisy
+  region is removed. Layer/mask fitting does not guarantee an ideal circle/face.
+- Continuous alpha, arbitrary translucent photographs, and all vector-editor behavior
+  are not certified. OpenMoji's difficult alpha case improves but does not establish
+  a universal .980 result. The original owner's exact files remain unavailable.
+- 100%/400% screenshots show real improvements and residual contour/color differences.
+  Vector Magic is a quality reference only; no equivalence claim is made.
 
-| Opaque source | Upstream fidelity before → after | Upstream SSIM before → after |
-|---|---|---|
-| quality/cat-128-opaque.png | 0.8986 → 0.8985 | 0.99710 → 0.99707 |
-| stage12/cat-128-blended.png | 0.7319 → 0.8088 | 0.99270 → 0.99585 |
-| stage12/cat-128-lossy.jpg | 0.7737 → 0.7755 | 0.99464 → 0.99469 |
-| stage12/cat-128-lossy.webp | 0.8284 → 0.8284 | 0.99478 → 0.99480 |
-| stage12/cat-512-blended.png | 0.8783 → 0.9287 | 0.99695 → 0.99919 |
-| gradient.jpg | 0.0006 → 0.0006 | 0.92923 → 0.92923 |
+## Runtime, limits and Android status
 
-## Desktop cold/warm evidence and memory limits
+Decode/startup/segmentation/downstream times are retained; coverage, opacity-contour
+work and SVG serialization are now separately exposed. The downstream total includes
+those subsets and should not be added to them a second time. Opacity work includes
+its own binary segmentation/fitting/serialization; it is not mislabeled as only RGB
+curve fitting. Pure export-to-disk time is browser-managed and not claimed measured.
 
-Same image, same auto profile, same actual SVG output: the dedicated browser test
-compares two runs and verifies only one WASM request. Reset must load WASM again.
-The numbers below are observations from that run; not medians, sustained benchmarks
-or a prediction of Android behavior. JIT and scheduler effects also change trace time.
+The existing single warm worker is reused; no candidate search runs on Convert.
+Opacity contours add cost: the 1024px experiment is around one second on this cloud
+machine. Native graph/fit limits bound work, but this is not a physical Android memory
+or runtime measurement. WASM linear bytes do not include all JS buffers or peak RSS.
+Original 10MiB/16MP source and consented 2MP trace limits remain. Original pixels are
+never silently resized, globally blurred, whitened or sent to a server.
 
-| Run | Decode ms | Engine initialization ms | Segmentation ms | Downstream ms | Worker total ms |
-|---|---:|---:|---:|---:|---:|
-| Cold | 12.40 | 17.00 | 22.20 | 16.70 | 63.60 |
-| Warm | 20.30 | 0.00 | 1.60 | 5.80 | 8.10 |
-| After Reset | 22.90 | 11.50 | 8.70 | 16.80 | 42.80 |
+**Physical Android performance and peak memory: NOT VERIFIED.** No device access
+was available. Desktop warm timings/viewport emulation cannot certify that target.
 
-Observed research WASM linear memory ranged 1.62–25.94 MiB during this
-sequential 128/512px experiment. This is allocated linear memory, not total JS buffers,
-process peak RSS, or an isolated per-algorithm memory comparison. Worker reuse retains
-the high-water allocation until reset/cancel/unmount/30s idle. The application WASM is
-now about 279kB versus about 183kB at Stage 1.1; cold mobile transfer/compilation needs
-real-device validation. Source caps remain 10 MiB, 16MP decode, 2MP trace with explicit
-resize consent. No silent resize was added. Original decode can use ~64MB, plus RGBA,
-WASM and clustering allocations.
-
-**Physical Android cold/warm/runtime/memory: NOT VERIFIED.** No device/ADB access was
-available. A mobile viewport test cannot substitute for it. On a physical device,
-repeat the same input/preset before Reset for warm timing, then Reset for cold timing,
-record diagnostics and Chrome memory data, and retain the original/SVG privately.
-No claim that Android slowness is resolved, and no hosted URL is invented.
-
-## Reproduction and artifacts
+## Reproduction and review
 
 ```bash
-# Activate Rust/Node per README, repository root.
+# Activate pinned Rust/Node per README, from the existing checkout.
 npm ci
-node scripts/stage12-fixtures.mjs
+node scripts/coverage-fixtures.mjs
+cargo test --manifest-path engine/Cargo.toml --locked
 npm run build:wasm
 npm run lint
 npm run typecheck
 npm run test
 npm run build
 NEXORA_CHROMIUM_PATH=/usr/bin/chromium npm run test:e2e
-NEXORA_CHROMIUM_PATH=/usr/bin/chromium node scripts/stage12-screenshots.mjs
-# Offline research (port 4195; production assets stay separate):
-bash scripts/stage12-research.sh
-NEXORA_CANDIDATE=policy bash scripts/stage12-research.sh --full
-node scripts/stage12-upstream-score.mjs
+NEXORA_CHROMIUM_PATH=/usr/bin/chromium node scripts/coverage-screenshots.mjs
+# Research exports are isolated from production:
+bash scripts/coverage-research.sh
+node scripts/alpha-research.mjs
+NEXORA_CANDIDATE=clean bash scripts/coverage-research.sh
 ```
 
-For the last command, set NEXORA_UPSTREAM_BENCH to a built vtracer-bench binary from
-the pinned source (cargo build -p vtracer-bench --release -j 2). Current instance binary:
-/workspace/nexora-upstream-vtracer/target/release/vtracer-bench. The benchmark is not
-needed for application development or CI. Local validation used NEXORA_TEST_PORT=4174
-because 4173 was occupied; the configurable default remains 4173. On research reruns,
-copy full.json before trying a different NEXORA_CANDIDATE to preserve each comparison.
+Current instance uses NEXORA_TEST_PORT=4174 to avoid an occupied 4173. CI uses the
+default isolated port and installed Playwright browser. Research CLI defaults to
+preinstalled Chromium here; set NEXORA_CHROMIUM_PATH elsewhere. The alpha research
+requires the research server assets built by coverage-research.sh. Research builds
+must not replace src/engine/wasm; npm run build:wasm always creates the production API.
 
-Actual generated artifacts, ignored by Git:
-- benchmark-results/stage12/matrix.json: initial 65 traces.
-- adaptive.json, cutout.json, denoise.json, watershed96.json: paired rejected/refined trials.
-- full.json: final 40 paired traces across 20 sources, including original eight fixtures.
-- upstream-fidelity.json: original upstream CLI output for 30 opaque reconstructions.
-- production.json, cold-warm.json: actual UI worker geometry/timing assertions.
-- *-baseline.svg and *-policy.svg plus PNG rasters: exported independent research results.
-- quality-cat-128-opaque.png-100.png / -400.png, stage12-cat-128-blended.png-100.png /
-  -400.png and stage12-cat-128-lossy.webp-100.png / -400.png: Chromium screenshots of
-  original | actual Stage 1.1 SVG | actual Stage 1.2 SVG at fixed matching scales.
-- test-results/stage12-*/: production screenshots and original download SVG artifacts.
+Actual local/generated artifacts (ignored by Git and reproduced/archived by CI):
+- benchmark-results/coverage/production.json and browser-alpha.json: actual downloads,
+  renderer metrics, stage timings and local-transition evidence.
+- full.json: final 54 paired experiments; alpha.json: nine alpha fitter trials.
+- clean-experiment.json: rejected pre-labeling experiment; separate SVGs retain variants.
+- test-results/coverage-old-main-*/: previous/auto SVG exports, renderer attachment.
+- benchmark-results/coverage/*-100.png and *-400.png: original | previous main SVG |
+  new SVG, same input and scale. Checkerboard is a shared viewer background, never an
+  opaque layer added to the SVG. New fixtures/provenance live in tests/fixtures/coverage/.
 
-CI already discovers the new browser tests and archives test-results/ and
-benchmark-results/. It regenerates production evidence and the 100%/400% comparison composites; expensive offline matrices
-are explicit research commands. Raw generated scores/screenshots are not committed.
-A successful local run does not establish a successful remote GitHub Actions run.
-Public Vector Magic tutorials remain a behavioral reference; network access was
-previously denied and no competitor code/assets/output were acquired.
+Both CI pipelines now run the six native Rust math/budget tests as well as the
+TypeScript/browser suites and generate the new comparison screenshots. GitHub push
+CI is enabled on this working branch. Remote CI/PR creation depends on GitHub access;
+local passing checks are never reported as an observed remote CI pass.
 
-## Validation and acceptance accounting
+Files changed: project Rust coverage/alpha modules and binding, TypeScript diagnostics/
+adapter/result metadata, tightly constrained SVG-mask validator, fixtures/provenance,
+unit/real-browser regression gates, screenshot/research tools, CI and this report.
+Vendor tracing algorithms, dependencies and original user files remain untouched.
+Self-review checked displacement/corner bounds, color-space ordering, original-data
+ownership, local-reference SVG safety, alpha complexity limits and unchanged worker
+cancellation/privacy. Independent review and CI verification are required before merge.
 
-- PASS: production WASM build, lint, typecheck; **22 unit tests, 9 browser tests**.
-- PASS: prior opaque/binary IoU, hole, face-feature and connected-ear gates retained;
-  SVG is real geometry, no bitmap embedding or stroke cover-up.
-- PASS: measured eye-shape improvements on clean/compressed fixtures and materially
-  improved blended-edge contour scores; baseline and experimental modes remain selectable.
-- PASS: licensed artwork added with full attribution and separate alpha status.
-- PASS: one trace per click; warm engine reuse, stale errors/replies, cancellation,
-  reset and idle cleanup; unchanged consented resolution caps.
-- PARTIAL: not every eye/muzzle/ear contour is ideal at 400%; the licensed partial-alpha
-  sample still needs explicit shared mode for its larger contour improvement.
-- FAIL / UNSUPPORTED: faithful partial alpha, including the earlier 128px .98 target.
-  The application explicitly warns; that target was not waived or reclassified as passed.
-- NOT VERIFIED: owner's exact raster/SVG, physical Android speed/peak memory, remote CI,
-  GitLab Pages deployment, vector-editor compatibility, competitor parity.
+## Acceptance accounting
 
-Changed subsystems: Rust binding/fitter selection and stage timing; diagnostics/adapter;
-worker lifecycle; decode/result timing and contour UI; geometry/performance tests;
-fixture provenance and offline research/scoring tools. Vendor sources and production
-fallback tracing parameters unchanged. Commit: see git log for the issue #2 Stage 1.2
-implementation commit; this report is committed with the source. Issue remains open
-until external/device evidence and remaining quality criteria are satisfied.
+- PASS locally: 6 Rust tests, 30 TypeScript tests, 10 real-browser tests; lint,
+  typecheck and production WASM/static build.
+- PASS: specified partial-alpha 128px fixture >=.980, independently rasterized and
+  checked in Chromium; no threshold reduction. 512/1024 prior gates retained.
+- PASS: true editable vector geometry, opacity-aware masks, intentional pink retention,
+  local coverage-based subpixel displacement, no fake loading or preview cover-up.
+- PASS with measured tradeoffs: current regression corpus and original benchmark suite;
+  residual ambiguity and small numerical regressions are shown above.
+- NOT VERIFIED: physical Android, total peak memory, exact owner's source/SVG,
+  remote CI outcome and vector-editor compatibility.
+- PENDING: branch review/PR and merge; main is intentionally unchanged.

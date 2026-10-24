@@ -1,3 +1,5 @@
+mod alpha;
+mod coverage;
 use vtracer::{ColorImage, Config, FitMode};
 use wasm_bindgen::prelude::*;
 
@@ -45,13 +47,15 @@ extern "C" {
     #[wasm_bindgen(js_namespace = performance, js_name = now)]
     fn now() -> f64;
 }
-thread_local! { static LAST_TIMING: std::cell::Cell<(f64,f64)> = const {std::cell::Cell::new((0.0,0.0))}; }
+thread_local! {static LAST_COVERAGE:std::cell::Cell<[u32;4]>=const {std::cell::Cell::new([0;4])};}
+#[wasm_bindgen]
+pub fn last_coverage_evidence() -> Vec<u32> {
+    LAST_COVERAGE.with(|s| s.get().to_vec())
+}
+thread_local! { static LAST_TIMING: std::cell::Cell<[f64;5]> = const {std::cell::Cell::new([0.0;5])}; }
 #[wasm_bindgen]
 pub fn last_stage_timings() -> Vec<f64> {
-    LAST_TIMING.with(|t| {
-        let (a, b) = t.get();
-        vec![a, b]
-    })
+    LAST_TIMING.with(|t| t.get().to_vec())
 }
 
 fn run_pipeline(
@@ -64,7 +68,11 @@ fn run_pipeline(
     let mut pipeline = config
         .build()
         .map_err(|e| JsValue::from_str(&e.to_string()))?;
-    if profile == "adaptive" {
+    if profile == "adaptive"
+        || profile == "coverage"
+        || profile == "alpha"
+        || profile.ends_with("-adaptive")
+    {
         pipeline.compositing = vtracer::compose::Compositing::Stacked(Box::new(RegionFitter {
             polygon: matches!(config.mode, FitMode::Polygon),
             max_side: width.min(height),
@@ -76,16 +84,51 @@ fn run_pipeline(
         height,
     };
     let start = now();
+    let (prepared, _) = if cfg!(feature = "experiments") && profile.starts_with("coverage-clean-") {
+        coverage::prepare(&img)
+    } else {
+        (None, 0)
+    };
     let mut segmented = start;
-    let doc = pipeline
-        .run_with_progress(&img, &vtracer::CancelToken::new(), &mut |p| {
-            if p.phase == vtracer::Phase::Segment && p.fraction >= 1.0 {
-                segmented = now();
-            }
-        })
+    let mut doc = pipeline
+        .run_with_progress(
+            prepared.as_ref().unwrap_or(&img),
+            &vtracer::CancelToken::new(),
+            &mut |p| {
+                if p.phase == vtracer::Phase::Segment && p.fraction >= 1.0 {
+                    segmented = now();
+                }
+            },
+        )
         .map_err(|e| JsValue::from_str(&e.to_string()))?;
-    let svg = pipeline.writer.write(&doc);
-    LAST_TIMING.with(|t| t.set((segmented - start, now() - segmented)));
+    let fitted_at = now();
+    let mut evidence = coverage::Evidence::default();
+    if profile.starts_with("coverage") {
+        evidence = coverage::refine(&mut doc, &img);
+    }
+    LAST_COVERAGE.with(|s| {
+        s.set([
+            evidence.accepted as u32,
+            evidence.rejected as u32,
+            evidence.srgb as u32,
+            evidence.linear as u32,
+        ])
+    });
+    let refined_at = now();
+    let mut svg = pipeline.writer.write(&doc);
+    let exported_at = now();
+    if profile.starts_with("coverage") || profile == "alpha" {
+        svg = alpha::apply(svg, &img).map_err(|e| JsValue::from_str(&e.to_string()))?;
+    }
+    LAST_TIMING.with(|t| {
+        t.set([
+            segmented - start,
+            now() - segmented,
+            refined_at - fitted_at,
+            now() - exported_at,
+            exported_at - refined_at,
+        ])
+    });
     Ok(svg)
 }
 
@@ -107,7 +150,16 @@ pub fn trace_quality(
     {
         return Err(JsValue::from_str("Invalid RGBA dimensions"));
     }
-    if !["adaptive", "shared", "legacy", "blend"].contains(&profile) {
+    if profile.starts_with("coverage-clean-") && !cfg!(feature = "experiments") {
+        return Err(JsValue::from_str(
+            "Pre-segmentation labeling is research-only",
+        ));
+    }
+    let base = profile
+        .strip_prefix("coverage-clean-")
+        .or_else(|| profile.strip_prefix("coverage-"))
+        .unwrap_or(profile);
+    if !["adaptive", "shared", "legacy", "blend", "coverage", "alpha"].contains(&base) {
         return Err(JsValue::from_str("Invalid quality profile"));
     }
     let mut config = Config::default();
@@ -130,13 +182,13 @@ pub fn trace_quality(
         }
         _ => return Err(JsValue::from_str("Invalid preset")),
     }
-    if profile == "shared" || profile == "blend" {
+    if base == "shared" || base == "blend" {
         config.hierarchical = vtracer::Hierarchical::Cutout;
         config.mode = FitMode::Spline;
         config.corner_threshold = 90;
         config.length_threshold = 2.0;
         config.simplify = Some(0.25);
-        if profile == "blend" {
+        if base == "blend" {
             config.clustering = vtracer::Clustering::Watershed;
             config.watershed_detail = 96;
         }
@@ -287,4 +339,31 @@ impl RegionFitter {
             SplineFitter::default().fit_region(mask)
         }
     }
+}
+
+#[cfg(feature = "experiments")]
+#[wasm_bindgen]
+pub fn alpha_experiment(
+    rgba: Vec<u8>,
+    width: usize,
+    height: usize,
+    preset: &str,
+    mode: u8,
+) -> Result<String, JsValue> {
+    let svg = trace_quality(rgba.clone(), width, height, preset, "adaptive")?;
+    let image = ColorImage {
+        pixels: rgba,
+        width,
+        height,
+    };
+    alpha::apply_with_mode(
+        svg,
+        &image,
+        match mode {
+            1 => FitMode::Polygon,
+            2 => FitMode::Pixel,
+            _ => FitMode::Spline,
+        },
+    )
+    .map_err(|e| JsValue::from_str(&e.to_string()))
 }

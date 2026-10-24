@@ -131,7 +131,8 @@ export async function decode(file: File, allowResize: boolean) {
       height,
       sourceFormat: info.mime,
       decodeMs: performance.now() - started,
-      quality: undefined as "auto" | "legacy" | "shared" | undefined,
+      quality: undefined as
+        "auto" | "legacy" | "shared" | "previous" | undefined,
     };
   } finally {
     bitmap.close();

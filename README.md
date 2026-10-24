@@ -8,10 +8,15 @@ Quality equivalence is not claimed; Photo is a baseline, and clean-vector improv
 ## Stage 1.2 — contour quality and worker startup
 
 [Issue #2 evidence, measurements and remaining failures](docs/STAGE_01_2_REPORT.md).
+The current review branch adds bounded local coverage fitting to upstream contours.
+It compares encoded-sRGB and linear-light hypotheses and preserves ambiguous regions.
+Partial-alpha flat art uses editable vector opacity contours (quantized, not exact
+continuous alpha); Photo/fallback limitations remain explicit.
 The default contour policy uses upstream spline fitting on disk-like components;
 blended opaque flat art uses shared boundaries. Baseline Stage 1.1 remains selectable.
 Diagnostics show heuristic input class, alpha coverage, effective profile and stage times.
-Partial-alpha fidelity remains **unsupported**, with a visible warning; it is not fixed.
+The 128px partial-alpha regression now requires IoU >=0.980 in both browser and
+independent rendering. Continuous-alpha fidelity is still not guaranteed.
 Workers are reused between completed jobs and released on cancel/reset/unmount or
 30 seconds idle. Images remain local and each click performs one trace.
 No Android-device speed or full Vector Magic parity is claimed.
