@@ -22,14 +22,14 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: engine
-      - run: cargo install wasm-bindgen-cli --version 0.2.126 --locked
-      - run: npm ci
+      - run: cargo install wasm-bindgen-cli --version 0.2.126 --locked 2>&1 | tee -a "$RUNNER_TEMP/nexora-validation.log"
+      - run: npm ci 2>&1 | tee -a "$RUNNER_TEMP/nexora-validation.log"
       - run: npm run build:wasm 2>&1 | tee -a "$RUNNER_TEMP/nexora-validation.log"
       - run: cargo test --manifest-path engine/Cargo.toml --locked 2>&1 | tee -a "$RUNNER_TEMP/nexora-validation.log"
       - run: cargo test --manifest-path engine/Cargo.toml --locked -p vtracer --lib 2>&1 | tee -a "$RUNNER_TEMP/nexora-validation.log"
       - run: (npm run lint && npm run typecheck && npm run test) 2>&1 | tee -a "$RUNNER_TEMP/nexora-validation.log"
       - run: npm run build 2>&1 | tee -a "$RUNNER_TEMP/nexora-validation.log"
-      - run: npx playwright install --with-deps chromium
+      - run: npx playwright install --with-deps chromium 2>&1 | tee -a "$RUNNER_TEMP/nexora-validation.log"
       - run: npm run test:e2e 2>&1 | tee -a "$RUNNER_TEMP/nexora-validation.log"
       - run: node scripts/stage12-screenshots.mjs 2>&1 | tee -a "$RUNNER_TEMP/nexora-validation.log"
       - run: node scripts/coverage-screenshots.mjs 2>&1 | tee -a "$RUNNER_TEMP/nexora-validation.log"
@@ -42,6 +42,9 @@ jobs:
           from pathlib import Path
           log = Path(os.environ['RUNNER_TEMP']) / 'nexora-validation.log'
           lines = log.read_text(errors='replace').splitlines()[-250:] if log.exists() else ['Failure occurred before validation logging.']
+          tail = '\n'.join(lines)[-12000:]
+          annotation = tail.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+          print('::error title=NEXORA failed validation details::' + annotation)
           with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
               summary.write('## Failed validation output\n\n```text\n' + '\n'.join(lines) + '\n```\n')
           PYCODE
