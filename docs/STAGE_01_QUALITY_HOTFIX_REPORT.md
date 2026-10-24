@@ -1,5 +1,7 @@
 # Stage 1.1 quality hotfix report
 
+Historical baseline. Stage 1.2 changes and measured regressions are in [STAGE_01_2_REPORT.md](STAGE_01_2_REPORT.md).
+
 ## Status: PARTIAL — representative flat-color improvement verified
 
 User's exact failing raster and exported SVG: **NOT VERIFIED**, neither was supplied.

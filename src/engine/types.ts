@@ -1,6 +1,8 @@
 export type Preset = "logo" | "illustration" | "photo";
 export type EngineId = "vtracer-wasm" | "imagetracerjs";
 export interface TraceInput {
+  sourceFormat?: string;
+  quality?: "auto" | "legacy" | "shared";
   rgba: Uint8ClampedArray;
   width: number;
   height: number;
@@ -9,12 +11,21 @@ export interface TraceResult {
   svg: string;
   engine: EngineId;
   elapsedMs: number;
+  timings?: { startupMs: number; workerTotalMs: number; warm: boolean };
   effectivePrecision?: number;
+  stages?: {
+    segmentationMs: number;
+    postprocessMs: number;
+    diagnosticsMs: number;
+    wasmLinearBytes?: number;
+  };
+  diagnostics?: import("./diagnostics").InputDiagnostics;
+  profile?: string;
   version: string;
   capabilities: {
     wasm: boolean;
     cancellation: "terminate-worker";
-    partialAlpha: "not-guaranteed";
+    partialAlpha: "not-guaranteed" | "unsupported";
   };
   preset: Preset;
   warning?: string;

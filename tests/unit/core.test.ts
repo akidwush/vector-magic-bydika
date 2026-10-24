@@ -87,7 +87,7 @@ describe("worker lifecycle", () => {
     const workers: FakeWorker[] = [];
     class FakeWorker {
       onmessage?: (event: { data: unknown }) => void;
-      onerror?: () => void;
+      onerror?: (event: { message: string }) => void;
       postMessage = vi.fn();
       terminate = vi.fn();
       constructor() {
@@ -105,11 +105,20 @@ describe("worker lifecycle", () => {
     const second = client.run(input(), "photo");
     expect((await first).code).toBe("CANCELLED");
     expect(workers[0].terminate).toHaveBeenCalled();
+    workers[0].onerror?.({ message: "obsolete failure" });
+    expect(workers[1].terminate).not.toHaveBeenCalled();
     const firstId = workers[0].postMessage.mock.calls[0][0].id;
     const secondId = workers[1].postMessage.mock.calls[0][0].id;
     workers[0].onmessage?.({ data: { id: firstId, result: { svg: "old" } } });
     workers[1].onmessage?.({ data: { id: secondId, result: { svg: "new" } } });
     expect((await second).svg).toBe("new");
+    expect(workers[1].terminate).not.toHaveBeenCalled();
+    const third = client.run(input(), "logo");
+    expect(workers).toHaveLength(2);
+    const thirdId = workers[1].postMessage.mock.calls[1][0].id;
+    workers[1].onmessage?.({ data: { id: thirdId, result: { svg: "warm" } } });
+    expect((await third).svg).toBe("warm");
+    client.cancel();
     expect(workers[1].terminate).toHaveBeenCalled();
   });
 });

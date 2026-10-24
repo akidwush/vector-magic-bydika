@@ -14,6 +14,7 @@ function App() {
     [vector, setVector] = useState("");
   const [preset, setPreset] = useState<Preset>("illustration"),
     [preferred, setPreferred] = useState<"auto" | "fallback">("auto");
+  const [quality, setQuality] = useState<"auto" | "legacy" | "shared">("auto");
   const [result, setResult] = useState<
       TraceResult & {
         width: number;
@@ -21,6 +22,7 @@ function App() {
         pathCount: number;
         bytes: number;
         totalMs: number;
+        decodeMs: number;
       }
     >(),
     [status, setStatus] = useState("idle"),
@@ -49,9 +51,9 @@ function App() {
     [vector],
   );
   const busy = status === "loading" || status === "tracing";
-  function clear() {
+  function clear(keepIdleWorker = false) {
     generation.current++;
-    client.current.cancel();
+    client.current.cancel(keepIdleWorker);
     setFile(undefined);
     setInfo(undefined);
     setOriginal("");
@@ -63,7 +65,7 @@ function App() {
     setZoom(1);
   }
   async function select(next?: File) {
-    clear();
+    clear(true);
     if (!next) return;
     const id = generation.current;
     setStatus("loading");
@@ -94,6 +96,7 @@ function App() {
       if (id !== generation.current) return;
       const { width, height } = input;
       setStatus("tracing");
+      input.quality = quality;
       const traced = await client.current.run(input, preset, preferred);
       if (id !== generation.current) return;
       const valid = validateSvg(traced.svg);
@@ -109,6 +112,7 @@ function App() {
         pathCount: valid.pathCount,
         bytes: blob.size,
         totalMs: performance.now() - started,
+        decodeMs: input.decodeMs,
       });
       setStatus("done");
     } catch (e) {
@@ -184,7 +188,7 @@ function App() {
                   {file.name}
                   <br />
                   {info?.width} × {info?.height} px{" "}
-                  <button className="text" onClick={clear}>
+                  <button className="text" onClick={() => clear()}>
                     Reset
                   </button>
                 </p>
@@ -231,7 +235,10 @@ function App() {
                       name="preset"
                       value={key}
                       checked={preset === key}
-                      onChange={() => setPreset(key)}
+                      onChange={() => {
+                        setPreset(key);
+                        if (key === "photo") setQuality("auto");
+                      }}
                     />
                     <span>
                       <strong>{presets[key].title}</strong>
@@ -240,6 +247,19 @@ function App() {
                   </label>
                 ))}
               </fieldset>
+              <label>
+                Kontur
+                <select
+                  aria-label="Profil kontur"
+                  disabled={busy || preset === "photo"}
+                  value={quality}
+                  onChange={(e) => setQuality(e.target.value as typeof quality)}
+                >
+                  <option value="auto">Otomatis</option>
+                  <option value="legacy">Baseline Stage 1.1</option>
+                  <option value="shared">Batas bersama · eksperimental</option>
+                </select>
+              </label>
               <button
                 className="convert"
                 disabled={!file || busy || (needsResize && !resize)}
@@ -401,7 +421,18 @@ function App() {
               </div>
             )}
             {result && (
-              <div className="result">
+              <div
+                className="result"
+                data-metrics={JSON.stringify({
+                  engine: result.engine,
+                  decodeMs: result.decodeMs,
+                  traceMs: result.elapsedMs,
+                  ...result.timings,
+                  ...result.stages,
+                  profile: result.profile,
+                  diagnostics: result.diagnostics,
+                })}
+              >
                 <div>
                   <strong>
                     {result.engine} · {result.version}
@@ -417,6 +448,34 @@ function App() {
                     {(result.bytes / 1024).toFixed(1)} KiB · {result.pathCount}{" "}
                     paths
                   </p>
+                  {result.diagnostics && (
+                    <details>
+                      <summary>Diagnostik input & waktu</summary>
+                      <p>
+                        {result.diagnostics.classification} · {result.profile}
+                        <br />
+                        Alpha parsial{" "}
+                        {(
+                          result.diagnostics.alphaPartialFraction * 100
+                        ).toFixed(2)}
+                        % · {result.diagnostics.dominantColors} warna dominan
+                        (95%)
+                        <br />
+                        Edge blend{" "}
+                        {result.diagnostics.edgeBlendScore.toFixed(2)} · noise{" "}
+                        {result.diagnostics.noiseScore.toFixed(2)} ·{" "}
+                        {result.diagnostics.megapixels.toFixed(3)} MP ·{" "}
+                        {result.diagnostics.sourceFormat}
+                        <br />
+                        Decode {result.decodeMs.toFixed(1)} ms · startup{" "}
+                        {result.timings?.startupMs.toFixed(1)} ms (
+                        {result.timings?.warm ? "warm" : "cold"})<br />
+                        Segmentasi {result.stages?.segmentationMs.toFixed(1) ?? "N/A"} ms
+                        · fitting/warna/optimasi{" "}
+                        {result.stages?.postprocessMs.toFixed(1) ?? "N/A"} ms
+                      </p>
+                    </details>
+                  )}
                 </div>
                 <a
                   className="download"

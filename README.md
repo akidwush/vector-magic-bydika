@@ -5,6 +5,17 @@ a tested ImageTracerJS fallback, three presets, original/vector comparison and l
 No account, tracing API, server upload, or paid runtime. Not affiliated with Vector Magic.
 Quality equivalence is not claimed; Photo is a baseline, and clean-vector improvement is future work.
 
+## Stage 1.2 — contour quality and worker startup
+
+[Issue #2 evidence, measurements and remaining failures](docs/STAGE_01_2_REPORT.md).
+The default contour policy uses upstream spline fitting on disk-like components;
+blended opaque flat art uses shared boundaries. Baseline Stage 1.1 remains selectable.
+Diagnostics show heuristic input class, alpha coverage, effective profile and stage times.
+Partial-alpha fidelity remains **unsupported**, with a visible warning; it is not fixed.
+Workers are reused between completed jobs and released on cancel/reset/unmount or
+30 seconds idle. Images remain local and each click performs one trace.
+No Android-device speed or full Vector Magic parity is claimed.
+
 ## Quality hotfix 1.1
 
 Logo/Illustration use upstream precision 5 before segmentation for statistically flat

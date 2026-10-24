@@ -98,6 +98,7 @@ export async function inspectFile(file: File) {
   return { ...dimensions(bytes, mime), mime };
 }
 export async function decode(file: File, allowResize: boolean) {
+  const started = performance.now();
   const info = await inspectFile(file);
   const resize = info.width * info.height > limits.tracePixels;
   if (resize && !allowResize)
@@ -124,7 +125,14 @@ export async function decode(file: File, allowResize: boolean) {
     ctx.drawImage(bitmap, 0, 0, width, height);
     const rgba = ctx.getImageData(0, 0, width, height).data;
     canvas.width = canvas.height = 0;
-    return { rgba, width, height };
+    return {
+      rgba,
+      width,
+      height,
+      sourceFormat: info.mime,
+      decodeMs: performance.now() - started,
+      quality: undefined as "auto" | "legacy" | "shared" | undefined,
+    };
   } finally {
     bitmap.close();
   }

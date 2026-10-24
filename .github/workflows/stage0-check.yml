@@ -26,6 +26,7 @@ jobs:
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
+      - run: node scripts/stage12-screenshots.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:

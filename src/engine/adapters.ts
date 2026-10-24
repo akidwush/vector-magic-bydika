@@ -1,4 +1,5 @@
 import type { TraceEngine, TraceInput, Preset } from "./types";
+import { analyzeInput, chooseProfile } from "./diagnostics";
 import { sourcePalette } from "./palette";
 import { presets } from "./types";
 export async function createEngine(
@@ -7,12 +8,15 @@ export async function createEngine(
   if (preferred === "auto") {
     try {
       const wasm = await import("./wasm/nexora_wasm");
-      await wasm.default();
+      const core = await wasm.default();
       return {
         engine: {
           id: "vtracer-wasm",
           async trace(input: TraceInput, preset: Preset) {
             const start = performance.now();
+            const diagnostics = analyzeInput(input);
+            const profile = chooseProfile(diagnostics, preset, input.quality);
+            const diagnosticsMs = performance.now() - start;
             const precision = wasm.precision_for(
               new Uint8Array(
                 input.rgba.buffer,
@@ -21,7 +25,7 @@ export async function createEngine(
               ),
               preset,
             );
-            const svg = wasm.trace(
+            const svg = wasm.trace_quality(
               new Uint8Array(
                 input.rgba.buffer,
                 input.rgba.byteOffset,
@@ -30,16 +34,32 @@ export async function createEngine(
               input.width,
               input.height,
               preset,
+              profile,
             );
             return {
               svg,
               engine: "vtracer-wasm",
               effectivePrecision: precision,
+              profile,
+              diagnostics,
+              stages: {
+                segmentationMs: wasm.last_stage_timings()[0],
+                postprocessMs: wasm.last_stage_timings()[1],
+                diagnosticsMs,
+                wasmLinearBytes: core.memory.buffer.byteLength,
+              },
+              warning:
+                diagnostics.alphaPartialFraction > 0
+                  ? "Kualitas alpha parsial BELUM DIDUKUNG: opacity tepi dapat berubah. Hasil ini bukan rekonstruksi transparansi yang setia."
+                  : undefined,
               version: "1.0.0-alpha.4 / e71343f",
               capabilities: {
                 wasm: true,
                 cancellation: "terminate-worker",
-                partialAlpha: "not-guaranteed",
+                partialAlpha:
+                  diagnostics.alphaPartialFraction > 0
+                    ? "unsupported"
+                    : "not-guaranteed",
               },
               preset,
               elapsedMs: performance.now() - start,
@@ -63,6 +83,7 @@ async function fallback(): Promise<TraceEngine> {
     async trace(input, preset) {
       const start = performance.now(),
         p = presets[preset];
+      const diagnostics = analyzeInput(input);
       const svg = tracer.imagedataToSVG(
         { data: input.rgba, width: input.width, height: input.height },
         {
@@ -82,6 +103,8 @@ async function fallback(): Promise<TraceEngine> {
       return {
         svg,
         engine: "imagetracerjs",
+        diagnostics,
+        profile: "fallback-palette",
         version: "1.2.6",
         capabilities: {
           wasm: false,
@@ -91,7 +114,9 @@ async function fallback(): Promise<TraceEngine> {
         preset,
         elapsedMs: performance.now() - start,
         warning:
-          "ImageTracerJS: alpha parsial dapat berubah; periksa transparansi hasil.",
+          diagnostics.alphaPartialFraction > 0
+            ? "Kualitas alpha parsial BELUM DIDUKUNG oleh fallback; opacity hasil dapat berubah."
+            : "ImageTracerJS memakai palette sumber; detail warna sangat kecil dapat berkurang.",
       };
     },
   };

@@ -25,6 +25,7 @@ validate:
     - npm run build
     - npx playwright install --with-deps chromium
     - npm run test:e2e
+    - node scripts/stage12-screenshots.mjs
   artifacts:
     when: always
     paths: [dist/, benchmark-results/, test-results/, playwright-report/]
