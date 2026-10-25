@@ -71,6 +71,11 @@ finds no supported cleanup, it retains Watershed/mosaic instead of forcing a
 segmentation change. JPEG/WebP, Photo and complex gradients retain their defaults.
 Partial-alpha inputs bypass this cleanup entirely and retain vector opacity masks.
 
+Cleanup currently applies up to a 256 px longest side. Larger inputs keep their
+original segmentation and still permit source-verified model-only refinement.
+This conservative scope follows the resolution regression below, rather than
+claiming an unverified high-resolution cleanup improvement.
+
 ### Source-verified geometry
 
 Existing VTracer contours supply all geometry candidates. Opaque two-color bands
@@ -197,8 +202,31 @@ they are not described as a universal gapless rendering fix.
 
 Local checks: 18 integration/native Rust tests, 31 upstream library tests,
 33 TypeScript unit tests, lint/typecheck, WASM and production build passed;
-16 browser tests passed. The geometry and dual-renderer benchmark scripts passed.
+16 browser tests passed before the additional resolution regression; the expanded
+suite now includes a seventeenth browser test. The geometry and dual-renderer benchmark scripts passed.
 
+
+
+### Resolution regression added after initial branch CI
+
+A new 512px test caught corner loss after the polygon parameter-fit budget was
+exhausted. Corner protection now remains active independently of that budget.
+Selective cleanup is conservatively limited to a 256 px longest side; larger
+inputs preserve the previous segmentation. The 512px star therefore retains its
+old geometry rather than being advertised as improved. No corner threshold or
+expected corner count was lowered.
+
+| Shape | Resolution | True corner hits old → new | Circle radial RMS old → new (px) |
+| --- | --- | --- | --- |
+| triangle | 64 | 3 → 3 | — |
+| star | 64 | 10 → 10 | — |
+| circle | 64 | 0 → 0 | 0.2863 → 0.0180 |
+| triangle | 256 | 3 → 3 | — |
+| star | 256 | 10 → 10 | — |
+| circle | 256 | 0 → 0 | 0.2156 → 0.0114 |
+| triangle | 512 | 3 → 3 | — |
+| star | 512 | 10 → 10 | — |
+| circle | 512 | 0 → 0 | 0.2054 → 0.0249 |
 
 ## Runtime and browser lifecycle
 
@@ -281,4 +309,6 @@ protected-corner checks, shared-edge/cancellation regression suites and measured
 old/new Auto comparisons. Remote CI and merge status are recorded after the
 corresponding runs finish; local success is not remote CI evidence.
 
-Branch CI: pending publication/verification. Main has not yet been merged at this report revision.
+Initial implementation `0e165b5`: [GitHub CI passed](https://github.com/akidwush/vector-magic-bydika/actions/runs/40162596616).
+The subsequent resolution fallback fix is awaiting its own branch CI; main has
+not yet been merged at this report revision.

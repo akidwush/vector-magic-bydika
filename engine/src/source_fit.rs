@@ -682,10 +682,7 @@ fn prune_polygon(ps: &[PointF64]) -> Vec<PointF64> {
 }
 /// Conservative all-straight polygon classification over the upstream DP result.
 /// Rounded contours have low-turn or short edges and keep the spline baseline.
-pub fn polygonal(mask: &vtracer::ir::RegionMask, img: &ColorImage) -> Option<Vec<FittedGeom>> {
-    if touches_frame(mask, img) {
-        return None;
-    }
+fn polygon_outline(mask: &vtracer::ir::RegionMask) -> Option<Vec<FittedGeom>> {
     use vtracer::fitter::CurveFitter;
     let mut gs = vtracer::fitter::PolygonFitter.fit_region(mask);
     if let [FittedGeom::Polyline(ps)] = gs.as_mut_slice() {
@@ -715,6 +712,14 @@ pub fn polygonal(mask: &vtracer::ir::RegionMask, img: &ColorImage) -> Option<Vec
             return None;
         }
     }
+    Some(gs)
+}
+pub fn polygonal(mask: &vtracer::ir::RegionMask, img: &ColorImage) -> Option<Vec<FittedGeom>> {
+    if touches_frame(mask, img) {
+        return None;
+    }
+    use vtracer::fitter::CurveFitter;
+    let mut gs = polygon_outline(mask)?;
     let raw = vtracer::fitter::PixelFitter.fit_region(mask);
     let [FittedGeom::Polyline(raw_ps)] = raw.as_slice() else {
         return None;
@@ -990,14 +995,23 @@ pub fn optimize(
         } else {
             None
         };
-    for model in [generic, ellipse(&seg, &samples), polygon]
-        .into_iter()
-        .flatten()
-    {
+    let ellipse = ellipse(&seg, &samples);
+    // Corner protection survives model-work budget exhaustion. A strong ellipse
+    // hypothesis is handled separately; pixel polygon corners on circles are false.
+    let critical = if ellipse.is_none() {
+        polygon_outline(mask)
+    } else {
+        None
+    };
+    for model in [generic, ellipse, polygon].into_iter().flatten() {
         let Some((model, path)) = quantized(model, img) else {
             continue;
         };
-        if matches!(&baseline[0], FittedGeom::Polyline(_)) && !preserves_corners(&old_geom, &model)
+        if critical
+            .as_ref()
+            .is_some_and(|g| !preserves_corners(&g[0], &model))
+            || (matches!(&baseline[0], FittedGeom::Polyline(_))
+                && !preserves_corners(&old_geom, &model))
         {
             continue;
         }
@@ -1166,6 +1180,11 @@ fn oriented(g: FittedGeom, seg: &Segment) -> FittedGeom {
 /// Selective two-color decontamination for segmentation only. Original RGBA is
 /// retained for coverage fitting. Stable third-color plateaus and alpha are skipped.
 pub fn prepare(img: &ColorImage) -> (Option<ColorImage>, usize) {
+    // Keep the original segmentation when its boundary bands can exceed the
+    // local model's bounded work. Model-only refinement remains available.
+    if img.width.max(img.height) > 256 {
+        return (None, 0);
+    }
     // Multiple colors on the canvas border indicate clipped regions: keep the
     // previous segmentation, since their missing exterior cannot support this model.
     let first = &img.pixels[..3];
