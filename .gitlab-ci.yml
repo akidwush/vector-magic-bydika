@@ -30,6 +30,7 @@ validate:
     - node scripts/stage12-screenshots.mjs
     - node scripts/coverage-screenshots.mjs
     - node scripts/shared-edge-screenshots.mjs
+    - node scripts/corner-benchmark.mjs
   artifacts:
     when: always
     paths: [dist/, benchmark-results/, test-results/, playwright-report/]

@@ -1,3 +1,6 @@
+export function primitives(
+  svg: string,
+): Array<{ d: string; edges: Array<Array<[number, number]>> }>;
 import type { Page } from "@playwright/test";
 export function coincidence(
   svg: string,

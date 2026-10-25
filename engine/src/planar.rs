@@ -23,6 +23,8 @@ pub struct Stats {
     pub max_drift: f64,
     pub pixel_fallback: bool,
     pub validation_budget_fallback: bool,
+    pub adaptive_rollback: bool,
+    pub source_accepted: usize,
 }
 impl Stats {
     pub fn values(&self) -> Vec<f64> {
@@ -39,6 +41,8 @@ impl Stats {
             self.max_drift,
             self.pixel_fallback as u8 as f64,
             self.validation_budget_fallback as u8 as f64,
+            self.adaptive_rollback as u8 as f64,
+            self.source_accepted as f64,
         ]
     }
 }
@@ -96,7 +100,7 @@ fn line(a: PointF64, b: PointF64, out: &mut Vec<PointF64>) {
         out.push(p(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t));
     }
 }
-fn flatten(g: &FittedGeom) -> Vec<PointF64> {
+pub(crate) fn flatten(g: &FittedGeom) -> Vec<PointF64> {
     let mut out = Vec::new();
     match g {
         FittedGeom::Polyline(ps) => {
@@ -117,6 +121,67 @@ fn flatten(g: &FittedGeom) -> Vec<PointF64> {
         }
     }
     out
+}
+pub(crate) fn aligned(seg: &mosaic::Segment, g: &FittedGeom) -> bool {
+    let raw: Vec<_> = seg
+        .points
+        .iter()
+        .map(|q| p(q.x as f64, q.y as f64))
+        .collect();
+    let a = flatten(g);
+    if a.is_empty() {
+        return false;
+    }
+    let bounds = |ps: &[PointF64]| {
+        [
+            ps.iter().map(|p| p.x).fold(f64::INFINITY, f64::min),
+            ps.iter().map(|p| p.y).fold(f64::INFINITY, f64::min),
+            ps.iter().map(|p| p.x).fold(f64::NEG_INFINITY, f64::max),
+            ps.iter().map(|p| p.y).fold(f64::NEG_INFINITY, f64::max),
+        ]
+    };
+    bounds(&raw)
+        .into_iter()
+        .zip(bounds(&a))
+        .all(|(a, b)| (a - b).abs() <= 2.)
+}
+pub(crate) fn valid_model(seg: &mosaic::Segment, g: &FittedGeom, w: u32, h: u32) -> bool {
+    if drift_bounded(seg, g, w, h, drift_limit(seg) + 0.5).is_none() {
+        return false;
+    }
+    let graph = BoundaryGraph {
+        nodes: Vec::new(),
+        segments: vec![seg.clone()],
+    };
+    matches!(collisions(&graph,&[FittedSegment{geom:g.clone()}]),Ok(bad) if bad.is_empty())
+}
+pub(crate) fn replacement_clear(g: &FittedGeom, others: &[FittedGeom]) -> bool {
+    let fitted: Vec<_> = std::iter::once(g)
+        .chain(others)
+        .map(|g| FittedSegment { geom: g.clone() })
+        .collect();
+    let graph = BoundaryGraph {
+        nodes: Vec::new(),
+        segments: fitted
+            .iter()
+            .map(|f| mosaic::Segment {
+                points: flatten(&f.geom)
+                    .iter()
+                    .map(|q| vtracer::PointI32 {
+                        x: q.x.round() as i32,
+                        y: q.y.round() as i32,
+                    })
+                    .collect(),
+                start: None,
+                end: None,
+                left: 0,
+                right: 1,
+                first_dir: 0,
+                last_dir: 0,
+            })
+            .collect(),
+    };
+    matches!(collisions(&graph,&fitted),Ok(bad) if !bad.contains(&0))
 }
 fn endpoints(g: &FittedGeom) -> Option<(PointF64, PointF64)> {
     match g {
@@ -148,6 +213,9 @@ fn drift_limit(seg: &mosaic::Segment) -> f64 {
 }
 
 fn drift(seg: &mosaic::Segment, g: &FittedGeom, w: u32, h: u32) -> Option<f64> {
+    drift_bounded(seg, g, w, h, drift_limit(seg))
+}
+fn drift_bounded(seg: &mosaic::Segment, g: &FittedGeom, w: u32, h: u32, limit: f64) -> Option<f64> {
     if let FittedGeom::Beziers(cs) = g {
         if cs.windows(2).any(|w| !near(w[0][3], w[1][0])) {
             return None;
@@ -171,11 +239,12 @@ fn drift(seg: &mosaic::Segment, g: &FittedGeom, w: u32, h: u32) -> Option<f64> {
     for ps in seg.points.windows(2) {
         let a = p(ps[0].x as f64, ps[0].y as f64);
         let b = p(ps[1].x as f64, ps[1].y as f64);
-        let key = (
-            (a.x.min(b.x) / 2.).floor() as i32,
-            (a.y.min(b.y) / 2.).floor() as i32,
-        );
-        cells.entry(key).or_default().push((a, b));
+        // PixelFitter coalesces straight runs; index their full extent too.
+        for y in (a.y.min(b.y) / 2.).floor() as i32..=(a.y.max(b.y) / 2.).floor() as i32 {
+            for x in (a.x.min(b.x) / 2.).floor() as i32..=(a.x.max(b.x) / 2.).floor() as i32 {
+                cells.entry((x, y)).or_default().push((a, b));
+            }
+        }
     }
     if seg.is_ring() {
         let area = |ps: &[PointF64]| {
@@ -215,7 +284,7 @@ fn drift(seg: &mosaic::Segment, g: &FittedGeom, w: u32, h: u32) -> Option<f64> {
             }
         }
         max = max.max(d);
-        if max > drift_limit(seg) {
+        if max > limit {
             return None;
         }
     }
@@ -246,7 +315,7 @@ fn drift(seg: &mosaic::Segment, g: &FittedGeom, w: u32, h: u32) -> Option<f64> {
             }
         }
         max = max.max(d);
-        if max > drift_limit(seg) {
+        if max > limit {
             return None;
         }
     }
@@ -444,13 +513,25 @@ fn constrained(
     }
 }
 
-pub fn compose(seg: &Segmentation) -> Result<(VectorDoc, Stats), String> {
-    let mut map = LabelMap::from_segmentation(seg);
-    // Merge only identical paints; never erase a real color to hide a seam.
-    map.merge_similar(0);
-    compose_map(&map)
-}
+#[cfg(test)]
 fn compose_map(map: &LabelMap) -> Result<(VectorDoc, Stats), String> {
+    compose_map_mode(map, false, None)
+}
+pub fn compose_mode(
+    seg: &Segmentation,
+    adaptive: bool,
+    img: Option<&vtracer::ColorImage>,
+) -> Result<(VectorDoc, Stats), String> {
+    let mut map = LabelMap::from_segmentation(seg);
+    map.merge_similar(0);
+    compose_map_mode(&map, adaptive, img)
+}
+fn compose_map_mode(
+    map: &LabelMap,
+    adaptive: bool,
+    img: Option<&vtracer::ColorImage>,
+) -> Result<(VectorDoc, Stats), String> {
+    crate::corners::reset();
     // Preflight before allocating graph/fitting. Source cap remains 2MP.
     let mut cracks = 0usize;
     for y in 0..map.height as i32 {
@@ -568,6 +649,99 @@ fn compose_map(map: &LabelMap) -> Result<(VectorDoc, Stats), String> {
             drift(s, &f.geom, map.width, map.height)
                 .ok_or("Shared-edge endpoint/drift validation failed")?,
         );
+    }
+    if adaptive {
+        if let Some(img) = img {
+            let baseline = fitted.clone();
+            let mut changed = vec![false; fitted.len()];
+            let mut sample_budget = 8192usize;
+            if !stats.pixel_fallback && graph.segments.len() <= 256 {
+                for (id, edge) in graph.segments.iter().enumerate() {
+                    let proposal = crate::corners::fit(edge, id, Some(img));
+                    let Some(samples) = crate::source_fit::samples(edge, map, img) else {
+                        continue;
+                    };
+                    if samples.len() > sample_budget {
+                        continue;
+                    }
+                    sample_budget -= samples.len();
+                    let old_error =
+                        crate::source_fit::error(&flatten(&baseline[id].geom), &samples);
+                    let mut best_error = old_error;
+                    let mut best = None;
+                    for geom in [proposal, crate::source_fit::ellipse(edge, &samples)]
+                        .into_iter()
+                        .flatten()
+                    {
+                        let mut candidate = FittedSegment { geom };
+                        quantize(&mut candidate.geom);
+                        if drift_bounded(
+                            edge,
+                            &candidate.geom,
+                            map.width,
+                            map.height,
+                            drift_limit(edge) + 0.5,
+                        )
+                        .is_none()
+                        {
+                            continue;
+                        }
+                        let e = crate::source_fit::error(&flatten(&candidate.geom), &samples);
+                        if e + 0.00005 < old_error * 0.95 && e < 0.01 && e < best_error {
+                            best_error = e;
+                            best = Some(candidate)
+                        }
+                    }
+                    if let Some(candidate) = best {
+                        fitted[id] = candidate;
+                        changed[id] = true
+                    } else {
+                        stats.adaptive_rollback = true;
+                    }
+                }
+                for _ in 0..3 {
+                    match collisions(&graph, &fitted) {
+                        Ok(bad) if bad.is_empty() => break,
+                        Ok(bad) => {
+                            let mut repaired = false;
+                            for id in bad {
+                                if changed[id] {
+                                    changed[id] = false;
+                                    fitted[id] = baseline[id].clone();
+                                    repaired = true;
+                                    stats.adaptive_rollback = true;
+                                }
+                            }
+                            if !repaired {
+                                fitted = baseline.clone();
+                                changed.fill(false);
+                                break;
+                            }
+                        }
+                        Err(_) => {
+                            fitted = baseline.clone();
+                            changed.fill(false);
+                            stats.adaptive_rollback = true;
+                            break;
+                        }
+                    }
+                }
+                if !matches!(collisions(&graph,&fitted),Ok(bad) if bad.is_empty()) {
+                    fitted = baseline;
+                    changed.fill(false);
+                    stats.adaptive_rollback = true;
+                }
+                stats.source_accepted = changed.iter().filter(|&&v| v).count();
+                stats.max_drift = 0.;
+                for (id, (edge, fit)) in graph.segments.iter().zip(&fitted).enumerate() {
+                    let limit = drift_limit(edge) + if changed[id] { 0.5 } else { 0. };
+                    stats.max_drift = stats.max_drift.max(
+                        drift_bounded(edge, &fit.geom, map.width, map.height, limit)
+                            .ok_or("Source fit drift validation failed")?,
+                    );
+                }
+            }
+        }
     }
     // No independent simplification/refinement/rounding after this composition.
     Ok((mosaic::compose_fitted(map, &graph, &faces, &fitted), stats))
