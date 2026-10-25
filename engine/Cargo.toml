@@ -13,3 +13,5 @@ opt-level = "s"
 lto = true
 [features]
 experiments = []
+# Research-only source target solver; activation blocked by exported geometry gate.
+source_geometry = []
