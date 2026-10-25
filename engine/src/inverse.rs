@@ -64,16 +64,23 @@ fn clamped_integral(a: f64, b: f64, dy: f64) -> f64 {
     if (a - b).abs() < 1e-12 {
         return a.clamp(0., 1.) * dy;
     }
-    let primitive = |x: f64| {
-        if x <= 0. {
-            0.
-        } else if x >= 1. {
-            x - 0.5
-        } else {
-            0.5 * x * x
+    // Integrate piecewise at clamp breakpoints. Avoid subtracting large
+    // antiderivatives for edges far outside the pixel (catastrophic cancellation).
+    let mut knots = vec![0., 1.];
+    for boundary in [0., 1.] {
+        let t = (boundary - a) / (b - a);
+        if t > 0. && t < 1. {
+            knots.push(t);
         }
-    };
-    dy * (primitive(b) - primitive(a)) / (b - a)
+    }
+    knots.sort_by(f64::total_cmp);
+    knots
+        .windows(2)
+        .map(|w| {
+            let value = |t: f64| (a + (b - a) * t).clamp(0., 1.);
+            (w[1] - w[0]) * (value(w[0]) + value(w[1])) * 0.5 * dy
+        })
+        .sum()
 }
 /// Polygon/pixel intersection area via Green's theorem. Horizontal extent is
 /// integrated analytically; unlike 4x4/16x16 occupancy, no coverage staircase.
@@ -515,7 +522,7 @@ pub fn refine(seg: &Segment, img: &ColorImage, old: &G, ss: &[Sample]) -> Option
             return None;
         }
         let initial_candidate = candidate.clone();
-        let initial_loss = loss(&candidate, ss, 0.002);
+        let initial_loss = loss(&candidate, ss, 0.001);
         // Local handles only. Anchors/corner discontinuities and joins are locked.
         let G::Beziers(init) = candidate.clone() else {
             return None;
@@ -581,6 +588,61 @@ pub fn refine(seg: &Segment, img: &ColorImage, old: &G, ss: &[Sample]) -> Option
                         }
                         candidate = chosen;
                     }
+                }
+            }
+        }
+        // Bounded normal-direction experiment: rotate smooth handle pairs
+        // together at locked anchors, retaining the direction of a smooth join.
+        #[cfg(feature = "experiments")]
+        {
+            for i in (0..init.len()).step_by((init.len() / 4).max(1)).take(4) {
+                for angle in [0.004_f64, 0.002, 0.001, 0.0005] {
+                    let mut value = loss(&candidate, ss, 0.001);
+                    let mut chosen = candidate.clone();
+                    for sign in [-1., 1.] {
+                        let mut trial = candidate.clone();
+                        let G::Beziers(ref mut cs) = trial else {
+                            unreachable!()
+                        };
+                        let prev = (i + cs.len() - 1) % cs.len();
+                        let anchor = cs[i][0];
+                        let (v, _) = endpoint_tangents(&cs[i]);
+                        let (_, u) = endpoint_tangents(&cs[prev]);
+                        let norm = u.x.hypot(u.y) * v.x.hypot(v.y);
+                        if norm < 1e-8 || (u.x * v.x + u.y * v.y) / norm < 0.9999 {
+                            continue;
+                        }
+                        let (sn, co) = (sign * angle).sin_cos();
+                        for (idx, j) in [(i, 1), (prev, 2)] {
+                            let d = P {
+                                x: cs[idx][j].x - anchor.x,
+                                y: cs[idx][j].y - anchor.y,
+                            };
+                            cs[idx][j] = P {
+                                x: anchor.x + co * d.x - sn * d.y,
+                                y: anchor.y + sn * d.x + co * d.y,
+                            };
+                        }
+                        if distance(cs[i][1], init[i][1]) > 1.
+                            || distance(cs[prev][2], init[prev][2]) > 1.
+                        {
+                            continue;
+                        }
+                        if !crate::planar::valid_model(
+                            seg,
+                            &trial,
+                            img.width as u32,
+                            img.height as u32,
+                        ) {
+                            continue;
+                        }
+                        let trial_loss = loss(&trial, ss, 0.001);
+                        if trial_loss + 1e-9 < value {
+                            value = trial_loss;
+                            chosen = trial;
+                        }
+                    }
+                    candidate = chosen;
                 }
             }
         }
@@ -690,12 +752,12 @@ pub fn refine(seg: &Segment, img: &ColorImage, old: &G, ss: &[Sample]) -> Option
             }
         }
         round(&mut candidate);
-        best = loss(&candidate, ss, 0.002);
+        best = loss(&candidate, ss, 0.001);
         if best > initial_loss {
             candidate = initial_candidate;
             best = initial_loss;
         }
-        let baseline = loss(old, ss, 0.002);
+        let baseline = loss(old, ss, 0.001);
         let count = |g: &G| match g {
             G::Beziers(c) => c.len(),
             G::Polyline(p) => p.len(),
@@ -737,6 +799,24 @@ mod tests {
     use super::*;
     fn p(x: f64, y: f64) -> P {
         P { x, y }
+    }
+    #[test]
+    fn integral_is_stable_outside_pixel_and_across_clamp_knots() {
+        let a: f64 = 0.7123456;
+        let b = a + 2e-12;
+        let exact = (a + b) * 0.5;
+        let old = (b * b * 0.5 - a * a * 0.5) / (b - a);
+        assert!((old - exact).abs() > 1e-8);
+        assert!((clamped_integral(a, b, 1.) - exact).abs() < 1e-15);
+        println!(
+            "NEAR_FLAT_AREA old_error={} stable_error={}",
+            (old - exact).abs(),
+            (clamped_integral(a, b, 1.) - exact).abs()
+        );
+        assert_eq!(clamped_integral(1e10, 1e10 + 0.001, 0.8), 0.8);
+        assert_eq!(clamped_integral(-1e10, -1e10 + 0.001, 0.8), 0.);
+        assert!((clamped_integral(-1., 2., 1.) - 0.5).abs() < 1e-12);
+        assert!((clamped_integral(2., -1., 1.) - 0.5).abs() < 1e-12);
     }
     #[test]
     fn analytic_area_moves_continuously_and_respects_winding() {

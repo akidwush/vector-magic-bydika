@@ -639,6 +639,17 @@ fn samples_mask(
     if norm < 2500. {
         return None;
     }
+    // Select once for the entire owned component, with errors in the same
+    // encoded-RGB scale. Ambiguous evidence retains Stage 1.5 sampling.
+    let linear = crate::inverse::enabled()
+        && crate::unmix::select(
+            &pixels
+                .iter()
+                .map(|(_, _, c)| c.map(|x| x / 255.))
+                .collect::<Vec<_>>(),
+            a.map(|x| x / 255.),
+            b.map(|x| x / 255.),
+        ) == Some(true);
     let mut samples = Vec::new();
     let mut bad = 0;
     for (x, y, c) in pixels {
@@ -646,6 +657,22 @@ fn samples_mask(
         let e = (0..3)
             .map(|k| (c[k] - b[k] - t * delta[k]).powi(2))
             .sum::<f64>();
+        let (t, e) = if linear {
+            match crate::unmix::project(
+                c.map(|x| x / 255.),
+                a.map(|x| x / 255.),
+                b.map(|x| x / 255.),
+                true,
+            ) {
+                Some((t, e)) => (t, e * 255. * 255.),
+                None => {
+                    bad += 1;
+                    continue;
+                }
+            }
+        } else {
+            (t, e)
+        };
         if e > norm * 0.003 || !(-0.08..=1.08).contains(&t) {
             bad += 1;
             continue;

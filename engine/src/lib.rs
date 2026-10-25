@@ -1,5 +1,6 @@
 mod alpha;
 mod inverse;
+mod unmix;
 #[wasm_bindgen]
 pub fn last_inverse() -> Vec<f64> {
     inverse::values()
