@@ -129,6 +129,15 @@ an existing model where warranted; it does not force organic eyes into ellipses.
   The corner benchmark now uses uniform arc length on independently flattened
   curves. Existing quality tolerances are unchanged; unit tests cover equivalent
   `C`/`L` loci and an unsupported reverse-direction bulge.
+- Final review found that profile-name exclusions alone missed upstream Mosaic
+  behind the `coverage-blend` alias. Document fitting now checks actual compositor
+  ownership; all Mosaic aliases bypass per-face approximation. A blended-cat
+  browser regression verifies the real coverage-blend route makes zero document
+  fitting attempts while preserving anchors and reconstruction. Raising unchanged
+  Mosaic serialization to six decimals initially exposed one additional closing
+  anchor and grew its SVG. Keeping the original writer precision fixes this:
+  164→164 anchors, 4586→4328 bytes, <1e-12px locus difference. Six decimals are
+  reserved for newly fitted stacked geometry and the existing locked graph.
 - Transferring millions of scalar RGBA values through Playwright exhausted the
   offline evidence harness's memory. Chromium now computes metrics in its own
   page and returns only measurements. This change affects research tooling,
@@ -205,40 +214,41 @@ line conversion, not anchor reduction.
 
 | Fixture / pixels / profile | Anchors old→new | Cubics old→new | Paths | SVG bytes old→new | Trace ms old→new |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| dense-circle-128.png / auto | 8→8 | 8→4 | 2 | 390→325 | 81.8→41.2 |
-| dense-circle-512.png / auto | 8→8 | 8→4 | 2 | 406→333 | 152.2→144.4 |
-| dense-circle-1024.png / auto | 56→8 | 56→4 | 2 | 1876→355 | 327.3→450.5 |
-| dense-ellipse-128.png / auto | 8→8 | 8→4 | 2 | 392→327 | 27.3→25.0 |
-| dense-ellipse-512.png / auto | 8→8 | 8→4 | 2 | 406→333 | 161.4→122.2 |
-| dense-ellipse-1024.png / auto | 53→8 | 52→4 | 2 | 1736→355 | 288.8→366.5 |
-| cubic-128.png / auto | 18→18 | 18→12 | 2 | 653→562 | 35.1→19.3 |
-| cubic-512.png / auto | 38→38 | 38→31 | 2 | 1183→1059 | 124.6→126.8 |
-| cubic-1024.png / auto | 36→31 | 35→24 | 2 | 1171→959 | 326.0→326.0 |
-| organic-128.png / auto | 23→23 | 23→15 | 2 | 823→693 | 10.9→11.7 |
-| organic-512.png / auto | 46→46 | 46→38 | 2 | 1533→1384 | 94.2→94.3 |
-| organic-1024.png / auto | 97→96 | 96→80 | 2 | 2972→2709 | 353.1→369.6 |
-| rounded-128.png / auto | 45→38 | 44→29 | 2 | 1276→1232 | 14.1→55.6 |
-| rounded-512.png / auto | 77→46 | 76→32 | 2 | 2175→1402 | 94.5→183.1 |
-| rounded-1024.png / auto | 108→107 | 107→72 | 2 | 2987→2453 | 368.3→423.3 |
-| wave-128.png / auto | 27→27 | 27→20 | 2 | 905→791 | 27.1→28.1 |
-| wave-512.png / auto | 46→45 | 45→39 | 2 | 1451→1351 | 98.6→96.3 |
-| wave-1024.png / auto | 37→32 | 36→26 | 2 | 1257→1046 | 352.4→355.3 |
-| square-128.png / auto | 8→8 | 4→0 | 2 | 279→214 | 16.4→16.6 |
-| triangle-128.png / auto | 7→7 | 4→0 | 2 | 276→211 | 38.8→35.7 |
-| star-128.png / auto | 14→14 | 4→0 | 2 | 350→285 | 110.0→109.5 |
-| hair-128.png / auto | 41→41 | 41→35 | 2 | 1256→1166 | 29.2→30.3 |
-| mixed-128.png / auto | 13→13 | 13→6 | 2 | 511→399 | 18.9→18.9 |
-| shared/organic.png / auto | 36→36 | 33→28 | 4 | 1123→1042 | 38.1→44.4 |
-| shared/organic.png / planar | 280→276 | 280→142 | 5 | 11617→8023 | 37.5→64.9 |
-| shared/organic.png / intelligent | 68→68 | 68→60 | 5 | 3531→3339 | 50.1→73.7 |
-| shared/thin.png / auto | 12→12 | 4→0 | 2 | 299→234 | 24.5→23.3 |
-| shared/thin.png / planar | 20→20 | 20→0 | 2 | 751→311 | 13.8→10.9 |
-| shared/thin.png / intelligent | 24→24 | 24→6 | 2 | 1033→617 | 19.3→24.4 |
-| shared/rings.png / auto | 16→16 | 16→12 | 4 | 669→604 | 41.7→42.7 |
-| shared/curve.jpg / auto | 145→145 | 145→70 | 22 | 4137→3055 | 23.0→39.2 |
-| shared/curve.webp / auto | 74→74 | 74→42 | 10 | 2126→1656 | 8.3→40.6 |
-| cat-128-partial.png / auto | 273→273 | 43→41 | 13 | 3284→3257 | 40.6→40.0 |
-| cat-512-opaque.png / auto | 101→100 | 100→92 | 5 | 3172→3039 | 185.7→203.8 |
+| dense-circle-128.png / auto | 8→8 | 8→4 | 2 | 390→325 | 84.6→43.5 |
+| dense-circle-512.png / auto | 8→8 | 8→4 | 2 | 406→333 | 156.6→171.2 |
+| dense-circle-1024.png / auto | 56→8 | 56→4 | 2 | 1876→355 | 342.2→415.1 |
+| dense-ellipse-128.png / auto | 8→8 | 8→4 | 2 | 392→327 | 30.1→25.3 |
+| dense-ellipse-512.png / auto | 8→8 | 8→4 | 2 | 406→333 | 119.6→119.6 |
+| dense-ellipse-1024.png / auto | 53→8 | 52→4 | 2 | 1736→355 | 295.0→364.5 |
+| cubic-128.png / auto | 18→18 | 18→12 | 2 | 653→562 | 24.0→32.8 |
+| cubic-512.png / auto | 38→38 | 38→31 | 2 | 1183→1059 | 136.0→133.7 |
+| cubic-1024.png / auto | 36→31 | 35→24 | 2 | 1171→959 | 341.9→344.3 |
+| organic-128.png / auto | 23→23 | 23→15 | 2 | 823→693 | 11.1→12.7 |
+| organic-512.png / auto | 46→46 | 46→38 | 2 | 1533→1384 | 92.7→97.3 |
+| organic-1024.png / auto | 97→96 | 96→80 | 2 | 2972→2709 | 374.3→380.6 |
+| rounded-128.png / auto | 45→38 | 44→29 | 2 | 1276→1232 | 14.2→58.6 |
+| rounded-512.png / auto | 77→46 | 76→32 | 2 | 2175→1402 | 95.0→182.0 |
+| rounded-1024.png / auto | 108→107 | 107→72 | 2 | 2987→2453 | 353.2→414.6 |
+| wave-128.png / auto | 27→27 | 27→20 | 2 | 905→791 | 31.1→27.2 |
+| wave-512.png / auto | 46→45 | 45→39 | 2 | 1451→1351 | 93.4→94.8 |
+| wave-1024.png / auto | 37→32 | 36→26 | 2 | 1257→1046 | 345.4→356.3 |
+| square-128.png / auto | 8→8 | 4→0 | 2 | 279→214 | 18.9→17.5 |
+| triangle-128.png / auto | 7→7 | 4→0 | 2 | 276→211 | 37.0→37.1 |
+| star-128.png / auto | 14→14 | 4→0 | 2 | 350→285 | 115.3→136.3 |
+| hair-128.png / auto | 41→41 | 41→35 | 2 | 1256→1166 | 30.3→28.9 |
+| mixed-128.png / auto | 13→13 | 13→6 | 2 | 511→399 | 19.0→20.9 |
+| shared/organic.png / auto | 36→36 | 33→28 | 4 | 1123→1042 | 38.5→45.0 |
+| shared/organic.png / planar | 280→276 | 280→142 | 5 | 11617→8023 | 47.5→65.5 |
+| shared/organic.png / intelligent | 68→68 | 68→60 | 5 | 3531→3339 | 52.8→76.3 |
+| shared/thin.png / auto | 12→12 | 4→0 | 2 | 299→234 | 23.2→24.2 |
+| shared/thin.png / planar | 20→20 | 20→0 | 2 | 751→311 | 9.2→10.6 |
+| shared/thin.png / intelligent | 24→24 | 24→6 | 2 | 1033→617 | 18.4→22.2 |
+| shared/rings.png / auto | 16→16 | 16→12 | 4 | 669→604 | 41.0→42.1 |
+| shared/curve.jpg / auto | 145→145 | 145→70 | 22 | 4137→3055 | 16.2→44.2 |
+| shared/curve.webp / auto | 74→74 | 74→42 | 10 | 2126→1656 | 8.5→35.2 |
+| stage12/cat-128-blended.png / auto | 164→164 | 144→126 | 13 | 4586→4328 | 20.5→13.2 |
+| cat-128-partial.png / auto | 273→273 | 43→41 | 13 | 3284→3257 | 59.6→39.2 |
+| cat-512-opaque.png / auto | 101→100 | 100→92 | 5 | 3172→3039 | 190.3→200.7 |
 
 The 1024px circle's object contour is 48→4 cubics (91.7% reduction); including
 the canvas gives 56→8 anchors (85.7%). Ellipse total anchors drop 84.9%.
@@ -291,7 +301,7 @@ is 0.0811px. Protected square/triangle/star corner identities are unchanged.
 
 ### Topology, features, transparency and editability
 
-All 34 before/after pairs preserve path and closed-subpath counts. The four
+All 35 before/after pairs preserve path and closed-subpath counts. The four
 additional locked planar/intelligent comparisons (organic and thin fixtures)
 have exact paired interior primitives, coincidence 1.0, unmatched primitives 0,
 geometric gap samples 0, overlap samples 0 and crossingsAfter 0. Native graph
@@ -305,7 +315,7 @@ both libvips and Chromium; no alpha regression is hidden by a white background.
 Opacity masks remain quantized vector contours, not exact continuous alpha.
 Thin lines, eyes/nose ROI retention, source color reconstruction, compressed
 JPEG/WebP, true-corner scales and photo/gradient routes pass their existing gates.
-JPEG/WebP path fragmentation is retained: 22 and 14 paths respectively on this
+JPEG/WebP path fragmentation is retained: 22 and 10 paths respectively on this
 fixture. Removing redundant handles is not represented as fixing segmentation.
 
 Inkscape 1.4 CLI actually imported optimized circle-1024, rounded-512,
@@ -324,12 +334,12 @@ warm runs, then reset/disposed. Measurements below are actual milliseconds:
 
 | Mode / run | WASM startup | Decode | Segmentation | Existing fitting | Refinement incl. optimizer | Optimizer subset | SVG export | Trace total | WASM committed MiB |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Baseline / cold | 10.9 | 20.8 | 39.5 | 95.7 | 2.9 | 0.0 | 1.9 | 175.7 | 7.69 |
-| Baseline / warm 1 | 0.0 | 20.0 | 32.9 | 72.2 | 1.2 | 0.0 | 0.9 | 126.8 | 9.75 |
-| Baseline / warm 2 | 0.0 | 25.7 | 20.0 | 66.1 | 1.5 | 0.0 | 0.5 | 118.4 | 9.75 |
-| Optimized / cold | 14.5 | 20.7 | 46.8 | 76.8 | 104.0 | 101.2 | 2.5 | 260.3 | 7.69 |
-| Optimized / warm 1 | 0.0 | 24.8 | 29.6 | 74.6 | 94.1 | 92.9 | 0.4 | 218.7 | 9.75 |
-| Optimized / warm 2 | 0.0 | 24.3 | 19.2 | 111.5 | 92.7 | 91.5 | 2.4 | 260.1 | 9.75 |
+| Baseline / cold | 15.7 | 28.1 | 51.3 | 82.6 | 2.5 | 0.0 | 1.5 | 181.4 | 7.69 |
+| Baseline / warm 1 | 0.0 | 20.4 | 21.0 | 65.8 | 1.1 | 0.0 | 0.5 | 105.0 | 9.75 |
+| Baseline / warm 2 | 0.0 | 23.3 | 33.5 | 73.6 | 1.4 | 0.0 | 0.4 | 139.3 | 9.75 |
+| Optimized / cold | 12.8 | 24.4 | 33.8 | 77.2 | 96.5 | 94.2 | 1.6 | 234.4 | 7.69 |
+| Optimized / warm 1 | 0.0 | 25.4 | 21.4 | 68.9 | 88.7 | 87.4 | 0.3 | 198.4 | 9.75 |
+| Optimized / warm 2 | 0.0 | 19.3 | 18.5 | 66.2 | 83.4 | 82.3 | 0.3 | 199.0 | 9.75 |
 
 The optimizer costs real CPU (about 90–100ms on this bounded rounded-512 case);
 it is not a speed improvement. The ellipse preflight removes ~100ms of pointless
@@ -352,7 +362,7 @@ revocation tests pass; they are not physical-device timing evidence.
 - Rust integration: **26/26**; upstream VTracer library: **31/31**.
 - TypeScript unit tests: **36/36**; lint/typecheck pass.
 - WASM release and production Vite build pass.
-- Actual production Chromium E2E: **19/19**, including 34 optimization
+- Actual production Chromium E2E: **19/19**, including 35 optimization
   comparisons, separate cold/warm reuse, fallback, reset/cancel, input caps,
   transparency, photo/gradients, shared graphs and previous-stage quality gates.
 - Independent ground truth, two rasterizers, source-quality evidence and four
@@ -417,6 +427,11 @@ forced path overlap, raster export or online solver sweep is introduced.
 
 ## GitHub and commit status
 
-Feature commit/CI and final integration status will be recorded after push and
-verification. Merge is conditional on the important regression gates succeeding;
-this report does not turn the unresolved absolute fidelity failures into PASS.
+Initial implementation: `7757a99b1c328032b5f1a574b136c17d60965d09`, authored
+by akidwush. GitHub validation **SUCCESS**:
+[run 40170471165](https://github.com/akidwush/vector-magic-bydika/actions/runs/40170471165).
+The final compositor-ownership and unchanged-Mosaic precision guard is a
+follow-up commit on the same branch; its exact CI status is checked before
+merging. Final integration status is recorded below after verification. No
+force-push is used. Regression success does not certify unresolved absolute
+fidelity objectives as PASS.

@@ -159,18 +159,9 @@ try {
       delta: row.delta,
     };
     evidence.push(result);
-    const show = [
-      "curve-optimization/dense-circle-1024.png",
-      "curve-optimization/dense-ellipse-1024.png",
-      "curve-optimization/rounded-512.png",
-      "curve-optimization/cubic-1024.png",
-      "curve-optimization/organic-512.png",
-      "curve-optimization/wave-512.png",
-      "shared-edge/organic.png",
-      "quality/cat-128-partial.png",
-      "corners/star-128.png",
-    ];
-    if (!show.includes(name) || row.profile !== "auto") continue;
+    const key =
+      name.replaceAll("/", "-") +
+      (row.profile === "auto" ? "" : "-" + row.profile);
     const box = variants[1].g.paths.at(-1).subpaths.flat();
     const objectTop = Math.min(...box.map((p) => p[1]));
     for (const scale of [1, 4, 10]) {
@@ -202,8 +193,7 @@ try {
         .locator("img")
         .evaluateAll((is) => Promise.all(is.map((i) => i.decode())));
       await page.screenshot({
-        path:
-          root + "/" + name.replaceAll("/", "-") + "-" + scale * 100 + ".png",
+        path: root + "/" + key + "-" + scale * 100 + ".png",
         fullPage: true,
       });
     }
@@ -230,7 +220,7 @@ try {
       .locator("img")
       .evaluateAll((is) => Promise.all(is.map((i) => i.decode())));
     await page.screenshot({
-      path: root + "/" + name.replaceAll("/", "-") + "-handles.png",
+      path: root + "/" + key + "-handles.png",
       fullPage: true,
     });
   }

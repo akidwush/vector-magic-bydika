@@ -226,13 +226,23 @@ fn run_pipeline(
         ])
     });
     if optimize {
-        if profile != "planar" && profile != "intelligent" && profile != "source-blend" {
+        // Check the compositor itself: aliases such as coverage-blend also own
+        // shared boundaries and must never enter a per-face fitting pass.
+        if profile != "planar"
+            && profile != "intelligent"
+            && matches!(
+                &pipeline.compositing,
+                vtracer::compose::Compositing::Stacked(_)
+            )
+        {
             use vtracer::optimize::OptimizerPass;
             vtracer::optimize::QuantizePass::new(2).run(&mut doc);
             reduce::document(&mut doc);
+            pipeline.writer.precision = Some(6);
         }
+        // Upstream Mosaic gets only exact line canonicalization. Retain its
+        // original writer precision; locked graph precision is already six.
         reduce::serialize_lines(&mut doc);
-        pipeline.writer.precision = Some(6);
     }
     let refined_at = now();
     let mut svg = pipeline.writer.write(&doc);

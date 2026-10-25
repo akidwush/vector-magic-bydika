@@ -41,6 +41,7 @@ test("curve optimization: actual SVG node counts, geometry and shared ownership"
     "shared-edge/rings.png",
     "shared-edge/curve.jpg",
     "shared-edge/curve.webp",
+    "stage12/cat-128-blended.png",
     "quality/cat-128-partial.png",
     "quality/cat-512-opaque.png",
   ];
@@ -121,6 +122,11 @@ test("curve optimization: actual SVG node counts, geometry and shared ownership"
         });
       }
       const [old, newer] = variants;
+      if (name === "stage12/cat-128-blended.png") {
+        expect(newer.perf.profile).toBe("coverage-blend");
+        expect(newer.perf.optimization.attempts).toBe(0);
+        expect(newer.g.anchors).toBe(old.g.anchors);
+      }
       expect(newer.g.paths.length).toBe(old.g.paths.length);
       expect(newer.g.closed).toBe(old.g.closed);
       expect(newer.g.anchors).toBeLessThanOrEqual(old.g.anchors);
