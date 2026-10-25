@@ -17,12 +17,13 @@ for(const name of ['edge-linear','edge-srgb']) {
  assert.equal(selected,name.slice(5));gamma.push({name,selected,transitionSamples:colors.length});
 }
 const measured=JSON.parse(await readFile('benchmark-results/stage15/evidence.json'));
-const baseline={cubic:{mean:0.09176246475390709,max:1.5615131224253462},wave:{mean:0.07944779640807578,max:1}};
+const baseline={cubic:{mean:0.09176246475390709,p95:0.37105308286056465,max:1.5615131224253462},wave:{mean:0.07944779640807578,p95:0.2984739672307605,max:1}};
 const geometry=[];
 for(const [name,old] of Object.entries(baseline)) {
  const row=measured.find(x=>x.name===`curve-optimization/${name}-1024.png`);
  assert(row,'missing actual export evidence');const current=row.groundTruth[1];
  assert(current.mean<=old.mean+1e-6,`${name}: Stage 1.5 mean regression`);
+ assert(current.p95<=old.p95+1e-6,`${name}: Stage 1.5 p95 regression`);
  assert(current.max<=old.max+1e-6,`${name}: Stage 1.5 max regression`);
  geometry.push({name,baseline:old,current,target_1_16:current.max<=1/16,target_1_64:current.max<=1/64});
 }

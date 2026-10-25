@@ -53,7 +53,7 @@ has been added. JPEG/WebP and ambiguous boundaries keep existing handling.
   actual `experiment` binding. Previously the requested default invocation failed
   with `Invalid quality profile`. Production profiles still use `trace_quality`.
 - `subpixel-proof.mjs` validates actual gamma fixtures and blocks any primary
-  absolute mean/max regression relative to Stage 1.5, independently of the looser
+  absolute mean/p95/max regression relative to Stage 1.5, independently of the looser
   historical Stage 1.4 improvement gate. It records research target failures.
 
 No reducer tolerance, corner threshold or topology safety guard was relaxed.
