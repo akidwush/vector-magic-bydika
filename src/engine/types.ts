@@ -3,6 +3,7 @@ export type EngineId = "vtracer-wasm" | "imagetracerjs";
 export interface TraceInput {
   sourceFormat?: string;
   optimize?: boolean;
+  sourceRefine?: boolean;
   quality?:
     | "auto"
     | "legacy"
@@ -24,6 +25,18 @@ export interface TraceResult {
   effectivePrecision?: number;
   corners?: number[];
   sourceModels?: number;
+  sourceRefinement?: {
+    enabled: boolean;
+    attempts: number;
+    accepted: number;
+    evaluations: number;
+    lossBefore: number;
+    lossAfter: number;
+    elapsedMs: number;
+    phase: number;
+    initialLoss: number;
+    supportInspections: number;
+  };
   optimization?: {
     attempts: number;
     accepted: number;

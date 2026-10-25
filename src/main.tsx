@@ -25,6 +25,7 @@ function App() {
     | "source"
   >("auto");
   const [optimize, setOptimize] = useState(true);
+  const [sourceRefine, setSourceRefine] = useState(false);
   const [result, setResult] = useState<
       TraceResult & {
         width: number;
@@ -108,6 +109,7 @@ function App() {
       setStatus("tracing");
       input.quality = quality;
       input.optimize = optimize;
+      input.sourceRefine = sourceRefine;
       const traced = await client.current.run(input, preset, preferred);
       if (id !== generation.current) return;
       const valid = validateSvg(traced.svg);
@@ -288,6 +290,16 @@ function App() {
                 />{" "}
                 Optimalkan node
               </label>
+              <label>
+                <input
+                  type="checkbox"
+                  aria-label="Refinement sumber"
+                  checked={sourceRefine}
+                  disabled={busy || preset !== "illustration"}
+                  onChange={(e) => setSourceRefine(e.target.checked)}
+                />{" "}
+                Refinement sumber · uji
+              </label>
               <button
                 className="convert"
                 disabled={!file || busy || (needsResize && !resize)}
@@ -463,6 +475,7 @@ function App() {
                   corners: result.corners,
                   sourceModels: result.sourceModels,
                   optimization: result.optimization,
+                  sourceRefinement: result.sourceRefinement,
                   transitions: result.transitions,
                   diagnostics: result.diagnostics,
                 })}
@@ -482,6 +495,13 @@ function App() {
                     {(result.bytes / 1024).toFixed(1)} KiB · {result.pathCount}{" "}
                     paths
                   </p>
+                  {sourceRefine && result.sourceRefinement && (
+                    <p>
+                      {result.sourceRefinement.enabled
+                        ? `Refinement sumber: ${result.sourceRefinement.accepted} kontur diterima · ${result.sourceRefinement.elapsedMs.toFixed(0)} ms solver`
+                        : "Refinement sumber tidak berlaku untuk input/preset/profil ini."}
+                    </p>
+                  )}
                   {result.diagnostics && (
                     <details>
                       <summary>Diagnostik input & waktu</summary>

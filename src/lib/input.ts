@@ -132,6 +132,7 @@ export async function decode(file: File, allowResize: boolean) {
       sourceFormat: info.mime,
       decodeMs: performance.now() - started,
       optimize: undefined as boolean | undefined,
+      sourceRefine: undefined as boolean | undefined,
       quality: undefined as
         | "auto"
         | "legacy"

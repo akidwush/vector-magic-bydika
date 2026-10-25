@@ -5,6 +5,14 @@ a tested ImageTracerJS fallback, three presets, original/vector comparison and l
 No account, tracing API, server upload, or paid runtime. Not affiliated with Vector Magic.
 Quality equivalence is not claimed; Photo is a baseline.
 
+## Stage 1.5 — experimental source refinement
+
+Stage 1.5 adds `Refinement sumber · uji`, disabled by default,
+for eligible opaque PNG illustrations. It uses source coverage to repair poor
+free-form initialization and refine local Bézier handle lengths. Promotion is
+controlled by an explicit source/reference geometry gate, including acute tips
+and final-output corners. Low-resolution caps and clipped contours remain limited. [Measured results and limitations](docs/STAGE_01_5_SOURCE_CONSTRAINED_BEZIER_REPORT.md).
+
 ## Stage 1.4 — bounded node optimization
 
 Eligible Auto contours reuse VTracer/flo_curves fitting with protected corners,

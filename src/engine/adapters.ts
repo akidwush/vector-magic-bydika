@@ -60,6 +60,13 @@ export async function createEngine(
               ),
               preset,
             );
+            const inverseEligible =
+              !!input.sourceRefine &&
+              preset === "illustration" &&
+              canReconstruct(diagnostics) &&
+              diagnostics.alphaPartialFraction === 0 &&
+              diagnostics.alphaZeroFraction === 0 &&
+              ["source", "planar", "intelligent"].includes(baseProfile);
             const svg = wasm.trace_quality(
               new Uint8Array(
                 input.rgba.buffer,
@@ -69,15 +76,17 @@ export async function createEngine(
               input.width,
               input.height,
               preset,
-              input.optimize !== false &&
+              (inverseEligible ? "inverse-" : "") +
+                (input.optimize !== false &&
                 preset !== "photo" &&
                 ["auto", "source", "planar", "intelligent"].includes(
                   input.quality ?? "auto",
                 )
-                ? `reduce-${profile}`
-                : profile,
+                  ? `reduce-${profile}`
+                  : profile),
             );
             const optimizationData = wasm.last_optimization();
+            const inverseData = wasm.last_inverse();
             const topologyData = wasm.last_topology();
             return {
               svg,
@@ -94,6 +103,18 @@ export async function createEngine(
               },
               corners: Array.from(wasm.last_corner_evidence()),
               sourceModels: wasm.last_source_models(),
+              sourceRefinement: {
+                enabled: inverseEligible,
+                attempts: inverseData[0],
+                accepted: inverseData[1],
+                evaluations: inverseData[2],
+                lossBefore: inverseData[3],
+                lossAfter: inverseData[4],
+                elapsedMs: inverseData[5],
+                phase: inverseData[6],
+                initialLoss: inverseData[7],
+                supportInspections: inverseData[8],
+              },
               optimization: {
                 attempts: optimizationData[0],
                 accepted: optimizationData[1],

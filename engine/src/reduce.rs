@@ -541,7 +541,7 @@ fn area(ps: &[P]) -> f64 {
         .map(|w| w[0].x * w[1].y - w[1].x * w[0].y)
         .sum()
 }
-fn inside(ps: &[P], p: P) -> bool {
+pub(crate) fn inside(ps: &[P], p: P) -> bool {
     ps.windows(2)
         .filter(|w| {
             (w[0].y > p.y) != (w[1].y > p.y)
