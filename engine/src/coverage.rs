@@ -248,6 +248,14 @@ fn plus(p: PointF64, d: PointF64) -> PointF64 {
     }
 }
 pub fn refine(doc: &mut VectorDoc, img: &ColorImage) -> Evidence {
+    refine_except(doc, img, &[])
+}
+/// Accepted source models already minimize coverage error; do not displace them again.
+pub fn refine_except(
+    doc: &mut VectorDoc,
+    img: &ColorImage,
+    protected: &[vtracer::ir::SubPath],
+) -> Evidence {
     let mut evidence = Evidence::default();
     if doc
         .shapes
@@ -261,6 +269,9 @@ pub fn refine(doc: &mut VectorDoc, img: &ColorImage) -> Evidence {
     }
     for shape in &mut doc.shapes {
         for path in &mut shape.path.subpaths {
+            if protected.contains(path) {
+                continue;
+            }
             let vertices: Vec<usize> = path
                 .commands
                 .iter()

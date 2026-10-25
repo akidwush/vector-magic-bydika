@@ -36,3 +36,27 @@ it("keeps sharp, compression noise, and complex sources distinct", () => {
     ),
   ).toBe("legacy");
 });
+
+it("routes source reconstruction conservatively and preserves the previous Auto comparator", () => {
+  const d = analyzeInput({
+    rgba: new Uint8ClampedArray([255, 0, 0, 255]),
+    width: 1,
+    height: 1,
+    sourceFormat: "image/png",
+  });
+  expect(chooseProfile(d, "illustration")).toBe("source");
+  expect(chooseProfile(d, "illustration", "pre-source")).toBe("adaptive");
+  expect(
+    chooseProfile(
+      { ...d, sourceFormat: "image/jpeg", classification: "compressed-flat" },
+      "illustration",
+    ),
+  ).toBe("adaptive");
+  expect(
+    chooseProfile(
+      { ...d, dominantCoverage: 0.95, classification: "blended-flat" },
+      "illustration",
+    ),
+  ).toBe("blend");
+  expect(chooseProfile(d, "photo", "source")).toBe("legacy");
+});

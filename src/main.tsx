@@ -15,7 +15,14 @@ function App() {
   const [preset, setPreset] = useState<Preset>("illustration"),
     [preferred, setPreferred] = useState<"auto" | "fallback">("auto");
   const [quality, setQuality] = useState<
-    "auto" | "legacy" | "shared" | "previous" | "planar" | "intelligent"
+    | "auto"
+    | "legacy"
+    | "shared"
+    | "previous"
+    | "pre-source"
+    | "planar"
+    | "intelligent"
+    | "source"
   >("auto");
   const [result, setResult] = useState<
       TraceResult & {
@@ -257,9 +264,11 @@ function App() {
                   value={quality}
                   onChange={(e) => setQuality(e.target.value as typeof quality)}
                 >
-                  <option value="auto">Otomatis · coverage</option>
+                  <option value="auto">Otomatis · rekonstruksi kontur</option>
+                  <option value="pre-source">Pembanding Auto lama</option>
                   <option value="previous">Baseline sebelum subpixel</option>
                   <option value="legacy">Baseline Stage 1.1</option>
+                  <option value="source">Rekonstruksi bentuk</option>
                   <option value="intelligent">Corner & Bézier · uji</option>
                   <option value="planar">
                     Shared edge · locked graph (eksperimental)
@@ -440,6 +449,7 @@ function App() {
                   coverage: result.coverage,
                   topology: result.topology,
                   corners: result.corners,
+                  sourceModels: result.sourceModels,
                   transitions: result.transitions,
                   diagnostics: result.diagnostics,
                 })}

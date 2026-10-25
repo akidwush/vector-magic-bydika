@@ -2,12 +2,18 @@ mod alpha;
 mod corners;
 mod coverage;
 mod planar;
+mod source_fit;
 #[wasm_bindgen]
 pub fn last_corner_evidence() -> Vec<f64> {
     corners::evidence()
 }
 use vtracer::{ColorImage, Config, FitMode};
 use wasm_bindgen::prelude::*;
+
+#[wasm_bindgen]
+pub fn last_source_models() -> u32 {
+    source_fit::accepted()
+}
 
 /// Thin integration only; segmentation and curve fitting are upstream VTracer.
 #[wasm_bindgen]
@@ -58,7 +64,7 @@ thread_local! {static LAST_COVERAGE:std::cell::Cell<[u32;4]>=const {std::cell::C
 pub fn last_coverage_evidence() -> Vec<u32> {
     LAST_COVERAGE.with(|s| s.get().to_vec())
 }
-thread_local! { static LAST_TIMING: std::cell::Cell<[f64;5]> = const {std::cell::Cell::new([0.0;5])}; }
+thread_local! { static LAST_TIMING: std::cell::Cell<[f64;7]> = const {std::cell::Cell::new([0.0;7])}; }
 #[wasm_bindgen]
 pub fn last_stage_timings() -> Vec<f64> {
     LAST_TIMING.with(|t| t.get().to_vec())
@@ -70,16 +76,48 @@ pub fn last_topology() -> Vec<f64> {
 }
 
 fn run_pipeline(
-    config: Config,
+    mut config: Config,
     rgba: Vec<u8>,
     width: usize,
     height: usize,
     profile: &str,
 ) -> Result<String, JsValue> {
+    let img = std::sync::Arc::new(ColorImage {
+        pixels: rgba,
+        width,
+        height,
+    });
+    source_fit::reset();
+    let prepare_started = now();
+    let source_prepared = if profile.starts_with("reconstruct") {
+        source_fit::prepare(&img).0
+    } else {
+        None
+    };
+    let profile = if profile.starts_with("reconstruct") {
+        if profile == "reconstruct-planar" {
+            "intelligent"
+        } else if profile == "reconstruct-blend" && source_prepared.is_none() {
+            config.hierarchical = vtracer::Hierarchical::Cutout;
+            config.clustering = vtracer::Clustering::Watershed;
+            config.mode = FitMode::Spline;
+            config.corner_threshold = 90;
+            config.length_threshold = 2.;
+            config.simplify = Some(0.25);
+            config.watershed_detail = 96;
+            "source-blend"
+        } else {
+            "source"
+        }
+    } else {
+        profile
+    };
+    let preparation_ms = now() - prepare_started;
     let mut pipeline = config
         .build()
         .map_err(|e| JsValue::from_str(&e.to_string()))?;
-    if profile == "adaptive"
+    if profile == "source"
+        || profile == "adaptive"
         || profile == "coverage"
         || profile == "alpha"
         || profile.ends_with("-adaptive")
@@ -87,13 +125,13 @@ fn run_pipeline(
         pipeline.compositing = vtracer::compose::Compositing::Stacked(Box::new(RegionFitter {
             polygon: matches!(config.mode, FitMode::Polygon),
             max_side: width.min(height),
+            source: if profile == "source" {
+                Some(img.clone())
+            } else {
+                None
+            },
         }));
     }
-    let img = ColorImage {
-        pixels: rgba,
-        width,
-        height,
-    };
     let start = now();
     let (prepared, _) = if cfg!(feature = "experiments") && profile.starts_with("coverage-clean-") {
         coverage::prepare(&img)
@@ -103,9 +141,30 @@ fn run_pipeline(
     let mut segmented = start;
     LAST_TOPOLOGY.with(|s| s.borrow_mut().clear());
     corners::reset();
-    let mut doc = if profile == "planar" || profile == "intelligent" {
+    let mut source_map = None;
+    let mut doc = if profile == "source-blend" {
         let mut seg = pipeline
-            .segment(&img)
+            .segment(source_prepared.as_ref().unwrap_or(&img))
+            .map_err(|e| JsValue::from_str(&e.to_string()))?;
+        segmented = now();
+        for fitter in &pipeline.color_fitters {
+            fitter.fit(&mut seg);
+        }
+        let mut map = vtracer::mosaic::LabelMap::from_segmentation(&seg);
+        let merge_diff = match &pipeline.compositing {
+            vtracer::compose::Compositing::Mosaic { merge_diff, .. } => *merge_diff,
+            _ => 0,
+        };
+        map.merge_similar(merge_diff);
+        source_map = Some(map);
+        let mut doc = pipeline.compositing.compose(&seg, &pipeline.curve_passes);
+        for pass in &pipeline.optimizers {
+            pass.run(&mut doc);
+        }
+        doc
+    } else if profile == "planar" || profile == "intelligent" {
+        let mut seg = pipeline
+            .segment(source_prepared.as_ref().unwrap_or(&img))
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
         segmented = now();
         for fitter in &pipeline.color_fitters {
@@ -122,7 +181,10 @@ fn run_pipeline(
     } else {
         pipeline
             .run_with_progress(
-                prepared.as_ref().unwrap_or(&img),
+                source_prepared
+                    .as_ref()
+                    .or(prepared.as_ref())
+                    .unwrap_or(&img),
                 &vtracer::CancelToken::new(),
                 &mut |p| {
                     if p.phase == vtracer::Phase::Segment && p.fraction >= 1.0 {
@@ -134,8 +196,16 @@ fn run_pipeline(
     };
     let fitted_at = now();
     let mut evidence = coverage::Evidence::default();
-    if profile.starts_with("coverage") {
+    if profile == "source" {
+        evidence = coverage::refine_except(&mut doc, &img, &source_fit::protected());
+    } else if profile.starts_with("coverage") || profile == "source-blend" {
         evidence = coverage::refine(&mut doc, &img);
+    }
+    if let Some(map) = source_map {
+        source_fit::refine_mosaic(&mut doc, &map, &img);
+        if source_fit::accepted() > 0 {
+            pipeline.writer.precision = Some(6);
+        }
     }
     LAST_COVERAGE.with(|s| {
         s.set([
@@ -152,6 +222,8 @@ fn run_pipeline(
         || profile == "alpha"
         || profile == "planar"
         || profile == "intelligent"
+        || profile == "source"
+        || profile == "source-blend"
     {
         svg = alpha::apply(svg, &img).map_err(|e| JsValue::from_str(&e.to_string()))?;
     }
@@ -162,6 +234,8 @@ fn run_pipeline(
             refined_at - fitted_at,
             now() - exported_at,
             exported_at - refined_at,
+            preparation_ms,
+            fitted_at - segmented,
         ])
     });
     Ok(svg)
@@ -203,6 +277,11 @@ pub fn trace_quality(
         "alpha",
         "planar",
         "intelligent",
+        "source",
+        "source-blend",
+        "reconstruct",
+        "reconstruct-blend",
+        "reconstruct-planar",
     ]
     .contains(&base)
     {
@@ -228,13 +307,13 @@ pub fn trace_quality(
         }
         _ => return Err(JsValue::from_str("Invalid preset")),
     }
-    if base == "shared" || base == "blend" {
+    if base == "shared" || base == "blend" || base == "source-blend" {
         config.hierarchical = vtracer::Hierarchical::Cutout;
         config.mode = FitMode::Spline;
         config.corner_threshold = 90;
         config.length_threshold = 2.0;
         config.simplify = Some(0.25);
-        if base == "blend" {
+        if base == "blend" || base == "source-blend" {
             config.clustering = vtracer::Clustering::Watershed;
             config.watershed_detail = 96;
         }
@@ -312,6 +391,7 @@ pub fn experiment(
                 p.compositing = vtracer::compose::Compositing::Stacked(Box::new(RegionFitter {
                     polygon: mode == "polygon",
                     max_side: width.min(height),
+                    source: None,
                 }));
             }
             p.to_svg(&ColorImage {
@@ -323,10 +403,11 @@ pub fn experiment(
         .map_err(|e| JsValue::from_str(&e.to_string()))
 }
 
-// Selects upstream fitters; no contours or curves are generated here.
+// Upstream contour extraction and baseline fitting; optional source-verified model refinement.
 struct RegionFitter {
     polygon: bool,
     max_side: usize,
+    source: Option<std::sync::Arc<ColorImage>>,
 }
 impl vtracer::fitter::CurveFitter for RegionFitter {
     fn fit_region(&self, mask: &vtracer::ir::RegionMask) -> Vec<vtracer::fitter::FittedGeom> {
@@ -339,7 +420,12 @@ impl vtracer::fitter::CurveFitter for RegionFitter {
                     y: mask.offset.y + cluster.rect.top,
                 },
             );
-            output.extend(self.fit_component(&component));
+            let baseline = self.fit_component(&component);
+            output.extend(if let Some(img) = &self.source {
+                source_fit::optimize(&component, img, baseline)
+            } else {
+                baseline
+            });
         }
         output
     }
@@ -372,6 +458,11 @@ impl RegionFitter {
                 }
             }
             round = intersection as f64 / union.max(1) as f64 >= 0.94;
+        }
+        if self.source.is_some() && !round {
+            if let Some(polygon) = source_fit::polygonal(mask, self.source.as_ref().unwrap()) {
+                return polygon;
+            }
         }
         if round {
             SplineFitter::new(FitParams {

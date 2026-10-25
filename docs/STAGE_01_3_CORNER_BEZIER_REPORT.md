@@ -1,5 +1,9 @@
 # Stage 1.3 — corner evidence and adaptive fitting
 
+**Follow-up:** [Source-guided production quality correction](SOURCE_GUIDED_QUALITY_REPORT.md)
+supersedes the default-policy and measurement status below. The original experimental
+failures are retained here as historical evidence.
+
 ## Status: PARTIAL, not certified complete
 
 Developed on `feat/stage-1-3-corner-bezier` from main `3f37c6e`.

@@ -136,7 +136,9 @@ export async function decode(file: File, allowResize: boolean) {
         | "legacy"
         | "shared"
         | "previous"
+        | "pre-source"
         | "planar"
+        | "source"
         | "intelligent"
         | undefined,
     };

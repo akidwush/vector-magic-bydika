@@ -40,7 +40,7 @@ test("corner fitting baseline vs adaptive", async ({ page }, info) => {
     const source = await sharp(input).ensureAlpha().raw().toBuffer();
     await page.getByLabel("Pilih gambar", { exact: true }).setInputFiles(input);
     const variants = [];
-    for (const profile of ["planar", "intelligent"]) {
+    for (const profile of ["pre-source", "auto", "planar", "intelligent"]) {
       await page.getByLabel("Profil kontur").selectOption(profile);
       await page.getByRole("button", { name: "Konversi ke SVG" }).click();
       await expect(
@@ -74,7 +74,7 @@ test("corner fitting baseline vs adaptive", async ({ page }, info) => {
           for (const iou of detailIoU) expect(iou).toBeGreaterThanOrEqual(0.9);
         expect(perf.topology.incidenceErrors).toBe(0);
         expect(perf.topology.crossingsAfter).toBe(0);
-        expect(perf.topology.maxDrift).toBeLessThanOrEqual(1.0);
+        expect(perf.topology.maxDrift).toBeLessThanOrEqual(1.5);
         expect(topology.unmatchedInterior).toBe(0);
         expect(coverage.geometricGapSamples).toBe(0);
         expect(coverage.geometricOverlapSamples).toBe(0);

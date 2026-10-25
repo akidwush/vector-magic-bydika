@@ -3,7 +3,18 @@
 **Local image → editable SVG.** Stage 1 browser converter with VTracer Rust/WASM,
 a tested ImageTracerJS fallback, three presets, original/vector comparison and local download.
 No account, tracing API, server upload, or paid runtime. Not affiliated with Vector Magic.
-Quality equivalence is not claimed; Photo is a baseline, and clean-vector improvement is future work.
+Quality equivalence is not claimed; Photo is a baseline.
+
+## Source-guided contour quality
+
+Auto now uses local two-color evidence and source-verified geometry for eligible
+flat PNGs: sharper polygon corners, smoother circular eyes and fewer antialias
+fragments. Original RGBA remains the fitting reference; partial alpha retains
+vector opacity masks. Photo, compressed/complex inputs and uncertain cases keep
+the previous routes. `Pembanding Auto lama` reproduces the exact prior Auto policy.
+[Measured results, comparisons and limitations](docs/SOURCE_GUIDED_QUALITY_REPORT.md).
+The locked shared-edge profile remains available and independently validated;
+Auto is not a universal planar-graph or Vector Magic quality guarantee.
 
 ## Stage 1.2 — contour quality and worker startup
 

@@ -85,6 +85,16 @@ export function analyzeInput(input: TraceInput): InputDiagnostics {
     sourceFormat: format,
   };
 }
+/** Conservative default: modeled flat PNG, with local source checks in Rust.
+ * Actual partial alpha bypasses decontamination and keeps the vector opacity route. */
+export function canReconstruct(d: InputDiagnostics): boolean {
+  return (
+    d.sourceFormat === "image/png" &&
+    d.dominantCoverage >= 0.96 &&
+    d.dominantColors <= 8 &&
+    ["sharp-flat", "blended-flat", "partial-alpha"].includes(d.classification)
+  );
+}
 export function chooseProfile(
   d: InputDiagnostics,
   preset: string,
@@ -93,9 +103,21 @@ export function chooseProfile(
     | "legacy"
     | "shared"
     | "previous"
+    | "pre-source"
     | "planar"
+    | "source"
     | "intelligent" = "auto",
-): "adaptive" | "shared" | "legacy" | "blend" | "planar" | "intelligent" {
+):
+  | "adaptive"
+  | "shared"
+  | "legacy"
+  | "blend"
+  | "planar"
+  | "source"
+  | "intelligent" {
+  if (preset === "photo") return "legacy";
+  if (quality === "source" || (quality === "auto" && canReconstruct(d)))
+    return "source";
   if (quality === "intelligent") return "intelligent";
   if (quality === "planar") return "planar";
   if (quality === "legacy" || preset === "photo") return "legacy";

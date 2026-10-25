@@ -7,7 +7,7 @@ use flo_curves::{
 use std::cell::RefCell;
 use vtracer::{
     ColorImage, PointF64,
-    mosaic::{FittedGeom, PolygonSegmentFitter, Segment, SegmentFitter},
+    mosaic::{FittedGeom, Segment},
 };
 thread_local! {static RECORDS:RefCell<Vec<f64>>=const{RefCell::new(Vec::new())};}
 pub fn reset() {
@@ -16,21 +16,11 @@ pub fn reset() {
 pub fn evidence() -> Vec<f64> {
     RECORDS.with(|r| r.borrow().clone())
 }
-pub fn restore(data: Vec<f64>) {
-    RECORDS.with(|r| *r.borrow_mut() = data);
-}
 fn p(x: f64, y: f64) -> PointF64 {
     PointF64 { x, y }
 }
 fn distance(a: PointF64, b: PointF64) -> f64 {
     (a.x - b.x).hypot(a.y - b.y)
-}
-fn angle(a: PointF64, b: PointF64, c: PointF64) -> f64 {
-    let u = p(b.x - a.x, b.y - a.y);
-    let v = p(c.x - b.x, c.y - b.y);
-    ((u.x * v.x + u.y * v.y) / (u.x.hypot(u.y) * v.x.hypot(v.y)).max(1e-12))
-        .clamp(-1., 1.)
-        .acos()
 }
 #[derive(Clone, Debug)]
 pub struct Corner {
@@ -60,20 +50,73 @@ pub fn detect(seg: &Segment) -> Vec<Corner> {
     for i in 0..n {
         let q = points[i];
         let junction = !seg.is_ring() && (i == 0 || i == n - 1);
-        let scales = [2usize, 4, 8].map(|s| s.min((n / 4).max(1)));
-        let turns =
-            scales.map(|s| angle(at(i as isize - s as isize), q, at(i as isize + s as isize)));
+        let scales = [3usize, 6, 10].map(|v| v.min((n / 4).max(1)));
+        let arm = |before: bool, scale: usize| {
+            let pts: Vec<_> = (2..=scale.max(3))
+                .map(|k| at(i as isize + if before { -(k as isize) } else { k as isize }))
+                .collect();
+            let m = p(
+                pts.iter().map(|q| q.x).sum::<f64>() / pts.len() as f64,
+                pts.iter().map(|q| q.y).sum::<f64>() / pts.len() as f64,
+            );
+            let xx = pts.iter().map(|q| (q.x - m.x).powi(2)).sum::<f64>();
+            let yy = pts.iter().map(|q| (q.y - m.y).powi(2)).sum::<f64>();
+            let xy = pts.iter().map(|q| (q.x - m.x) * (q.y - m.y)).sum::<f64>();
+            let t = 0.5 * (2. * xy).atan2(xx - yy);
+            let mut d = p(t.cos(), t.sin());
+            let direction = if before {
+                p(
+                    pts[0].x - pts[pts.len() - 1].x,
+                    pts[0].y - pts[pts.len() - 1].y,
+                )
+            } else {
+                p(
+                    pts[pts.len() - 1].x - pts[0].x,
+                    pts[pts.len() - 1].y - pts[0].y,
+                )
+            };
+            if d.x * direction.x + d.y * direction.y < 0. {
+                d.x = -d.x;
+                d.y = -d.y;
+            }
+            (m, d)
+        };
+        let mut turns = [0.; 3];
+        let mut intersections = Vec::new();
+        for (k, scale) in scales.into_iter().enumerate() {
+            let (a, u) = arm(true, scale);
+            let (b, v) = arm(false, scale);
+            turns[k] = (u.x * v.x + u.y * v.y).clamp(-1., 1.).acos();
+            let det = u.x * v.y - u.y * v.x;
+            if k > 0 && det.abs() > 0.05 {
+                let t = ((b.x - a.x) * v.y - (b.y - a.y) * v.x) / det;
+                intersections.push(p(a.x + t * u.x, a.y + t * u.y));
+            }
+        }
         let lo = turns.into_iter().fold(f64::INFINITY, f64::min);
         let hi = turns.into_iter().fold(0., f64::max);
         let stable = lo / hi.max(0.01);
-        let confidence = (stable * (lo / 1.2).min(1.)).clamp(0., 1.);
+        let estimate =
+            if intersections.len() == 2 && distance(intersections[0], intersections[1]) < 0.9 {
+                p(
+                    (intersections[0].x + intersections[1].x) * 0.5,
+                    (intersections[0].y + intersections[1].y) * 0.5,
+                )
+            } else {
+                q
+            };
+        let localized = intersections.len() == 2
+            && distance(estimate, q) < 1.8
+            && distance(intersections[0], intersections[1]) < 0.9;
+        let confidence =
+            (stable * (lo / 1.2).min(1.) / (1. + distance(estimate, q) * 0.2)).clamp(0., 1.);
         let class = if junction {
             4
-        } else if !seg.is_ring() && (i < 8 || i + 8 >= n) {
+        } else if !seg.is_ring() && (i < 10 || i + 10 >= n) {
             5
-        } else if lo > 0.65 && stable > 0.78 {
+        } else if lo > 0.5 && stable > 0.72 && localized {
             0
-        } else if lo > 0.35 && stable > 0.65 {
+        } else if lo > 0.35 && stable > 0.6 {
             1
         } else if hi < 0.12 {
             3
@@ -86,7 +129,7 @@ pub fn detect(seg: &Segment) -> Vec<Corner> {
             index: i,
             class,
             confidence: if junction { 1. } else { confidence },
-            position: q,
+            position: if class == 0 { estimate } else { q },
             protected: junction,
         });
     }
@@ -232,7 +275,7 @@ pub fn fit(seg: &Segment, edge: usize, img: Option<&ColorImage>) -> Option<Fitte
     let last = seg.points.len() - 1;
     if seg.is_ring() {
         if cuts.is_empty() {
-            return None;
+            return fit_smooth_ring(seg);
         }
         let start = cuts[0];
         let mut rotated = seg.clone();
@@ -243,7 +286,12 @@ pub fn fit(seg: &Segment, edge: usize, img: Option<&ColorImage>) -> Option<Fitte
             .collect();
         cuts.sort_unstable();
         cuts.push(last);
-        return fit_pieces(&rotated, &cuts);
+        let positions: Vec<_> = corners
+            .iter()
+            .filter(|c| c.protected)
+            .map(|c| c.position)
+            .collect();
+        return fit_pieces(&rotated, &cuts, &positions);
     }
     if cuts.first() != Some(&0) {
         cuts.insert(0, 0)
@@ -251,29 +299,104 @@ pub fn fit(seg: &Segment, edge: usize, img: Option<&ColorImage>) -> Option<Fitte
     if cuts.last() != Some(&last) {
         cuts.push(last)
     }
-    fit_pieces(seg, &cuts)
+    let positions: Vec<_> = cuts
+        .iter()
+        .map(|i| {
+            corners.iter().find(|c| c.index == *i).map_or_else(
+                || p(seg.points[*i].x as f64, seg.points[*i].y as f64),
+                |c| c.position,
+            )
+        })
+        .collect();
+    fit_pieces(seg, &cuts, &positions)
 }
-fn fit_pieces(seg: &Segment, cuts: &[usize]) -> Option<FittedGeom> {
+fn smooth(raw: &[PointF64], closed: bool) -> Vec<PointF64> {
+    (0..raw.len())
+        .map(|i| {
+            if !closed && (i == 0 || i + 1 == raw.len()) {
+                return raw[i];
+            }
+            let mut q = p(0., 0.);
+            let mut sum = 0.;
+            for (k, w) in [1., 2., 3., 2., 1.].into_iter().enumerate() {
+                let j = i as isize + k as isize - 2;
+                let j = if closed {
+                    j.rem_euclid(raw.len() as isize) as usize
+                } else {
+                    j.clamp(0, raw.len() as isize - 1) as usize
+                };
+                q.x += w * raw[j].x;
+                q.y += w * raw[j].y;
+                sum += w;
+            }
+            p(q.x / sum, q.y / sum)
+        })
+        .collect()
+}
+fn fit_smooth_ring(seg: &Segment) -> Option<FittedGeom> {
+    let n = seg.points.len() - 1;
+    if n < 8 {
+        return None;
+    }
+    let raw: Vec<_> = seg.points[..n]
+        .iter()
+        .map(|q| p(q.x as f64, q.y as f64))
+        .collect();
+    let ps = smooth(&raw, true);
+    let mut out = Vec::new();
+    let tangent = |i: usize| {
+        let a = ps[(i + n - 3) % n];
+        let b = ps[(i + 3) % n];
+        let d = distance(a, b).max(1e-12);
+        Coord2((b.x - a.x) / d, (b.y - a.y) / d)
+    };
+    for (a, b) in [(0, n / 2), (n / 2, n)] {
+        let data: Vec<_> = (a..=b).map(|i| Coord2(ps[i % n].x, ps[i % n].y)).collect();
+        let t = tangent(b % n);
+        let curves: Vec<Curve<Coord2>> =
+            fit_curve_cubic(&data, &tangent(a), &Coord2(-t.0, -t.1), 0.4);
+        for c in curves {
+            out.push([
+                p(c.start_point.0, c.start_point.1),
+                p(c.control_points.0.0, c.control_points.0.1),
+                p(c.control_points.1.0, c.control_points.1.1),
+                p(c.end_point.0, c.end_point.1),
+            ]);
+        }
+    }
+    if out.is_empty() {
+        None
+    } else {
+        Some(FittedGeom::Beziers(out))
+    }
+}
+fn fit_pieces(seg: &Segment, cuts: &[usize], positions: &[PointF64]) -> Option<FittedGeom> {
     let mut curves = Vec::new();
     let mut polygon = Vec::new();
     let mut all_straight = true;
-    for w in cuts.windows(2) {
+    for (piece_id, w) in cuts.windows(2).enumerate() {
         let mut piece = seg.clone();
         piece.points = seg.points[w[0]..=w[1]].to_vec();
         piece.start = Some(0);
         piece.end = Some(0);
-        let FittedGeom::Polyline(ps) = PolygonSegmentFitter.fit_open(&piece).geom else {
-            return None;
-        };
+        let raw: Vec<_> = piece
+            .points
+            .iter()
+            .map(|q| p(q.x as f64, q.y as f64))
+            .collect();
+        let mut ps = smooth(&raw, false);
+        ps[0] = positions[piece_id];
+        let last = ps.len() - 1;
+        ps[last] = positions[(piece_id + 1) % positions.len()];
         if ps.len() < 2 {
             return None;
         }
         let a = ps[0];
         let b = *ps.last()?;
         let len = distance(a, b).max(1e-12);
-        let straight = ps
+        let straight = raw
             .iter()
-            .all(|q| ((b.x - a.x) * (q.y - a.y) - (b.y - a.y) * (q.x - a.x)).abs() / len <= 0.7);
+            .all(|q| ((b.x - a.x) * (q.y - a.y) - (b.y - a.y) * (q.x - a.x)).abs() / len <= 1.0);
         all_straight &= straight;
         if polygon.is_empty() {
             polygon.push(a)

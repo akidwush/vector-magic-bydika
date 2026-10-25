@@ -1,6 +1,6 @@
 import type { TraceEngine, TraceInput, Preset } from "./types";
 import { analyzeTransitions } from "./transitions";
-import { analyzeInput, chooseProfile } from "./diagnostics";
+import { analyzeInput, chooseProfile, canReconstruct } from "./diagnostics";
 import { sourcePalette } from "./palette";
 import { presets } from "./types";
 export async function createEngine(
@@ -22,14 +22,33 @@ export async function createEngine(
               input.quality,
             );
             const refine =
-              (input.quality ?? "auto") === "auto" &&
+              ["auto", "pre-source"].includes(input.quality ?? "auto") &&
               preset !== "photo" &&
               diagnostics.dominantCoverage >= 0.85;
             const alphaSupported =
               refine ||
               baseProfile === "planar" ||
-              baseProfile === "intelligent";
-            const profile = refine ? `coverage-${baseProfile}` : baseProfile;
+              baseProfile === "intelligent" ||
+              baseProfile === "source";
+            const profile =
+              baseProfile === "source"
+                ? diagnostics.alphaPartialFraction === 0 &&
+                  diagnostics.alphaZeroFraction === 0 &&
+                  canReconstruct(diagnostics)
+                  ? diagnostics.classification === "blended-flat"
+                    ? "reconstruct-blend"
+                    : "reconstruct"
+                  : diagnostics.classification === "blended-flat"
+                    ? "source-blend"
+                    : "source"
+                : baseProfile === "intelligent" &&
+                    canReconstruct(diagnostics) &&
+                    diagnostics.alphaPartialFraction === 0 &&
+                    diagnostics.alphaZeroFraction === 0
+                  ? "reconstruct-planar"
+                  : refine
+                    ? `coverage-${baseProfile}`
+                    : baseProfile;
             const transitions =
               preset === "photo" ? undefined : analyzeTransitions(input);
             const diagnosticsMs = performance.now() - start;
@@ -67,6 +86,7 @@ export async function createEngine(
                 linear: wasm.last_coverage_evidence()[3],
               },
               corners: Array.from(wasm.last_corner_evidence()),
+              sourceModels: wasm.last_source_models(),
               topology: topologyData.length
                 ? {
                     vertices: topologyData[0],
@@ -82,10 +102,13 @@ export async function createEngine(
                     pixelFallback: !!topologyData[10],
                     validationBudgetFallback: !!topologyData[11],
                     adaptiveRollback: !!topologyData[12],
+                    sourceAccepted: topologyData[13],
                   }
                 : undefined,
               stages: {
                 segmentationMs: wasm.last_stage_timings()[0],
+                preparationMs: wasm.last_stage_timings()[5],
+                fittingMs: wasm.last_stage_timings()[6],
                 postprocessMs: wasm.last_stage_timings()[1],
                 diagnosticsMs,
                 refinementMs: wasm.last_stage_timings()[2],

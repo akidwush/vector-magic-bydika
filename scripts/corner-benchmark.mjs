@@ -1,3 +1,4 @@
+import assert from "node:assert/strict";
 import { chromium } from "@playwright/test";
 import { readFile, writeFile, readdir } from "node:fs/promises";
 import { svgPoints } from "./stage12-svg-metrics.mjs";
@@ -13,7 +14,7 @@ const browser = await chromium.launch({
 });
 const d = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
 const nearest = (a, bs) => bs.reduce((m, b) => Math.min(m, d(a, b)), Infinity);
-function points(svg) {
+function pointChains(svg) {
   return primitives(svg)
     .flatMap((p) => p.edges)
     .filter(
@@ -23,7 +24,7 @@ function points(svg) {
         !ps.every((p) => p[1] === 0) &&
         !ps.every((p) => p[1] === 128),
     )
-    .flatMap((ps) =>
+    .map((ps) =>
       Array.from(
         {
           length: Math.min(
@@ -61,6 +62,92 @@ function points(svg) {
       ),
     );
 }
+function points(svg) {
+  return pointChains(svg).flat();
+}
+const inRoi = (p) => p[0] > 2 && p[0] < 126 && p[1] > 2 && p[1] < 126;
+function segments(chains) {
+  return chains.flatMap((ps) =>
+    ps
+      .slice(1)
+      .map((b, i) => [ps[i], b])
+      .filter((e) => e.every(inRoi)),
+  );
+}
+function nearestSegment(p, lines) {
+  let best = Infinity;
+  for (const [a, b] of lines) {
+    const dx = b[0] - a[0],
+      dy = b[1] - a[1],
+      norm = dx * dx + dy * dy;
+    const t = norm
+      ? Math.max(
+          0,
+          Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / norm),
+        )
+      : 0;
+    const x = p[0] - a[0] - t * dx,
+      y = p[1] - a[1] - t * dy;
+    best = Math.min(best, x * x + y * y);
+  }
+  return Math.sqrt(best);
+}
+function outputCorners(svg) {
+  const out = [];
+  for (const { edges } of primitives(svg))
+    for (const next of edges) {
+      const q = next[0];
+      if (q[0] <= 2 || q[0] >= 126 || q[1] <= 2 || q[1] >= 126) continue;
+      const prev = edges.find((e) => d(e.at(-1), q) < 1e-5);
+      if (!prev) continue;
+      const before = prev.length === 4 ? prev[2] : prev[0],
+        after = next[1];
+      const a = [q[0] - before[0], q[1] - before[1]],
+        b = [after[0] - q[0], after[1] - q[1]];
+      const norm = Math.hypot(...a) * Math.hypot(...b);
+      if (
+        norm > 1e-8 &&
+        Math.acos(
+          Math.max(-1, Math.min(1, (a[0] * b[0] + a[1] * b[1]) / norm)),
+        ) > 0.65 &&
+        !out.some((p) => d(p, q) < 1e-4)
+      )
+        out.push(q);
+    }
+  return out;
+}
+function cornerAccuracy(candidates, expected) {
+  const available = new Set(candidates.map((_, i) => i));
+  const errors = [];
+  for (const p of expected) {
+    let best = -1,
+      delta = 2;
+    for (const i of available) {
+      const dd = d(p, candidates[i]);
+      if (dd <= delta) {
+        best = i;
+        delta = dd;
+      }
+    }
+    if (best >= 0) {
+      errors.push(delta);
+      available.delete(best);
+    }
+  }
+  return {
+    precision: candidates.length
+      ? errors.length / candidates.length
+      : expected.length
+        ? 0
+        : 1,
+    recall: expected.length ? errors.length / expected.length : 1,
+    matched: errors.length,
+    cornerCount: candidates.length,
+    meanPositionError: errors.length
+      ? errors.reduce((a, b) => a + b, 0) / errors.length
+      : null,
+  };
+}
 try {
   const page = await browser.newPage();
   for (const row of rows) {
@@ -71,17 +158,17 @@ try {
       .replace(/-128\.png$/, ".svg")
       .replace(/\.(png|jpg|webp)$/, ".svg");
     const gt = await readFile(vector, "utf8");
-    const referenceAll = await page.evaluate((svg) => {
+    const referenceChains = await page.evaluate((svg) => {
       const doc = new DOMParser().parseFromString(svg, "image/svg+xml");
       const root = document.importNode(doc.documentElement, true);
       document.body.append(root);
       const out = Array.from(root.querySelectorAll("path,circle,ellipse,rect"))
         .slice(1)
-        .flatMap((el) => {
+        .map((el) => {
           const g = el;
           const len = g.getTotalLength();
           return Array.from(
-            { length: Math.min(1024, Math.max(64, Math.ceil(len * 2))) },
+            { length: Math.min(1024, Math.max(64, Math.ceil(len * 2))) + 1 },
             (_, i) => {
               const p = g.getPointAtLength(
                 (i / Math.min(1024, Math.max(64, Math.ceil(len * 2)))) * len,
@@ -93,9 +180,10 @@ try {
       root.remove();
       return out;
     }, gt);
-    const reference = referenceAll.filter(
-      (p) => p[0] > 2 && p[0] < 126 && p[1] > 2 && p[1] < 126,
-    );
+    const referenceLines = segments(referenceChains);
+    const reference = referenceChains
+      .flat()
+      .filter((p) => p[0] > 2 && p[0] < 126 && p[1] > 2 && p[1] < 126);
     const images = [
       [
         "Original",
@@ -115,8 +203,9 @@ try {
       const samples = points(svg).filter(
         (p) => p[0] > 2 && p[0] < 126 && p[1] > 2 && p[1] < 126,
       );
-      const errors = samples.map((p) => nearest(p, reference));
-      const reverse = reference.map((p) => nearest(p, samples));
+      const outputLines = segments(pointChains(svg));
+      const errors = samples.map((p) => nearestSegment(p, referenceLines));
+      const reverse = reference.map((p) => nearestSegment(p, outputLines));
       const all = [...errors, ...reverse].sort((a, b) => a - b);
       v.geometry = {
         svgNodes: svgPoints(svg),
@@ -163,6 +252,8 @@ try {
         .at(-1)
         .replace(/-128\.png$|\.jpg$|\.webp$/, "");
       const expected = truth[key]?.corners;
+      if (expected)
+        v.geometry.outputCorners = cornerAccuracy(outputCorners(svg), expected);
       if (expected && v.profile === "intelligent") {
         const records = v.perf.corners || [];
         const candidates = [];
@@ -204,11 +295,30 @@ try {
       }
       images.push([v.profile, Buffer.from(svg), "image/svg+xml"]);
     }
+    const oldAuto = row.variants.find((v) => v.profile === "pre-source"),
+      newAuto = row.variants.find((v) => v.profile === "auto");
+    if (
+      oldAuto.geometry.outputCorners &&
+      ["square", "triangle", "star", "mixed"].some((k) =>
+        row.name.includes(k + "-128"),
+      )
+    ) {
+      assert(
+        newAuto.geometry.outputCorners.recall >=
+          oldAuto.geometry.outputCorners.recall,
+        `${row.name}: protected corner recall regressed`,
+      );
+      assert(
+        newAuto.geometry.outputCorners.precision >=
+          oldAuto.geometry.outputCorners.precision,
+        `${row.name}: false corner regression`,
+      );
+    }
     for (const scale of process.argv.includes("--metrics-only")
       ? []
       : [1, 4, 10]) {
       await page.setViewportSize({
-        width: 128 * scale * 3 + 48,
+        width: 128 * scale * images.length + 48,
         height: 128 * scale + 100,
       });
       await page.setContent(
