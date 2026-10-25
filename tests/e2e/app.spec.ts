@@ -225,7 +225,7 @@ test("decode guardrails, downscale consent, alpha and forced fallback", async ({
   await expect(
     page.getByRole("button", { name: "Konversi ke SVG" }),
   ).toBeDisabled();
-  await page.getByRole("checkbox").check();
+  await page.getByRole("checkbox", { name: /Setujui pengecilan/ }).check();
   await page.getByRole("button", { name: "Konversi ke SVG" }).click();
   await expect(page.locator(".result")).toContainText("1906 × 1048");
   const rotated = await sharp({

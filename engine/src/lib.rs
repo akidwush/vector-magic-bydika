@@ -2,7 +2,12 @@ mod alpha;
 mod corners;
 mod coverage;
 mod planar;
+mod reduce;
 mod source_fit;
+#[wasm_bindgen]
+pub fn last_optimization() -> Vec<f64> {
+    reduce::values()
+}
 #[wasm_bindgen]
 pub fn last_corner_evidence() -> Vec<f64> {
     corners::evidence()
@@ -82,12 +87,16 @@ fn run_pipeline(
     height: usize,
     profile: &str,
 ) -> Result<String, JsValue> {
+    let optimize = profile.starts_with("reduce-");
+    let profile = profile.strip_prefix("reduce-").unwrap_or(profile);
+    reduce::reset();
     let img = std::sync::Arc::new(ColorImage {
         pixels: rgba,
         width,
         height,
     });
     source_fit::reset();
+    source_fit::sparse(optimize);
     let prepare_started = now();
     let source_prepared = if profile.starts_with("reconstruct") {
         source_fit::prepare(&img).0
@@ -170,8 +179,9 @@ fn run_pipeline(
         for fitter in &pipeline.color_fitters {
             fitter.fit(&mut seg);
         }
-        let (doc, stats) = planar::compose_mode(&seg, profile == "intelligent", Some(&img))
-            .map_err(|e| JsValue::from_str(&e))?;
+        let (doc, stats) =
+            planar::compose_optimized(&seg, profile == "intelligent", Some(&img), optimize)
+                .map_err(|e| JsValue::from_str(&e))?;
         LAST_TOPOLOGY.with(|s| *s.borrow_mut() = stats.values());
         // Absolute, pre-quantized shared coordinates. No per-face optimizer pass.
         pipeline.writer.relative = false;
@@ -215,6 +225,15 @@ fn run_pipeline(
             evidence.linear as u32,
         ])
     });
+    if optimize {
+        if profile != "planar" && profile != "intelligent" && profile != "source-blend" {
+            use vtracer::optimize::OptimizerPass;
+            vtracer::optimize::QuantizePass::new(2).run(&mut doc);
+            reduce::document(&mut doc);
+        }
+        reduce::serialize_lines(&mut doc);
+        pipeline.writer.precision = Some(6);
+    }
     let refined_at = now();
     let mut svg = pipeline.writer.write(&doc);
     let exported_at = now();
@@ -259,6 +278,8 @@ pub fn trace_quality(
     {
         return Err(JsValue::from_str("Invalid RGBA dimensions"));
     }
+    let requested_profile = profile;
+    let profile = profile.strip_prefix("reduce-").unwrap_or(profile);
     if profile.starts_with("coverage-clean-") && !cfg!(feature = "experiments") {
         return Err(JsValue::from_str(
             "Pre-segmentation labeling is research-only",
@@ -318,7 +339,7 @@ pub fn trace_quality(
             config.watershed_detail = 96;
         }
     }
-    run_pipeline(config, rgba, width, height, profile)
+    run_pipeline(config, rgba, width, height, requested_profile)
 }
 
 /// Conservative flat-color statistic: at least 85% of pixels in eight RGB bins.

@@ -24,6 +24,7 @@ function App() {
     | "intelligent"
     | "source"
   >("auto");
+  const [optimize, setOptimize] = useState(true);
   const [result, setResult] = useState<
       TraceResult & {
         width: number;
@@ -106,6 +107,7 @@ function App() {
       const { width, height } = input;
       setStatus("tracing");
       input.quality = quality;
+      input.optimize = optimize;
       const traced = await client.current.run(input, preset, preferred);
       if (id !== generation.current) return;
       const valid = validateSvg(traced.svg);
@@ -275,6 +277,16 @@ function App() {
                   </option>
                   <option value="shared">Mosaic upstream · pembanding</option>
                 </select>
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  aria-label="Optimalkan node"
+                  checked={optimize}
+                  disabled={busy || preset === "photo"}
+                  onChange={(e) => setOptimize(e.target.checked)}
+                />{" "}
+                Optimalkan node
               </label>
               <button
                 className="convert"
@@ -450,6 +462,7 @@ function App() {
                   topology: result.topology,
                   corners: result.corners,
                   sourceModels: result.sourceModels,
+                  optimization: result.optimization,
                   transitions: result.transitions,
                   diagnostics: result.diagnostics,
                 })}

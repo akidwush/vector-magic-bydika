@@ -69,8 +69,15 @@ export async function createEngine(
               input.width,
               input.height,
               preset,
-              profile,
+              input.optimize !== false &&
+                preset !== "photo" &&
+                ["auto", "source", "planar", "intelligent"].includes(
+                  input.quality ?? "auto",
+                )
+                ? `reduce-${profile}`
+                : profile,
             );
+            const optimizationData = wasm.last_optimization();
             const topologyData = wasm.last_topology();
             return {
               svg,
@@ -87,6 +94,16 @@ export async function createEngine(
               },
               corners: Array.from(wasm.last_corner_evidence()),
               sourceModels: wasm.last_source_models(),
+              optimization: {
+                attempts: optimizationData[0],
+                accepted: optimizationData[1],
+                rejected: optimizationData[2],
+                segmentsBefore: optimizationData[3],
+                segmentsAfter: optimizationData[4],
+                validationSamples: optimizationData[5],
+                budgetFallback: !!optimizationData[6],
+                elapsedMs: optimizationData[7],
+              },
               topology: topologyData.length
                 ? {
                     vertices: topologyData[0],

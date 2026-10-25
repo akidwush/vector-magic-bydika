@@ -1,7 +1,7 @@
 name: NEXORA Stage 1
 on:
   push:
-    branches: [main, feat/stage-1-2-subpixel-coverage, feat/stage-1-2b-locked-shared-edges, feat/stage-1-3-corner-bezier, feat/source-guided-quality]
+    branches: [main, feat/stage-1-2-subpixel-coverage, feat/stage-1-2b-locked-shared-edges, feat/stage-1-3-corner-bezier, feat/source-guided-quality, feat/stage-1-4-curve-optimization]
   pull_request:
 jobs:
   validate:
@@ -36,6 +36,8 @@ jobs:
       - run: node scripts/shared-edge-screenshots.mjs 2>&1 | tee -a "$RUNNER_TEMP/nexora-validation.log"
       - run: node scripts/corner-benchmark.mjs 2>&1 | tee -a "$RUNNER_TEMP/nexora-validation.log"
       - run: node scripts/source-quality-evidence.mjs 2>&1 | tee -a "$RUNNER_TEMP/nexora-validation.log"
+      - run: node scripts/curve-optimization-evidence.mjs 2>&1 | tee -a "$RUNNER_TEMP/nexora-validation.log"
+      - run: node scripts/curve-optimization-editability.mjs 2>&1 | tee -a "$RUNNER_TEMP/nexora-validation.log"
       - name: Publish failed validation details
         if: failure()
         run: |

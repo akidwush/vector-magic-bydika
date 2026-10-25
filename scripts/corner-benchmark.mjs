@@ -3,6 +3,7 @@ import { chromium } from "@playwright/test";
 import { readFile, writeFile, readdir } from "node:fs/promises";
 import { svgPoints } from "./stage12-svg-metrics.mjs";
 import { primitives } from "./shared-edge-metrics.mjs";
+import { geometry, chains } from "./curve-geometry-metrics.mjs";
 const root = "benchmark-results/stage13";
 const rows = JSON.parse(await readFile(root + "/production.json"));
 const truth = JSON.parse(await readFile("tests/fixtures/corners/truth.json"));
@@ -14,53 +15,29 @@ const browser = await chromium.launch({
 });
 const d = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
 const nearest = (a, bs) => bs.reduce((m, b) => Math.min(m, d(a, b)), Infinity);
+// Uniform arclength sampling on a 0.002px flattened curve. A collinear cubic
+// and an L command have the same locus; their SVG parameter speeds must not
+// change the statistical weight of distant noise regions in p95/Chamfer.
 function pointChains(svg) {
-  return primitives(svg)
-    .flatMap((p) => p.edges)
-    .filter(
-      (ps) =>
-        !ps.every((p) => p[0] === 0) &&
-        !ps.every((p) => p[0] === 128) &&
-        !ps.every((p) => p[1] === 0) &&
-        !ps.every((p) => p[1] === 128),
-    )
-    .map((ps) =>
-      Array.from(
-        {
-          length: Math.min(
-            65,
-            Math.max(
-              2,
-              Math.ceil(
-                ps.slice(1).reduce((s, p, i) => s + d(p, ps[i]), 0) * 2,
-              ) + 1,
-            ),
-          ),
-        },
-        (_, i) => {
-          const n = Math.min(
-            64,
-            Math.max(
-              1,
-              Math.ceil(
-                ps.slice(1).reduce((s, p, i) => s + d(p, ps[i]), 0) * 2,
-              ),
-            ),
-          );
-          const t = i / n,
-            u = 1 - t;
-          return ps.length === 2
-            ? [ps[0][0] * u + ps[1][0] * t, ps[0][1] * u + ps[1][1] * t]
-            : [0, 1].map(
-                (k) =>
-                  u * u * u * ps[0][k] +
-                  3 * u * u * t * ps[1][k] +
-                  3 * u * t * t * ps[2][k] +
-                  t * t * t * ps[3][k],
-              );
-        },
-      ),
-    );
+  return chains(geometry(svg)).map((ps) => {
+    const lengths = [0];
+    for (let i = 1; i < ps.length; i++)
+      lengths.push(lengths.at(-1) + d(ps[i - 1], ps[i]));
+    const total = lengths.at(-1),
+      n = Math.max(1, Math.ceil(total * 2));
+    if (n > 16384) throw Error("Geometry metric sampling budget");
+    let j = 0;
+    return Array.from({ length: n + 1 }, (_, i) => {
+      const s = (total * i) / n;
+      while (j + 1 < lengths.length - 1 && lengths[j + 1] < s) j++;
+      const span = lengths[j + 1] - lengths[j],
+        t = span ? (s - lengths[j]) / span : 0;
+      return [
+        ps[j][0] + (ps[j + 1][0] - ps[j][0]) * t,
+        ps[j][1] + (ps[j + 1][1] - ps[j][1]) * t,
+      ];
+    });
+  });
 }
 function points(svg) {
   return pointChains(svg).flat();

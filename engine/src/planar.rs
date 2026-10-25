@@ -515,21 +515,23 @@ fn constrained(
 
 #[cfg(test)]
 fn compose_map(map: &LabelMap) -> Result<(VectorDoc, Stats), String> {
-    compose_map_mode(map, false, None)
+    compose_map_mode(map, false, None, false)
 }
-pub fn compose_mode(
+pub fn compose_optimized(
     seg: &Segmentation,
     adaptive: bool,
     img: Option<&vtracer::ColorImage>,
+    optimize: bool,
 ) -> Result<(VectorDoc, Stats), String> {
     let mut map = LabelMap::from_segmentation(seg);
     map.merge_similar(0);
-    compose_map_mode(&map, adaptive, img)
+    compose_map_mode(&map, adaptive, img, optimize)
 }
 fn compose_map_mode(
     map: &LabelMap,
     adaptive: bool,
     img: Option<&vtracer::ColorImage>,
+    optimize: bool,
 ) -> Result<(VectorDoc, Stats), String> {
     crate::corners::reset();
     // Preflight before allocating graph/fitting. Source cap remains 2MP.
@@ -741,6 +743,60 @@ fn compose_map_mode(
                     );
                 }
             }
+        }
+    }
+    if optimize && !stats.pixel_fallback {
+        crate::reduce::timed(|| {
+            let original = fitted.clone();
+            let mut changed = vec![false; fitted.len()];
+            for (id, edge) in graph.segments.iter().enumerate() {
+                if let Some(g) = crate::reduce::propose(&fitted[id].geom, edge.is_ring()) {
+                    let limit = drift_limit(edge).max(
+                        drift_bounded(edge, &fitted[id].geom, map.width, map.height, 1.5)
+                            .unwrap_or(0.),
+                    );
+                    if drift_bounded(edge, &g, map.width, map.height, limit).is_some() {
+                        fitted[id].geom = g;
+                        changed[id] = true;
+                    }
+                }
+            }
+            match collisions(&graph, &fitted) {
+                Ok(bad) => {
+                    for id in bad {
+                        if changed[id] {
+                            fitted[id] = original[id].clone();
+                            changed[id] = false;
+                        }
+                    }
+                }
+                Err(_) => {
+                    fitted = original.clone();
+                    changed.fill(false);
+                }
+            }
+            if !matches!(collisions(&graph,&fitted),Ok(bad) if bad.is_empty()) {
+                fitted = original.clone();
+                changed.fill(false);
+            }
+            stats.max_drift = 0.;
+            for (id, edge) in graph.segments.iter().enumerate() {
+                if changed[id] {
+                    crate::reduce::accepted(&original[id].geom, &fitted[id].geom);
+                }
+                stats.max_drift = stats.max_drift.max(
+                    drift_bounded(edge, &fitted[id].geom, map.width, map.height, 1.5).unwrap_or(0.),
+                );
+            }
+        });
+    }
+    if optimize {
+        stats.max_drift = 0.;
+        for (edge, fit) in graph.segments.iter().zip(&fitted) {
+            stats.max_drift = stats.max_drift.max(
+                drift_bounded(edge, &fit.geom, map.width, map.height, 1.5)
+                    .ok_or("Optimized shared edge drift invalid")?,
+            );
         }
     }
     // No independent simplification/refinement/rounding after this composition.
