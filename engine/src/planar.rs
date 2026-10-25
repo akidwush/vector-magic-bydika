@@ -799,6 +799,54 @@ fn compose_map_mode(
             );
         }
     }
+    if crate::inverse::enabled() && !stats.pixel_fallback {
+        if let Some(img) = img {
+            let baseline = fitted.clone();
+            let mut changed = vec![false; fitted.len()];
+            for (id, edge) in graph.segments.iter().enumerate() {
+                if !edge.is_ring()
+                    || !matches!(&fitted[id].geom,FittedGeom::Beziers(cs) if cs.len()>4)
+                {
+                    continue;
+                }
+                if !crate::inverse::claim_support() {
+                    break;
+                }
+                if let Some(ss) = crate::source_fit::samples(edge, map, img) {
+                    if let Some(g) = crate::inverse::refine(edge, img, &fitted[id].geom, &ss) {
+                        fitted[id].geom = g;
+                        changed[id] = true;
+                    }
+                }
+            }
+            if let Ok(bad) = collisions(&graph, &fitted) {
+                for id in bad {
+                    if changed[id] {
+                        fitted[id] = baseline[id].clone();
+                        changed[id] = false;
+                        crate::inverse::undo();
+                    }
+                }
+            }
+            if !matches!(collisions(&graph,&fitted),Ok(bad) if bad.is_empty()) {
+                for &c in &changed {
+                    if c {
+                        crate::inverse::undo();
+                    }
+                }
+                fitted = baseline;
+            }
+        }
+    }
+    if crate::inverse::enabled() {
+        stats.max_drift = 0.;
+        for (edge, fit) in graph.segments.iter().zip(&fitted) {
+            stats.max_drift = stats.max_drift.max(
+                drift_bounded(edge, &fit.geom, map.width, map.height, 1.5)
+                    .ok_or("Source-refined shared edge invalid")?,
+            );
+        }
+    }
     // No independent simplification/refinement/rounding after this composition.
     Ok((mosaic::compose_fitted(map, &graph, &faces, &fitted), stats))
 }

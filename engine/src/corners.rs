@@ -31,6 +31,12 @@ pub struct Corner {
     pub protected: bool,
 }
 pub fn detect(seg: &Segment) -> Vec<Corner> {
+    detect_mode(seg, false)
+}
+pub fn detect_source(seg: &Segment) -> Vec<Corner> {
+    detect_mode(seg, true)
+}
+fn detect_mode(seg: &Segment, source: bool) -> Vec<Corner> {
     let n = seg.points.len() - seg.is_ring() as usize;
     let points: Vec<_> = seg.points[..n]
         .iter()
@@ -50,7 +56,12 @@ pub fn detect(seg: &Segment) -> Vec<Corner> {
     for i in 0..n {
         let q = points[i];
         let junction = !seg.is_ring() && (i == 0 || i == n - 1);
-        let scales = [3usize, 6, 10].map(|v| v.min((n / 4).max(1)));
+        let scales = (if source && n > 1024 {
+            [6usize, 12, 24]
+        } else {
+            [3usize, 6, 10]
+        })
+        .map(|v| v.min((n / 4).max(1)));
         let arm = |before: bool, scale: usize| {
             let pts: Vec<_> = (2..=scale.max(3))
                 .map(|k| at(i as isize + if before { -(k as isize) } else { k as isize }))
@@ -108,6 +119,19 @@ pub fn detect(seg: &Segment) -> Vec<Corner> {
         let localized = intersections.len() == 2
             && distance(estimate, q) < 1.8
             && distance(intersections[0], intersections[1]) < 0.9;
+        let extension = source
+            && intersections.len() == 2
+            && lo > 1.0
+            && stable > 0.72
+            && distance(estimate, q) < 4.
+            && distance(intersections[0], intersections[1]) < 0.9;
+        let localized = localized || extension;
+        let source_position = if extension && distance(estimate, q) > 1.2 {
+            let t = 1.2 / distance(estimate, q);
+            p(q.x + (estimate.x - q.x) * t, q.y + (estimate.y - q.y) * t)
+        } else {
+            estimate
+        };
         let confidence =
             (stable * (lo / 1.2).min(1.) / (1. + distance(estimate, q) * 0.2)).clamp(0., 1.);
         let class = if junction {
@@ -129,7 +153,7 @@ pub fn detect(seg: &Segment) -> Vec<Corner> {
             index: i,
             class,
             confidence: if junction { 1. } else { confidence },
-            position: if class == 0 { estimate } else { q },
+            position: if class == 0 { source_position } else { q },
             protected: junction,
         });
     }
@@ -237,7 +261,39 @@ fn ellipse(seg: &Segment, corners: &[Corner]) -> Option<FittedGeom> {
     Some(FittedGeom::Beziers(curves))
 }
 pub fn fit(seg: &Segment, edge: usize, img: Option<&ColorImage>) -> Option<FittedGeom> {
-    let corners = detect(seg);
+    fit_impl(seg, edge, img, false, &[])
+}
+pub fn fit_source(
+    seg: &Segment,
+    edge: usize,
+    img: Option<&ColorImage>,
+    final_corners: &[PointF64],
+) -> Option<FittedGeom> {
+    fit_impl(seg, edge, img, true, final_corners)
+}
+fn fit_impl(
+    seg: &Segment,
+    edge: usize,
+    img: Option<&ColorImage>,
+    bounded: bool,
+    final_corners: &[PointF64],
+) -> Option<FittedGeom> {
+    let mut corners = if bounded {
+        detect_source(seg)
+    } else {
+        detect(seg)
+    };
+    if bounded {
+        for &fixed in final_corners {
+            if let Some(c) = corners
+                .iter_mut()
+                .filter(|c| c.protected && distance(c.position, fixed) <= 1.5)
+                .min_by(|a, b| distance(a.position, fixed).total_cmp(&distance(b.position, fixed)))
+            {
+                c.position = fixed;
+            }
+        }
+    }
     RECORDS.with(|r| {
         let mut r = r.borrow_mut();
         for c in corners.iter().filter(|c| c.protected || c.index % 8 == 0) {
@@ -269,13 +325,13 @@ pub fn fit(seg: &Segment, edge: usize, img: Option<&ColorImage>) -> Option<Fitte
     }
     let mut cuts: Vec<_> = corners
         .iter()
-        .filter(|c| c.protected)
+        .filter(|c| c.protected && (!bounded || c.confidence >= 0.5))
         .map(|c| c.index)
         .collect();
     let last = seg.points.len() - 1;
     if seg.is_ring() {
         if cuts.is_empty() {
-            return fit_smooth_ring(seg);
+            return fit_smooth_ring(seg, bounded);
         }
         let start = cuts[0];
         let mut rotated = seg.clone();
@@ -288,10 +344,10 @@ pub fn fit(seg: &Segment, edge: usize, img: Option<&ColorImage>) -> Option<Fitte
         cuts.push(last);
         let positions: Vec<_> = corners
             .iter()
-            .filter(|c| c.protected)
+            .filter(|c| c.protected && (!bounded || c.confidence >= 0.5))
             .map(|c| c.position)
             .collect();
-        return fit_pieces(&rotated, &cuts, &positions);
+        return fit_pieces(&rotated, &cuts, &positions, bounded);
     }
     if cuts.first() != Some(&0) {
         cuts.insert(0, 0)
@@ -308,7 +364,7 @@ pub fn fit(seg: &Segment, edge: usize, img: Option<&ColorImage>) -> Option<Fitte
             )
         })
         .collect();
-    fit_pieces(seg, &cuts, &positions)
+    fit_pieces(seg, &cuts, &positions, bounded)
 }
 fn smooth(raw: &[PointF64], closed: bool) -> Vec<PointF64> {
     (0..raw.len())
@@ -333,7 +389,54 @@ fn smooth(raw: &[PointF64], closed: bool) -> Vec<PointF64> {
         })
         .collect()
 }
-fn fit_smooth_ring(seg: &Segment) -> Option<FittedGeom> {
+// Bounded source-only initialization partitions the existing smoothed contour.
+// Interior chunk endpoints share one tangent estimate, preserving G1 direction.
+fn fit_source_chunks(
+    ps: &[PointF64],
+    start: &Coord2,
+    end: &Coord2,
+    tolerance: f64,
+    bounded: bool,
+) -> Vec<Curve<Coord2>> {
+    if !bounded || ps.len() <= 192 {
+        return fit_curve_cubic(
+            &ps.iter().map(|p| Coord2(p.x, p.y)).collect::<Vec<_>>(),
+            start,
+            end,
+            tolerance,
+        );
+    }
+    let tangent = |i: usize| {
+        let a = ps[i.saturating_sub(3)];
+        let b = ps[(i + 3).min(ps.len() - 1)];
+        let d = distance(a, b).max(1e-12);
+        Coord2((b.x - a.x) / d, (b.y - a.y) / d)
+    };
+    let mut out = Vec::new();
+    let mut a = 0;
+    while a + 1 < ps.len() {
+        let b = (a + 191).min(ps.len() - 1);
+        let t = tangent(b);
+        let u = if a == 0 { *start } else { tangent(a) };
+        let v = if b + 1 == ps.len() {
+            *end
+        } else {
+            Coord2(-t.0, -t.1)
+        };
+        out.extend(fit_curve_cubic::<Curve<Coord2>>(
+            &ps[a..=b]
+                .iter()
+                .map(|p| Coord2(p.x, p.y))
+                .collect::<Vec<_>>(),
+            &u,
+            &v,
+            tolerance,
+        ));
+        a = b;
+    }
+    out
+}
+fn fit_smooth_ring(seg: &Segment, bounded: bool) -> Option<FittedGeom> {
     let n = seg.points.len() - 1;
     if n < 8 {
         return None;
@@ -351,10 +454,9 @@ fn fit_smooth_ring(seg: &Segment) -> Option<FittedGeom> {
         Coord2((b.x - a.x) / d, (b.y - a.y) / d)
     };
     for (a, b) in [(0, n / 2), (n / 2, n)] {
-        let data: Vec<_> = (a..=b).map(|i| Coord2(ps[i % n].x, ps[i % n].y)).collect();
+        let points: Vec<_> = (a..=b).map(|i| ps[i % n]).collect();
         let t = tangent(b % n);
-        let curves: Vec<Curve<Coord2>> =
-            fit_curve_cubic(&data, &tangent(a), &Coord2(-t.0, -t.1), 0.4);
+        let curves = fit_source_chunks(&points, &tangent(a), &Coord2(-t.0, -t.1), 0.4, bounded);
         for c in curves {
             out.push([
                 p(c.start_point.0, c.start_point.1),
@@ -370,7 +472,12 @@ fn fit_smooth_ring(seg: &Segment) -> Option<FittedGeom> {
         Some(FittedGeom::Beziers(out))
     }
 }
-fn fit_pieces(seg: &Segment, cuts: &[usize], positions: &[PointF64]) -> Option<FittedGeom> {
+fn fit_pieces(
+    seg: &Segment,
+    cuts: &[usize],
+    positions: &[PointF64],
+    bounded: bool,
+) -> Option<FittedGeom> {
     let mut curves = Vec::new();
     let mut polygon = Vec::new();
     let mut all_straight = true;
@@ -403,16 +510,16 @@ fn fit_pieces(seg: &Segment, cuts: &[usize], positions: &[PointF64]) -> Option<F
         }
         polygon.push(b);
         let tolerance = if ps.len() < 16 { 0.3 } else { 0.5 };
-        let data: Vec<_> = ps.iter().map(|q| Coord2(q.x, q.y)).collect();
         let unit = |a: PointF64, b: PointF64| {
             let d = distance(a, b).max(1e-12);
             Coord2((b.x - a.x) / d, (b.y - a.y) / d)
         };
-        let fitted: Vec<Curve<Coord2>> = fit_curve_cubic(
-            &data,
+        let fitted = fit_source_chunks(
+            &ps,
             &unit(ps[0], ps[1]),
             &unit(ps[ps.len() - 1], ps[ps.len() - 2]),
             tolerance,
+            bounded,
         );
         for c in fitted {
             let cv = |q: Coord2| p(q.0, q.1);

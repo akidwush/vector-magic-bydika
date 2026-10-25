@@ -1,4 +1,9 @@
 mod alpha;
+mod inverse;
+#[wasm_bindgen]
+pub fn last_inverse() -> Vec<f64> {
+    inverse::values()
+}
 mod corners;
 mod coverage;
 mod planar;
@@ -87,6 +92,9 @@ fn run_pipeline(
     height: usize,
     profile: &str,
 ) -> Result<String, JsValue> {
+    let experimental = profile.starts_with("inverse-");
+    let profile = profile.strip_prefix("inverse-").unwrap_or(profile);
+    inverse::reset(experimental);
     let optimize = profile.starts_with("reduce-");
     let profile = profile.strip_prefix("reduce-").unwrap_or(profile);
     reduce::reset();
@@ -204,6 +212,7 @@ fn run_pipeline(
             )
             .map_err(|e| JsValue::from_str(&e.to_string()))?
     };
+    inverse::repair(&mut doc).map_err(|e| JsValue::from_str(&e))?;
     let fitted_at = now();
     let mut evidence = coverage::Evidence::default();
     if profile == "source" {
@@ -289,6 +298,7 @@ pub fn trace_quality(
         return Err(JsValue::from_str("Invalid RGBA dimensions"));
     }
     let requested_profile = profile;
+    let profile = profile.strip_prefix("inverse-").unwrap_or(profile);
     let profile = profile.strip_prefix("reduce-").unwrap_or(profile);
     if profile.starts_with("coverage-clean-") && !cfg!(feature = "experiments") {
         return Err(JsValue::from_str(
@@ -453,7 +463,11 @@ impl vtracer::fitter::CurveFitter for RegionFitter {
             );
             let baseline = self.fit_component(&component);
             output.extend(if let Some(img) = &self.source {
-                source_fit::optimize(&component, img, baseline)
+                inverse::component(
+                    &component,
+                    img,
+                    source_fit::optimize(&component, img, baseline),
+                )
             } else {
                 baseline
             });

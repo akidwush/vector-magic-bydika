@@ -217,3 +217,30 @@ export function corners(g) {
     }
   return points;
 }
+// Diagnostic location using the same sampling/distance rule as boundary().
+export function worstBoundary(a, b) {
+  const e = errors(a, b),
+    f = errors(b, a);
+  let index = 0,
+    reverse = false,
+    value = -1;
+  e.forEach((v, i) => {
+    if (v > value) {
+      value = v;
+      index = i;
+      reverse = false;
+    }
+  });
+  f.forEach((v, i) => {
+    if (v > value) {
+      value = v;
+      index = i;
+      reverse = true;
+    }
+  });
+  return {
+    distance: value,
+    point: samples(reverse ? b : a)[index],
+    direction: reverse ? "output-to-reference" : "reference-to-output",
+  };
+}

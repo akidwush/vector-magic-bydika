@@ -563,13 +563,27 @@ fn samples_mask(
             && (y as usize) < mask.height()
             && mask.image.get_pixel(x as usize, y as usize)
     };
-    for q in seg.points.iter().step_by(if sparse {
+    let extra: std::collections::HashSet<_> = if sparse && crate::inverse::enabled() {
+        crate::corners::detect_source(seg)
+            .into_iter()
+            .filter(|c| c.protected && c.confidence >= 0.5)
+            .map(|c| c.index)
+            .collect()
+    } else {
+        std::collections::HashSet::new()
+    };
+    let stride = if sparse {
         seg.points.len().div_ceil(512).max(1)
     } else {
         1
-    }) {
-        for y in q.y - 2..=q.y + 1 {
-            for x in q.x - 2..=q.x + 1 {
+    };
+    for (index, q) in seg.points.iter().enumerate() {
+        if index % stride != 0 && !extra.contains(&index) {
+            continue;
+        }
+        let radius = if extra.contains(&index) { 3 } else { 2 };
+        for y in q.y - radius..q.y + radius {
+            for x in q.x - radius..q.x + radius {
                 if x < 0
                     || y < 0
                     || x >= img.width as i32
@@ -915,7 +929,7 @@ fn model_doc(g: FittedGeom, img: &ColorImage) -> vtracer::ir::VectorDoc {
     });
     doc
 }
-fn from_path(path: &vtracer::ir::SubPath) -> Option<FittedGeom> {
+pub(crate) fn from_path(path: &vtracer::ir::SubPath) -> Option<FittedGeom> {
     use vtracer::ir::PathCmd;
     let mut points = Vec::new();
     let mut curves = Vec::new();
@@ -969,26 +983,28 @@ fn quantized(g: FittedGeom, img: &ColorImage) -> Option<(FittedGeom, vtracer::ir
     let path = doc.shapes.first()?.path.subpaths.first()?.clone();
     Some((from_path(&path)?, path))
 }
-/// Preserve the upstream painter representation; only replace a single safe contour.
-pub fn optimize(
+pub(crate) fn inverse_support(
     mask: &vtracer::ir::RegionMask,
     img: &ColorImage,
-    baseline: Vec<FittedGeom>,
-) -> Vec<FittedGeom> {
-    use vtracer::fitter::{CurveFitter, PixelFitter};
-    // The missing side of a canvas-clipped boundary supplies no source evidence.
-    if baseline.len() != 1 || touches_frame(mask, img) {
-        return baseline;
+) -> Option<(Segment, Vec<Sample>)> {
+    if touches_frame(mask, img) {
+        return None;
     }
+    let seg = raw_segment(mask)?;
+    let ss = samples_mask(&seg, mask, img, true)?;
+    Some((seg, ss))
+}
+fn raw_segment(mask: &vtracer::ir::RegionMask) -> Option<Segment> {
+    use vtracer::fitter::{CurveFitter, PixelFitter};
     let raw = PixelFitter.fit_region(mask);
     if raw.len() != 1 {
-        return baseline;
+        return None;
     }
     let FittedGeom::Polyline(ps) = &raw[0] else {
-        return baseline;
+        return None;
     };
     if ps.len() < 4 || ps.len() > 16384 {
-        return baseline;
+        return None;
     }
     let seg = Segment {
         points: {
@@ -1000,7 +1016,7 @@ pub fn optimize(
                 let b = pair[1];
                 let n = (b.x - a.x).abs().max((b.y - a.y).abs()).ceil() as usize;
                 if dense.len() + n > 16384 {
-                    return baseline;
+                    return None;
                 }
                 for i in 0..n {
                     let t = i as f64 / n as f64;
@@ -1022,6 +1038,42 @@ pub fn optimize(
         right: 1,
         first_dir: 0,
         last_dir: 0,
+    };
+    Some(seg)
+}
+pub(crate) fn inverse_reference(g: &FittedGeom, img: &ColorImage) -> Option<FittedGeom> {
+    use vtracer::optimize::OptimizerPass;
+    let mut doc = model_doc(g.clone(), img);
+    vtracer::optimize::QuantizePass::new(2).run(&mut doc);
+    vtracer::optimize::CleanupPass.run(&mut doc);
+    crate::coverage::refine_except(&mut doc, img, &protected());
+    from_path(doc.shapes.first()?.path.subpaths.first()?)
+}
+pub(crate) fn protect_inverse(
+    model: FittedGeom,
+    old: &FittedGeom,
+    img: &ColorImage,
+) -> Option<FittedGeom> {
+    let (model, path) = quantized(model, img)?;
+    let (_, old_path) = quantized(old.clone(), img)?;
+    crate::inverse::remember(path.clone(), old_path);
+    PROTECTED.with(|p| p.borrow_mut().push(path));
+    Some(model)
+}
+
+/// Preserve the upstream painter representation; only replace a single safe contour.
+pub fn optimize(
+    mask: &vtracer::ir::RegionMask,
+    img: &ColorImage,
+    baseline: Vec<FittedGeom>,
+) -> Vec<FittedGeom> {
+    use vtracer::fitter::CurveFitter;
+    // The missing side of a canvas-clipped boundary supplies no source evidence.
+    if baseline.len() != 1 || touches_frame(mask, img) {
+        return baseline;
+    }
+    let Some(seg) = raw_segment(mask) else {
+        return baseline;
     };
     let mut subsampled = false;
     let samples = samples_mask(&seg, mask, img, false).or_else(|| {
