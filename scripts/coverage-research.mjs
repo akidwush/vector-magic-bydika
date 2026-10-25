@@ -139,7 +139,8 @@ try {
                 c[4], c[5], c[1], c[2], c[3] || undefined, c[6], c[7]);
           return {
             svg,
-            evidence: m.last_coverage_evidence(),
+            evidence: ["baseline", "coverage", "clean", "adaptive", "denoise"].includes(c[0])
+              ? m.last_coverage_evidence() : null,
             ms: performance.now() - start,
             precision,
             wasmLinearBytes: core.memory.buffer.byteLength,
