@@ -351,11 +351,10 @@ pub fn repair(doc: &mut vtracer::ir::VectorDoc) -> Result<(), String> {
             return Err("Source-refined contour ownership could not be verified".into());
         }
         if locations.len() > 1 {
-            for (i, j) in locations {
-                doc.shapes[i].path.subpaths[j] = old.clone();
-            }
-            undo();
-            continue;
+            // Equal geometry does not prove equal ownership: another layer
+            // may already have this path. Rewriting every match would corrupt
+            // unrelated objects rather than reliably rolling this one back.
+            return Err("Source-refined contour ownership is ambiguous".into());
         }
         let (i, j) = locations[0];
         let others: Vec<_> = doc
@@ -870,6 +869,23 @@ mod safety_tests {
         );
         let mut doc = vtracer::ir::VectorDoc::new(100, 100);
         assert!(repair(&mut doc).is_err());
+    }
+    #[test]
+    fn ambiguous_ownership_does_not_rewrite_unrelated_layers() {
+        reset(true);
+        let new = rect(10.).into_closed_subpath();
+        remember(new.clone(), rect(11.).into_closed_subpath());
+        let mut doc = vtracer::ir::VectorDoc::new(100, 100);
+        for color in [0, 255] {
+            let mut path = vtracer::ir::MultiPath::new();
+            path.push(new.clone());
+            doc.shapes.push(vtracer::ir::Shape {
+                paint: vtracer::ir::Paint::Solid(vtracer::Color::new(color, 0, 0)),
+                path,
+            });
+        }
+        assert!(repair(&mut doc).is_err());
+        assert!(doc.shapes.iter().all(|s| s.path.subpaths[0] == new));
     }
     #[test]
     fn rollback_preserves_nested_face_membership_without_boundary_crossings() {

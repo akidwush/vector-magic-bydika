@@ -169,7 +169,8 @@ changing the node reducer or globally relaxing raw-contour safety.
 Stacked composition preserves object/layer ordering. Accepted replacements are
 recorded with their original paths; after composition they must have identifiable
 ownership, pass collision checks against other contours and preserve nested-face
-membership. Ambiguous duplicates roll back; unmatched ownership fails closed.
+membership. Ambiguous or unmatched ownership fails closed without rewriting unrelated
+layers. Unique, identifiable replacements retain their rollback geometry.
 The baseline is retained for rollback. New source paths are protected from a
 second independent coverage displacement.
 
@@ -375,7 +376,7 @@ continuous opacity.
 
 ## Tests, quality gates and visual evidence
 
-Rust integration 34 tests, upstream library 31 tests, TypeScript unit 36 tests,
+Rust integration 35 tests, upstream library 31 tests, TypeScript unit 36 tests,
 lint/typecheck, WASM release and Vite builds are run. The full browser suite has
 21 tests, including 35 new before/after comparisons plus warm reuse, cancellation
 and unsupported-route identity checks. Prior source-quality, Stage 1.4 and
@@ -467,7 +468,14 @@ is changed. Review checks final exported geometry, not merely solver counters.
 
 Local experimental geometry gates PASS, including primary maxima <2px and
 all final-output corner comparisons. The reviewed patch preserves Auto byte
-parity and all original safety thresholds. Remote CI is pending on this branch;
-no main integration is authorized by this report until that verification passes.
-The exact source commit, workflow result and integration decision will be
-recorded after remote verification. Full requested input coverage remains PARTIAL.
+parity and all original safety thresholds.
+
+Initial source implementation: `e904018279a711c6d72b85774f8fe470d8b766a7`.
+[Its GitHub workflow passed](https://github.com/akidwush/vector-magic-bydika/actions/runs/40179572292),
+including all 21 browser tests and the explicit source geometry gate.
+A final ownership review additionally rejects identical paths in multiple
+layers, rather than overwriting all matches on rollback; a dedicated native
+regression verifies unrelated layers remain untouched. All 35 native tests,
+WASM/Vite rebuilds and 18 baseline byte-parity comparisons pass after this
+safety change. Its remote revalidation is pending; main integration waits for
+that final commit's CI. Full requested input coverage remains PARTIAL.
