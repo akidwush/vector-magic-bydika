@@ -271,6 +271,38 @@ pub fn ellipse(seg: &Segment, ss: &[Sample]) -> Option<FittedGeom> {
 mod tests {
     use super::*;
     #[test]
+    fn sparse_model_preflight_rejects_large_nonelliptic_outlines() {
+        let make = |points| Segment {
+            points,
+            start: None,
+            end: None,
+            left: 0,
+            right: 1,
+            first_dir: 0,
+            last_dir: 0,
+        };
+        let circle = make(
+            (0..512)
+                .map(|i| {
+                    let a = i as f64 * std::f64::consts::TAU / 512.;
+                    vtracer::PointI32 {
+                        x: (512. + 340. * a.cos()).round() as i32,
+                        y: (512. + 340. * a.sin()).round() as i32,
+                    }
+                })
+                .collect(),
+        );
+        assert!(sparse_ellipse_candidate(&circle));
+        let square = make(vec![
+            vtracer::PointI32 { x: 0, y: 0 },
+            vtracer::PointI32 { x: 1024, y: 0 },
+            vtracer::PointI32 { x: 1024, y: 1024 },
+            vtracer::PointI32 { x: 0, y: 1024 },
+        ]);
+        assert!(!sparse_ellipse_candidate(&square));
+        assert!(!sparse_ellipse_candidate(&make(Vec::new())));
+    }
+    #[test]
     fn source_ellipse_improves_upstream_fit() {
         use vtracer::fitter::{CurveFitter, SplineFitter};
         let e = Ellipse {
@@ -477,11 +509,35 @@ mod tests {
     }
 }
 
-thread_local! {static PROTECTED:std::cell::RefCell<Vec<vtracer::ir::SubPath>>=const{std::cell::RefCell::new(Vec::new())};static BUDGET:std::cell::Cell<usize>=const{std::cell::Cell::new(8192)};static ACCEPTED:std::cell::Cell<u32>=const{std::cell::Cell::new(0)};}
+thread_local! {static SPARSE:std::cell::Cell<bool>=const{std::cell::Cell::new(false)};static PROTECTED:std::cell::RefCell<Vec<vtracer::ir::SubPath>>=const{std::cell::RefCell::new(Vec::new())};static BUDGET:std::cell::Cell<usize>=const{std::cell::Cell::new(8192)};static ACCEPTED:std::cell::Cell<u32>=const{std::cell::Cell::new(0)};}
 pub fn protected() -> Vec<vtracer::ir::SubPath> {
     PROTECTED.with(|p| p.borrow().clone())
 }
+// Cheap eligibility check for the existing axis-aligned ellipse model. Sparse
+// image sampling is reserved for outlines already close to that model; it must
+// not spend a coverage solver budget on large organic/straight-sided shapes.
+fn sparse_ellipse_candidate(seg: &Segment) -> bool {
+    let Some(x0) = seg.points.iter().map(|p| p.x).min() else {
+        return false;
+    };
+    let x1 = seg.points.iter().map(|p| p.x).max().unwrap();
+    let y0 = seg.points.iter().map(|p| p.y).min().unwrap();
+    let y1 = seg.points.iter().map(|p| p.y).max().unwrap();
+    let cx = (x0 as f64 + x1 as f64) * 0.5;
+    let cy = (y0 as f64 + y1 as f64) * 0.5;
+    let rx = (x1 as f64 - x0 as f64) * 0.5;
+    let ry = (y1 as f64 - y0 as f64) * 0.5;
+    rx >= 2.5
+        && ry >= 2.5
+        && seg.points.iter().all(|p| {
+            (((p.x as f64 - cx) / rx).hypot((p.y as f64 - cy) / ry) - 1.).abs() * rx.min(ry) <= 2.5
+        })
+}
+pub fn sparse(enabled: bool) {
+    SPARSE.with(|s| s.set(enabled));
+}
 pub fn reset() {
+    sparse(false);
     PROTECTED.with(|p| p.borrow_mut().clear());
     BUDGET.with(|b| b.set(8192));
     ACCEPTED.with(|b| b.set(0));
@@ -493,6 +549,7 @@ fn samples_mask(
     seg: &Segment,
     mask: &vtracer::ir::RegionMask,
     img: &ColorImage,
+    sparse: bool,
 ) -> Option<Vec<Sample>> {
     let mut pixels = Vec::new();
     let mut seen = HashSet::new();
@@ -506,7 +563,11 @@ fn samples_mask(
             && (y as usize) < mask.height()
             && mask.image.get_pixel(x as usize, y as usize)
     };
-    for q in &seg.points {
+    for q in seg.points.iter().step_by(if sparse {
+        seg.points.len().div_ceil(512).max(1)
+    } else {
+        1
+    }) {
         for y in q.y - 2..=q.y + 1 {
             for x in q.x - 2..=q.x + 1 {
                 if x < 0
@@ -742,7 +803,7 @@ pub fn polygonal(mask: &vtracer::ir::RegionMask, img: &ColorImage) -> Option<Vec
     let FittedGeom::Polyline(mut ps) = gs.remove(0) else {
         return None;
     };
-    let ss = samples_mask(&seg, mask, img)?;
+    let ss = samples_mask(&seg, mask, img, false)?;
     {
         if ps.len() > 13 || ss.len() > 4096 {
             return None;
@@ -962,7 +1023,16 @@ pub fn optimize(
         first_dir: 0,
         last_dir: 0,
     };
-    let Some(samples) = samples_mask(&seg, mask, img) else {
+    let mut subsampled = false;
+    let samples = samples_mask(&seg, mask, img, false).or_else(|| {
+        if SPARSE.with(|s| s.get()) && seg.points.len() > 2048 && sparse_ellipse_candidate(&seg) {
+            subsampled = true;
+            samples_mask(&seg, mask, img, true)
+        } else {
+            None
+        }
+    });
+    let Some(samples) = samples else {
         return baseline;
     };
     let allowed = BUDGET.with(|b| {
@@ -987,7 +1057,11 @@ pub fn optimize(
     let old = error(&crate::planar::flatten(&old_geom), &samples);
     let mut best = old;
     let mut result = None;
-    let generic = crate::corners::fit(&seg, 0, Some(img));
+    let generic = if subsampled {
+        None
+    } else {
+        crate::corners::fit(&seg, 0, Some(img))
+    };
     let polygon = vtracer::fitter::PolygonFitter.fit_region(mask);
     let polygon =
         if polygon.len() == 1 && matches!(&polygon[0],FittedGeom::Polyline(ps) if ps.len()<=8) {
@@ -1003,6 +1077,7 @@ pub fn optimize(
     } else {
         None
     };
+    let polygon = if subsampled { None } else { polygon };
     for model in [generic, ellipse, polygon].into_iter().flatten() {
         let Some((model, path)) = quantized(model, img) else {
             continue;

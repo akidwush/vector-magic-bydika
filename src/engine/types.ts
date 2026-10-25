@@ -2,6 +2,7 @@ export type Preset = "logo" | "illustration" | "photo";
 export type EngineId = "vtracer-wasm" | "imagetracerjs";
 export interface TraceInput {
   sourceFormat?: string;
+  optimize?: boolean;
   quality?:
     | "auto"
     | "legacy"
@@ -23,6 +24,16 @@ export interface TraceResult {
   effectivePrecision?: number;
   corners?: number[];
   sourceModels?: number;
+  optimization?: {
+    attempts: number;
+    accepted: number;
+    rejected: number;
+    segmentsBefore: number;
+    segmentsAfter: number;
+    validationSamples: number;
+    budgetFallback: boolean;
+    elapsedMs: number;
+  };
   topology?: {
     vertices: number;
     edges: number;

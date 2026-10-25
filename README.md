@@ -5,6 +5,16 @@ a tested ImageTracerJS fallback, three presets, original/vector comparison and l
 No account, tracing API, server upload, or paid runtime. Not affiliated with Vector Magic.
 Quality equivalence is not claimed; Photo is a baseline.
 
+## Stage 1.4 — bounded node optimization
+
+Eligible Auto contours reuse VTracer/flo_curves fitting with protected corners,
+two-sided distance checks and topology rollback. Shared boundaries are optimized
+once in their existing edge cache; exactly straight cubics export as lines.
+`Optimalkan node` is enabled by default; uncheck it to reproduce the previous
+engine geometry. Dense circles and some rounded contours improve measurably;
+complex curves and region fragmentation remain open quality work.
+[Actual measurements, visual artifacts and remaining failures](docs/STAGE_01_4_CURVE_OPTIMIZATION_REPORT.md).
+
 ## Source-guided contour quality
 
 Auto now uses local two-color evidence and source-verified geometry for eligible
@@ -98,7 +108,9 @@ SVG must pass structural/security validation before preview and download.
 Three presets map to real engine settings; mappings, fallback behavior, provenance,
 alpha limitations and decisions are in [implementation notes](docs/STAGE_01_IMPLEMENTATION_NOTES.md).
 Android-size viewport tests are emulation, **not physical Android-device tests**.
-No Inkscape verification or Vector Magic comparative benchmark has been performed.
+Inkscape 1.4 CLI import/plain SVG roundtrip and PNG export were verified on four
+Stage 1.4 fixtures; GUI anchor editing and Illustrator remain unverified.
+No comparative Vector Magic benchmark has been performed.
 
 ## Hosting and licenses
 
