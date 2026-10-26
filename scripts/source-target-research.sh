@@ -98,6 +98,6 @@ cargo build --manifest-path engine/Cargo.toml --locked --release --target wasm32
 wasm-bindgen engine/target/wasm32-unknown-unknown/release/nexora_wasm.wasm --target web --out-dir "$proof_dir/large-apex-wasm"
 wasm-bindgen engine/target/wasm32-unknown-unknown/release/nexora_wasm.wasm --target web --out-dir src/engine/wasm
 npm run build
-NEXORA_LARGE_APEX=1 NEXORA_TEST_PORT="${NEXORA_TEST_PORT:-4187}" npm run test:e2e -- --output="$proof_dir/large-feature-e2e"
+NEXORA_LARGE_APEX=1 NEXORA_STAGE15_ROOT="$proof_dir/large-regression" NEXORA_LOW_RES_ROOT="$proof_dir/large-browser" NEXORA_TEST_PORT="${NEXORA_TEST_PORT:-4187}" npm run test:e2e -- --output="$proof_dir/large-feature-e2e"
 NEXORA_COMPARE_STAGE=16f NEXORA_STAGE16B_WASM="$proof_dir/stage16e-wasm" NEXORA_PROOF_DIR="$proof_dir/large-apex" node scripts/low-resolution-benchmark.mjs
 node scripts/large-apex-quality-gate.mjs
