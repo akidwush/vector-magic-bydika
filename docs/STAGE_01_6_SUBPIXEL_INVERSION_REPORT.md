@@ -1,194 +1,290 @@
-# Stage 1.6B — source-calibrated geometry recovery
+# Stage 1.6B recovery — output-consistent source geometry
 
-**Decision: FAIL / REJECTED for activation. No merge or global enablement.**
+**Recovery gate: PASS locally and in GitHub CI. Research feature only; no merge or global enablement.**
+The broader Stage 1.6 goal of 1/16–1/64px absolute reconstruction remains
+**PARTIAL**, including on these fixtures. Numerical coverage precision is not
+boundary accuracy or evidence of Vector Magic equivalence.
 
-Base: `feat/stage-1-6-analytical-coverage`, verified
-`db06a032f7180f349b275ef3801854c048bb674d`.
-Follow-up: `feat/stage-1-6b-source-geometry`.
-Stage 1.5 comparator: `6084faffbd18313c80b7d4bc8bec349dd88b63c8`.
+Implementation: [`e482595f595a9a20678690614af389a91255050b`](https://github.com/akidwush/vector-magic-bydika/commit/e482595f595a9a20678690614af389a91255050b)
+on `feat/stage-1-6b-recovery`.
+Predecessor: rejected Stage 1.6B `c30e0ebe223597f1aa3f55b8fa813c7b33bec85a`.
+Stage 1.6 comparator: `db06a032f7180f349b275ef3801854c048bb674d`.
+Stage 1.5 production comparator: `6084faffbd18313c80b7d4bc8bec349dd88b63c8`.
+Measurements below were obtained locally on 2026-10-26 using the actual WASM,
+original PNGs and exported SVGs. CI status is recorded separately below.
 
-The solver now uses subpixel targets to change actual exported geometry. It
-improves some boundaries, but fails the required joint p95/maximum/corner and
-source-reconstruction gates. The failed candidate is compiled only with
-`--features source_geometry`; normal builds, including the existing experimental
-source checkbox, exclude it. No threshold was lowered to call this successful.
+## Confirmed causes and rejected predecessor
 
-## Reused foundations and source evidence
+1. **Acute wedges are not half-planes.** Both sides of the cubic tip contribute
+   area to the same pixels. Inverting their coverage as one boundary biases the
+   normal target inward. Reliable two-color unmixing alone cannot detect this.
+2. **Intermediate knots are not exported corners.** The old solver ran before
+   reduction; tiny corner splices were optimized and then simplified differently.
+   Cubic grew from 73 to 76 anchors and Wave from 57 to 61. Protected candidates
+   did not correspond one-to-one to the serialized apex.
+3. **A whole-ring solve redistributes residuals.** Wave's accurate vertical side
+   and its first junction absorbed errors from curved spans. Lower aggregate
+   coverage loss hid a worse mean/reference distance and worse rendered MAE.
 
-VTracer remains the tracer; segmentation, region ownership, the shared-edge
-cache, continuous polygon coverage, calibrated unmixing and signed-offset
-inversion are reused. No new tracer, rasterizer, model dependency or service.
-AGENTS/handoff and the preceding source pipeline were audited before editing.
+The previous candidate reduced Cubic mean to 0.053294px, but maximum rose from
+1.561513 to 1.966913px and corner recall fell to 0.667. Wave maximum improved to
+0.724224px, but mean rose to 0.083441px and libvips MAE to 0.541106. That candidate
+remains rejected; its historical report and source are retained at `c30e0eb`.
 
-`Sample.trusted` records only colour/gamma evidence: the owned opaque component
-must support a two-colour model, a decisive calibrated gamma selection and a
-small mixing residual. It is not proof of single-boundary geometry. Partial
-alpha remains rejected. Planar samples and open/junction chains are not eligible
-for this prototype; existing shared-edge reuse stays intact.
+## Architecture and reused components
 
-For each eligible transition pixel, a 4px spatial grid locates a nearby initial
-cubic and its parameter. Its tangent supplies an outward normal; local tangent
-variation must pass the direction test. The existing analytical inversion gives
-`target = pixel_center + offset(coverage, normal)*normal`. Point-to-curve residuals
-are projected onto the normal; they never become one SVG anchor per pixel.
+VTracer is still the tracer: 1.0.0-alpha.4, pinned upstream
+`e71343fbcbf469b8a72a255030408a39939162eb`; visioncortex 0.9.3 and flo_curves 0.8.0
+remain unchanged. Licenses and attribution are unchanged. There is no new
+segmentation engine, planar graph, rasterizer dependency, model or service.
 
-## Bounded solver and objective
+The implementation reuses `source_fit::Sample`, VTracer `FittedGeom`/`SubPath`,
+the existing calibrated unmixing and validated signed-offset helper, and the
+Stage 1.6 continuous Green-integral polygon coverage evaluator. The old dense
+whole-ring target solver was removed, not layered under another solver.
 
-The candidate parameterization moves each existing knot and its adjacent handles
-together. For cubic Bernstein weights, a start-knot displacement has coefficient
-`B0+B1`, and an end-knot displacement `B2+B3`. The source-target equations form a
-regularized normal system for 2N coordinates. Endpoint closure and existing join
-tangent directions survive these coupled translations before quantization.
+The order for an eligible stacked source contour is now:
 
-The least-squares surrogate includes a Tikhonov displacement prior and neighboring
-displacement regularization, excluding detected hard turns from smoothing.
-Complexity is constant within this pass: no new knot/curve is inserted. Final
-node reduction remains separate and may keep more nodes on a changed shape.
+```text
+VTracer → existing Stage 1.5 source fit / protection
+        → inverse repair / unique document ownership
+        → existing coverage + quantization + conservative node reduction
+        → source geometry recovery on reduced knots
+        → exact line serialization → SVG writer
+```
 
-Actual proposals are accepted only if original-raster coverage loss does not
-increase and `L_coverage + 0.1*L_target_geometry` improves. Source geometry remains
-subject to existing winding, mask drift, collision, nesting and ownership checks.
-The preceding initialization and whole-pass rollback are retained. This source
-objective is demonstrably insufficient for promotion; the independent export
-quality gate is mandatory.
+Matching is unique before reduction; stable shape/subpath indices carry ownership
+through the reducer. Ambiguous matches skip recovery. A tentative tiny-splice
+canonicalization happens before the span solve, followed by source validation.
+There is no reduction after recovery. A final apex-only validation may change
+coordinates, but cannot collapse or insert a segment. The final knot count must
+not exceed the reduced baseline; SVG writes at six-place precision with geometry
+quantized to four places. The node reducer's 0.12px validation is unchanged.
 
-Limits: <=128 cubics, <=8192 source samples, <=16384 tessellation pieces,
-<=65536 grid entries, <=2 million nearby distance checks, a <=256-coordinate dense
-system, three refinement iterations and three backtracking scales. Per-step
-knot movement is <=0.75px; cumulative baseline displacement is separately bounded.
-Singular systems, unsupported evidence and invalid geometry roll back. The loop
-stops for <0.005px proposals or no accepted improvement. Open chains return the
-input unchanged. This is bounded research, not a convergence guarantee.
+Eligibility remains conservative: supported, owned, closed opaque two-color
+components, decisive gamma evidence and small color residuals. Open/junction
+chains, partial alpha, unsupported ownership and uncertain gamma keep the
+previous geometry. The document must have at most 64 shapes and 65536 commands;
+only up to four captured components and 5–128 reduced cubics per component are
+considered. Colors are never merged to create eligibility.
 
-## Actual failures targeted and root causes
+## Wedge exclusion and source-calibrated corners
 
-The retained baselines' worst locations are the acute cubic tip and wave's first
-vertical/curved junction. A smaller mean source loss can move these corners the
-wrong way while improving the long contour. Tiny splice segments and subsequent
-node reduction mean intermediate detected corners do not reliably identify the
-critical final serialized vertex. This failed protection is a blocker, not an
-acceptable corner refinement.
+A 4px spatial index contains tessellated final curves, expanded by 2.5px.
+Transition pixels are excluded from half-plane inversion when another nearby
+nonadjacent piece has a sufficiently different outward normal (dot < 0.75,
+distance < 2.25px), or when the pixel falls inside a detected G0 corner's
+`clamp(1.25/sin(interior_angle/2), 2.25, 6)` exclusion radius. Opposite sides in
+a 3×3 neighborhood are conservatively covered by this distance/normal test.
+Stable single-edge orientation, trusted ownership and the existing coverage
+inversion are still required elsewhere. Samples do not become SVG anchors.
 
-An acute tip can also place both sides of a region inside one pixel: two-colour
-membership does not make the single-half-plane inversion valid there. Color and
-gamma confidence cannot substitute for a local boundary-multiplicity test.
-Experiments excluding opposing nearby segments still did not establish robust
-tip recovery. The existing mask drift guard was not globally loosened.
+Tiny splices require length <2.25px or close endpoints <3px with combined
+adjacent turn >35°. Incoming/outgoing tangent intersection supplies one explicit
+G0 vertex. It is accepted together with source-verified apex adjustment, never
+merely because the segment is short. Smooth short arcs are retained.
 
-The next viable solver needs output-consistent corner constraints, explicit
-multi-edge/acute-tip likelihoods, and high-error span scheduling rather than
-unconstrained closed-ring redistribution. These remain unresolved; this patch
-must not be described as completing Stage 1.6B.
+Arm evidence is sampled outside the wedge, from approximately `R_wedge+1` to
+16px of arclength. Opposite-arm pixels are rejected. Deterministic PCA tangent
+calibration uses ordered original-raster samples; uncertain arms receive lower
+weight. Axis-aligned supported arms retain their exact tangent.
 
-## Three-build browser proof
+At a supported acute corner the two calibrated tangent lines solve:
 
-The benchmark builds the actual Stage 1.5 and Stage 1.6 commits in temporary
-worktrees and the feature candidate separately. Chromium loads each WASM module,
-traces original decoded pixels, downloads real SVG blobs and measures the exported
-paths. All three use Illustration and `inverse-reduce-reconstruct`; this matches
-the source-enabled Stage 1.5 values specified in the task. WASM initialization
-is recorded separately from tracing.
+```text
+min_C  w_in [n_in·(C-P_in)]² + w_out [n_out·(C-P_out)]²
+       + 1e-5 ||C-C_initial||²
+```
 
-Ground truth is the retained legal vector reference. The existing symmetric
-sampled distance rule and identical reference sampling are retained. Chromium
-and libvips independently rasterize actual exports against the original PNG.
-The maximum is sampled, not an analytic Hausdorff certificate.
+The regularized 2×2 intersection has determinant and displacement guards.
+A bounded coordinate search then compares full 2D region coverage in a dense
+5×5 source patch: apex movement stays within 1.25px of the intersection;
+only incident handle length/direction changes are considered. The original
+final-output G0 turn is protected by a ±0.35-radian angle prior. This conservative
+prior prevents introducing a new acute turn, and also limits complete tangent
+recovery in uncertain junctions. Unsupported/nonacute corners remain locked.
 
-| Fixture / build | Mean px | p95 px | Sampled max px | Corner precision / recall | Anchors | SVG bytes | Trace ms |
-|---|---:|---:|---:|---:|---:|---:|---:|
-| cubic / stage15 | 0.091762 | 0.371053 | 1.561513 | 1.000 / 1.000 | 73 | 2179 | 742.2 |
-| cubic / stage16 | 0.091762 | 0.371053 | 1.561513 | 1.000 / 1.000 | 73 | 2179 | 1022.2 |
-| cubic / candidate | 0.053294 | 0.186851 | 1.966913 | 0.667 / 0.667 | 76 | 2342 | 993.6 |
-| wave / stage15 | 0.079448 | 0.298474 | 1.000000 | 1.000 / 1.000 | 57 | 1839 | 547.2 |
-| wave / stage16 | 0.079448 | 0.298474 | 1.000000 | 1.000 / 1.000 | 57 | 1839 | 534.3 |
-| wave / candidate | 0.083441 | 0.262392 | 0.724224 | 1.000 / 1.000 | 61 | 2020 | 736.9 |
+Acceptance requires strictly lower local coverage MSE and nonincreasing local
+rendered-paint RGB error. Both the original wedge and unchanged curve
+contributions are included; no half-plane targets guide the apex patch.
 
-Cubic's true reference corner is (928,320). Its baseline exported corner is
-(927.62,321.58), about 1.625px away; the candidate moves it farther away.
-The legacy contour sampler's maximum is slightly lower because its reference
-polyline samples near the vertex. `source-target-probe.mjs` provides a second
-independent path-flattening sampler including exact reference endpoints; it also
-rejects the candidate's cubic maximum. We do not replace the old metric with a
-more favorable sampler.
+## Partitioned fitting and rollback
 
-| Fixture / build | Premultiplied RGBA MAE libvips | MAE Chromium | Source loss | Source evaluations | Target observations / accepted steps / ms |
+Contours are partitioned at final G0 vertices. A smooth closed ring gets a fixed
+virtual seam. Each smooth span has its own regularized, banded normal system;
+G0 endpoints do not transmit displacement into another span. Coupled knot and
+incident-handle translations preserve existing smooth tangent rays.
+
+The least-squares surrogate contains normal target residuals, a 0.01 displacement
+prior and 0.02 neighboring-displacement regularization. Spans are ranked by p95
+plus maximum target residual. Mean <0.035px and max <0.15px skips an already
+accurate span. At most four spans, three iterations and three backtracking scales
+are evaluated; movement <0.005px or no improvement terminates early.
+
+Axis-aligned collinear edges and their adjacent knots are locked during curved
+span solving. Separate axis calibration permits normal-only movement when its
+median supported offset exceeds 0.05px; exact 0°/90° tangents are retained.
+The long axis edges of both primary fixtures needed no normal update.
+
+Each proposed span must improve local bbox/band coverage MSE **and** not increase
+local RGB L1 reconstruction. A failed span rolls back independently. Original
+source A/B colors and gamma estimate coverage; actual quantized SVG foreground
+and dominant surrounding paint colors predict export RGB. These are separate
+models: source white and exported #fefefe are not silently treated as identical.
+For this opaque route alpha is always one, so this RGB comparison is proportional
+to premultiplied RGBA MAE. Independent renderers validate the exported result.
+
+Per-step knot displacement is limited to 0.4px, per-span control displacement to
+1.25px. Final source-evidenced geometry has a separate two-sided 3.5px baseline
+trust region, with no change to existing node reduction or raw-mask guards.
+Closure, finite bounds, winding, containment, sampled self-crossings and existing
+`planar::replacement_clear` checks must all pass. Whole-component source and
+paint error are checked again after quantization; otherwise the old reduced
+geometry is restored.
+
+Shared-edge/planar composition does not run this independent stacked recovery.
+Its existing once-fitted edge cache and exact reversed geometry remain intact.
+There is no independent per-face adjustment after graph assembly.
+
+## Actual three-build export benchmark
+
+All variants use the original 1024px PNG, Illustration preset, VTracer WASM and
+`inverse-reduce-reconstruct`. The runner builds both comparator commits in
+isolated temporary worktrees, downloads actual SVG blobs, and measures them
+against retained legal vector ground truth. No fixture names are used in the
+engine. Existing gate thresholds and metric code were not changed.
+
+| Fixture / build | Mean px | p95 px | Sampled max px | Corner precision / recall | Anchors | Cubics | Paths | SVG bytes |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| Cubic / Stage 1.5 | 0.091762 | 0.371053 | 1.561513 | 1 / 1 | 73 | 66 | 2 | 2179 |
+| Cubic / Stage 1.6 | 0.091762 | 0.371053 | 1.561513 | 1 / 1 | 73 | 66 | 2 | 2179 |
+| Cubic / recovery | 0.046768 | 0.198287 | 0.702885 | 1 / 1 | 72 | 65 | 2 | 2735 |
+| Wave / Stage 1.5 | 0.079448 | 0.298474 | 1.000000 | 1 / 1 | 57 | 50 | 2 | 1839 |
+| Wave / Stage 1.6 | 0.079448 | 0.298474 | 1.000000 | 1 / 1 | 57 | 50 | 2 | 1839 |
+| Wave / recovery | 0.058444 | 0.238860 | 0.660000 | 1 / 1 | 57 | 50 | 2 | 2309 |
+
+Cubic improves mean 49.0%, p95 46.6%, sampled maximum 55.0%; Wave improves
+26.4%, 20.0% and 34.0%. Both have zero proper sampled crossings, two closed paths,
+no new acute turns, and zero new holes. Smooth-join maximum angle is
+0.007977→0.006583 radians for Cubic and 0.006888→0.006888 for Wave.
+
+**Endpoint-inclusive cross-check:** the historical Chromium reference sampler
+samples near the true tip rather than exactly at it. The independent probe
+includes exact reference endpoints. Cubic maximum there is
+1.625054→0.766976px; the final actual corner is (927.8522,320.7526) against
+(928,320). Wave's corner is (64,512.66), 0.66px from (64,512), down from 1px.
+Both samplers improve; neither is an analytic Hausdorff certificate.
+
+| Fixture / build | RGBA MAE libvips | RGBA MAE Chromium | Silhouette IoU libvips | IoU Chromium | Trace ms |
 |---|---:|---:|---:|---:|---:|
-| cubic / stage15 | 0.540209 | 0.543315 | 0.00504485 | 189 | n/a |
-| cubic / stage16 | 0.540209 | 0.543315 | 0.00504527 | 189 | n/a |
-| cubic / candidate | 0.530088 | 0.532371 | 0.00177800 | 195 | 2895 / 3 / 137.1 |
-| wave / stage15 | 0.539178 | 0.541712 | 0.00439934 | 137 | n/a |
-| wave / stage16 | 0.539178 | 0.541712 | 0.00440529 | 137 | n/a |
-| wave / candidate | 0.541106 | 0.542093 | 0.00400062 | 144 | 2672 / 1 / 164.0 |
+| Cubic / Stage 1.5 | 0.540209 | 0.543315 | 0.999281 | 0.999186 | 699.1 |
+| Cubic / Stage 1.6 | 0.540209 | 0.543315 | 0.999281 | 0.999186 | 714.4 |
+| Cubic / recovery | 0.528289 | 0.530567 | 0.999596 | 0.999553 | 851.3 |
+| Wave / Stage 1.5 | 0.539178 | 0.541712 | 0.999274 | 0.999274 | 535.3 |
+| Wave / Stage 1.6 | 0.539178 | 0.541712 | 0.999274 | 0.999274 | 567.0 |
+| Wave / recovery | 0.531787 | 0.533414 | 0.999504 | 0.999443 | 670.1 |
 
-Target observations count reused points per iteration, not unique source pixels.
-Source loss diagnostics precede final simplification; independent exported metrics
-are authoritative. Pixel loss drops strongly on cubic while its maximum/corner
-accuracy worsens. Wave's maximum improves, while mean and source reconstruction
-regress. These are explicit failures. Runtime is a desktop sample, not an Android
-claim or stable speed guarantee.
+MAE uses the existing 0–255 premultiplied metric. Higher IoU does not prove
+precise corner recovery; the boundary and endpoint checks remain mandatory.
+**SVG bytes increase about 25.5%** from additional fractional coordinates despite
+stable/reduced nodes. This is a geometry recovery result, not a file compression
+improvement. No coordinate precision was discarded to hide that cost.
 
-## Experiments and performance
+### Cross-resolution probe, including exact reference endpoints
 
-1. Coupled knot translations: source targets reduce cubic mean/p95 and wave's
-   maximum, but displace the cubic tip and underconstrain already-correct straight
-   sides. Rejected by actual exports despite lower source loss.
-2. Opposing-edge exclusion and a weaker trust prior: still fails the cubic tip.
-3. Additional scalar handle-length variables on fixed rays: more expensive and
-   still fails both required maximum improvements. Rejected.
-4. Fully covered/uncovered pixel inequalities plus additional corner constraints:
-   improved some means, but failed meaningful maximum recovery. Rejected.
-5. Intermediate protected-corner variants: did not protect the final cubic tip
-   through tiny splices/simplification. Rejected; no false claim of preserved
-   protected features.
-6. Spatially indexed coupled-translation candidate retained **for research only**:
-   same geometry behavior, less unnecessary searching. The report tables describe
-   this final, rejected candidate.
+| Fixture | Baseline mean / p95 / max px | Recovery mean / p95 / max px | Decision |
+|---|---:|---:|---|
+| Cubic 128 | 0.122940 / 0.354277 / 3.474265 | identical | unsupported prior source initialization; unchanged |
+| Cubic 512 | 0.104745 / 0.396321 / 3.474265 | identical | unsupported prior source initialization; unchanged |
+| Wave 128 | 0.128942 / 0.426717 / 1.569711 | identical | unsupported prior source initialization; unchanged |
+| Wave 512 | 0.087896 / 0.296898 / 1.000000 | 0.074254 / 0.237143 / 0.578088 | accepted |
+| Cubic 1024 | 0.093364 / 0.374901 / 1.625054 | 0.047432 / 0.200903 / 0.766976 | accepted |
+| Wave 1024 | 0.080852 / 0.301974 / 1.000000 | 0.059089 / 0.241311 / 0.660000 | accepted |
 
-The old inverse pass performs roughly 189 coverage evaluations on cubic and 137
-on wave, repeatedly flattening the contour for span-local scoring. The indexed
-target proposal adds only a few full coverage evaluations, tessellates once per
-iteration and queries nearby segments. The dense solve and target construction
-still add CPU. This is better bounded than running a global raster loss for every
-individual handle coordinate, but does not justify activation without quality.
-Target timing is included inside the existing source-phase timing, not additive.
-Peak RSS and physical Android measurements remain unavailable. Matrix allocation
-is bounded to roughly 0.5MiB plus target/grid storage; that is not a measured total
-memory peak. Worker cancellation/reset and warm WASM reuse remain unchanged.
+The unsupported cases report zero accepted inverse initialization and zero
+recovery components; this phase deliberately cannot bypass missing trusted
+initialization. Cubic 128/512 still have a large error. This is an unresolved
+quality limitation, not a PASS for low-resolution recovery.
 
-## Structural and regression evidence
+## Cost, profiling and coverage precision
 
-The three-build comparison records final closure, proper sampled crossings,
-acute-turn counts, smooth-join angles and corner positions. Coincident parsed endpoints are normalized within 1e-6px, with bow-tie and
-shared-join sanity checks. A sampled crossing check is not a formal proof against every tiny loop. No claim of universal
-geometric validity is made from SVG validity alone.
+| Fixture | New recovery ms | Span solve/index ms | Axis/corner ms | Coverage evaluations | Trusted observations / wedge exclusions | Collapsed splices / apex updates |
+|---|---:|---:|---:|---:|---:|---:|
+| Cubic 1024 | 124.7 | 71.3 | 20.7 | 215 | 2850 / 45 | 1 / 2 |
+| Wave 1024 | 133.1 | 68.9 | 25.2 | 243 | 4003 / 15 | 0 / 1 |
 
-40 native tests include an actual synthetic source-circle perturbation whose
-geometry and coverage improve without adding anchors, plus closed-join, invalid
-junction and untrusted-evidence rollback checks. 37 TypeScript tests, lint,
-typecheck, Rust/WASM/Vite builds and all 21 default browser tests pass locally.
-The feature browser suite also completes all 35 export comparisons, cancellation,
-worker reuse, unsupported alpha/photo routes and shared-edge checks. Its primary
-geometry/corner gate nevertheless FAILS. No existing threshold is reduced.
+Original-source coverage MSE on the retained sample band, evaluated after
+reduction, changes 0.00584651→0.00195843 for Cubic and
+0.00484606→0.00281755 for Wave. This local/sample loss is not a substitute for
+the exported full-image and absolute boundary metrics above.
 
-## Quality gate and artifacts
+The remaining time covers final safety/whole-component scoring and ownership.
+Target observations count reused samples across iterations; they are not unique
+source pixels. Existing Stage 1.5 fitting and inverse scoring remain separate;
+`last_recovery` and adapter `sourceGeometry` expose the added work. Relative to
+the Stage 1.6 comparator, tracing rises 19.2%/18.2%, within the unchanged 50% cap.
+These are local desktop observations, not Android-device measurements.
+WASM cold initialization is recorded separately (8.5ms candidate on the first
+fixture); subsequent module reuse reports effectively zero initialization.
+Browser tests also exercise warm worker reuse, cancel, replacement and reset.
 
-`scripts/source-geometry-quality-gate.mjs` requires at least 5% mean, p95 and
-maximum improvement on both primary fixtures, no corner/reconstruction regression
-and bounded extra runtime. The failed gate exits nonzero. CI runs the default
-regressions first, then this research gate on the follow-up branch; an overall
-red workflow is the correct result for this rejected candidate. No continue-on-
-error or masked exit code is used to label it successful.
+Profiling identified repeated whole-contour flattening for corner trials as
+avoidable cost. The patch evaluator caches unchanged **signed** Green-integral
+contributions and re-flattens only the two incident cubics at 0.001px tolerance.
+Abs/clamp happens only after all contributions are summed. Native tests verify
+cache/full evaluator agreement, both winding orientations and both source gamma
+models. The validated continuous coverage formula was reused, not replaced.
 
-Generated measurements, original downloads and visual comparisons are ignored
-artifacts under `benchmark-results/stage16b/`:
+Other limits: 8192 source samples/raw contour points, 16384 target pieces,
+65536 grid entries, two million proximity checks, at most 256 scalar variables,
+three span iterations and bounded apex searches with early termination.
+The normal matrix is allocated densely (at most about 0.5MiB); banded elimination
+avoids dense whole-ring solve cost. Grid/context/geometry allocations are also
+capped. Total peak RSS/WASM memory has **not** been measured. Cancellation still
+terminates the worker; no external processing is introduced.
 
-- `exports/{cubic,wave}-{stage15,stage16,candidate}.svg`.
-- `comparison.json`, `quality-gate.json`, `probe.json`.
-- `cubic-100.png`, `cubic-400.png`, `cubic-1000.png` and wave equivalents: Source |
-  Stage 1.5 | Stage 1.6 | Candidate at exactly the same viewport/ROI/scale.
-- `rejected-first/` and archived intermediate logs retain failed experiments.
+Coverage regression retains the existing curved-pixel reference: final polygon
+estimate 0.599938966 versus exact 0.6 and independent high-density libvips
+0.599832871. This validates integration convergence, not 1/64px shape recovery.
 
-Reproduce with the existing toolchain:
+## Experiments and limits of acceptance
+
+- Previous pre-reduction whole-ring translation, opposing-edge-only exclusion,
+  normal-handle fitting and intermediate corner protection: rejected; they did
+  not jointly preserve maximum error, corner recall, reconstruction and speed.
+- First output-topology recovery reduced geometric error, but unrestricted
+  calibrated tangent rotation introduced an extra acute Wave turn. Rejected.
+  A final-output angle consistency prior now constrains the uncertain junction.
+- Re-flattening the full ring for every apex coordinate trial improved geometry
+  but cost too much. Replaced by the mathematically equivalent signed-area cache.
+- Using source palette colors as exported colors can make local RGB rollback
+  incorrect. Source unmixing and actual document paints are now scored separately.
+- The retained candidate passes the immutable primary recovery gate. The maximum
+  remains 0.767px at the actual cubic endpoint; no universal subpixel accuracy,
+  exact original-shape recovery or commercial parity is claimed.
+- The additional alpha research sweep still rejects the old spline-only 128px
+  experiment: IoU 0.978553 is below 0.980. The production polygon alpha route
+  remains at 0.983604; the high-node pixel alternative is not promoted merely
+  because its IoU is higher. These experimental variants are not all marked PASS.
+
+New native cases cover unique ownership/reset, ambiguous alpha/third colors,
+additive signed coverage caching, positive/singular banded solves, opposing arms,
+short smooth segments, bevel collapse, axis-only movement, dense wedge recovery,
+no added knots and invalid crossings. Regression export comparisons cover all
+35 existing source cases, including circles, ellipses, sharp polygons, hair,
+cat features, thin details, JPEG/WebP, partial alpha and shared edges.
+
+Partial-alpha 128 IoU remains 0.983604 (>0.980), with no hole. Shared organic/thin
+planar and intelligent modes retain exact coincidence 1.0, unmatched edges 0,
+geometric gap samples 0 and overlap samples 0. Renderer antialias seam pixels
+still exist on coincident boundaries; this recovery does not claim to eliminate
+renderer compositing seams. Inkscape 1.4 CLI plain-SVG/PNG roundtrips pass on four
+actual candidate exports, with unchanged editable anchors. GUI anchor editing
+and Illustrator are unverified.
+
+## Verification and GitHub
+
+All mandatory commands completed successfully locally:
 
 ```sh
 ./scripts/build-wasm.sh
@@ -196,17 +292,69 @@ cargo test --manifest-path engine/Cargo.toml --locked
 cargo test --manifest-path engine/Cargo.toml --locked --features source_geometry
 npm test && npm run lint && npm run typecheck && npm run build
 npm run test:e2e
-bash scripts/source-target-research.sh  # expected nonzero until the gate passes
+bash scripts/source-target-research.sh
 ```
 
-For local installed Chromium, prefix browser commands with
-`NEXORA_CHROMIUM_PATH=/usr/bin/chromium`. The research script restores production
-WASM even on rejection. It builds reference commits from their exact hashes,
-never changes the working branch and removes only its temporary worktrees.
-No generated metrics, compiled WASM or uploaded images are committed.
+Results: 51 native tests in each configuration, 31 upstream tests, 37 TypeScript
+tests, all 22 default and all 22 feature-enabled browser tests. The research
+runner separately reruns three targeted feature browser tests, all 35 export
+comparisons, Inkscape checks when installed, the Stage 1.5 retention gate,
+Stage 1.6 proof and unchanged Stage 1.6B gate. Final gate JSON is
+`{"status":"PASS","failures":[]}`. Stage 1.6 proof still records the failed
+1/16–1/64px research targets. No threshold, allowed failure or masked exit code
+was added.
 
-Modified: inverse/source_fit Rust modules, feature declaration, source-target
-probe/browser benchmark/research runner, independent promotion gate and workflow.
-The branch is reviewable; main remains at Stage 1.5. Per-commit CI and failed
-quality evidence are available from
-[the branch workflow](https://github.com/akidwush/vector-magic-bydika/actions?query=branch%3Afeat%2Fstage-1-6b-source-geometry).
+The additional alpha/coverage research scripts and existing Stage 1.2, shared-edge,
+corner, source-quality and curve-optimization evidence scripts also completed
+with exit 0. This verifies execution and their existing assertions, not acceptance
+of every research configuration. The source-quality comparison covers 19 fixtures;
+the curve evidence covers 35 comparisons and four actual Inkscape roundtrips.
+
+One initial research invocation was interrupted by editing its shell script
+while Bash was reading it; it produced no quality result. The unchanged rerun
+completed with exit 0. The runner now restores both normal WASM and dist, preserves
+failure exit status and removes only its own temporary worktrees. Changed Rust
+modules pass rustfmt checks; a separate whole-crate formatting check reports
+pre-existing formatting differences in unchanged `coverage.rs`.
+
+GitHub CI for implementation commit: **PASS**, completed 2026-10-26 (9m30s),
+including the feature build, actual browser exports and blocking recovery gate.
+[Exact implementation workflow run](https://github.com/akidwush/vector-magic-bydika/actions/runs/40251873902).
+The workflow includes the normal regressions and feature promotion gate. Main
+remains at Stage 1.5; source_geometry is excluded from normal builds and Auto.
+
+## Visual evidence, exports and reproduction
+
+Artifacts are original generated evidence, not committed scores or private
+binaries. Download `stage-01-evidence` from the workflow run; locally open:
+
+- `benchmark-results/stage16b/exports/{cubic,wave}-{stage15,stage16,candidate}.svg`.
+- `benchmark-results/stage16b/{cubic,wave}-{100,400,1000}.png`: Source Raster |
+  Stage 1.5 | Stage 1.6 | Recovery, same viewport and identical ROI/scale. The
+  1000% crop includes the original worst tip/junction. These screenshots were
+  visually inspected; SVGs contain real editable paths, no raster/stroke cover-up.
+- `benchmark-results/stage16b/comparison.json`, `quality-gate.json`, `probe/`.
+- `benchmark-results/stage15/production.json`, `evidence.json`, `exports/` and
+  `inkscape/`: full feature regression exports and independent rasterization.
+- Local `benchmark-results/recovery/accepted/` preserves the final feature run
+  and cross-resolution endpoint probes; `rejected-baseline/` preserves the old
+  rejected experiment. These archives are ignored by git.
+
+Use `NEXORA_CHROMIUM_PATH=/usr/bin/chromium` for installed local Chromium. For an
+independent probe without replacing normal WASM, emit feature bindings to an
+artifact directory and set `NEXORA_CANDIDATE_WASM` when running
+`source-target-probe.mjs`; `TARGET_SIZE` selects the retained 128/512/1024 fixtures.
+
+Changed files: new `engine/src/recovery.rs`; integration and signed-area reuse
+in `engine/src/{lib,inverse,reduce}.rs`; adapter diagnostics in
+`src/engine/{adapters,types}.ts` and `src/main.tsx`; new browser recovery test;
+source-target benchmark/probe/research runner; workflow branch coverage, README
+and this report. `source_fit.rs`, coverage math, segmentation, transparency and
+upstream sources are reused unchanged.
+
+**Promotion decision:** keep the follow-up research branch for review. Do not
+merge or enable it globally in this change. Next work is reliable low-resolution
+initialization, stronger source-supported tangent estimates, broader real-art
+holdouts, peak-memory/device profiling, and safe coordinate serialization to
+recover file-size efficiency. These must retain the present exported-geometry
+and reconstruction gates.
