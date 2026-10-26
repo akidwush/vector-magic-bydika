@@ -187,3 +187,9 @@ Ordinary 3px/3.5px validation is retained and reported independently. This is
 experimental, does not change Auto or shared-edge composition, and is not enabled
 in normal WASM builds. The isolated research runner retains all historical gates
 and compares the extended contract against Stage 1.6E exports.
+
+[Stage 1.6F measured report](docs/STAGE_01_6F_LARGE_APEX_RECOVERY_REPORT.md):
+Triangle 128 maximum boundary error 5.154 → 0.410px, corner precision/recall 1/1,
+14 anchors retained; all 44 other corpus exports unchanged. Both implementation
+CI runs pass. Local runtime gates still fail on recorded historical/protected
+cases, so local validation remains PARTIAL and the feature stays experimental.
