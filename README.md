@@ -5,6 +5,15 @@ a tested ImageTracerJS fallback, three presets, original/vector comparison and l
 No account, tracing API, server upload, or paid runtime. Not affiliated with Vector Magic.
 Quality equivalence is not claimed; Photo is a baseline.
 
+## Stage 1.6E — source-verified sharp apex research
+
+The experimental already-G0 fallback fits incident handles jointly at a
+source-supported apex. Triangle 8° at 512px maximum error improves from
+2.255 to 0.985px; the protected Stage 1.6D exports remain identical. Triangle
+128 still requires an uncertified movement beyond the unchanged trust bounds
+and stays unresolved. Normal Auto is unchanged.
+[Diagnostics, measured results and actual exports](docs/STAGE_01_6E_SHARP_APEX_REPORT.md).
+
 ## Stage 1.6D — source-verified continuity research
 
 The experimental recovery now rejects source-disproved short spline splices.
