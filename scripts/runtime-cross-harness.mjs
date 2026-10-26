@@ -63,7 +63,11 @@ for (const id of buildIds) {
   const wasm = await readFile(dir + "/nexora_wasm_bg.wasm");
   if (hash(wasm) !== m.wasmSHA256)
     throw Error("Immutable binary changed: " + id);
-  manifests[id] = { ...m, dir };
+  manifests[id] = {
+    ...m,
+    dir,
+    glueSHA256: hash(await readFile(dir + "/nexora_wasm.js")),
+  };
   buffers[id] = wasm;
   wrappers[id] = template
     .replaceAll("__CORE__", JSON.stringify("/binary/" + id + "/nexora_wasm.js"))
@@ -401,6 +405,7 @@ try {
                   const page = holder.page;
                   const traceId = `s${rep}-${f.key}-${id}-${mode}-${slot}-${round}`;
                   const before = await snapshot(cdp);
+                  const controllerStarted = process.cpuUsage();
                   const started = process.hrtime.bigint();
                   let packet,
                     appMetrics = null,
@@ -460,6 +465,7 @@ try {
                   }
                   const resultWallMs =
                     Number(process.hrtime.bigint() - started) / 1e6;
+                  const controllerCPU = process.cpuUsage(controllerStarted);
                   const after = await snapshot(cdp);
                   const downloadStart = process.hrtime.bigint();
                   const event = page.waitForEvent("download");
@@ -482,6 +488,8 @@ try {
                   const downloadEventMs =
                     Number(process.hrtime.bigint() - downloadStart) / 1e6;
                   const file = await download.path();
+                  const downloadCompleteMs =
+                    Number(process.hrtime.bigint() - downloadStart) / 1e6;
                   const downloadBytes = await readFile(file);
                   const downloadSHA256 = hash(downloadBytes);
                   const canonical = await page.evaluate((svg) => {
@@ -566,6 +574,11 @@ try {
                     initialization: holder.setup,
                     resultWallMs,
                     downloadEventMs,
+                    downloadCompleteMs,
+                    controllerCPU: {
+                      userMs: controllerCPU.user / 1000,
+                      systemMs: controllerCPU.system / 1000,
+                    },
                     downloadSHA256,
                     downloadBytes: downloadBytes.length,
                     cpu: deltaCPU(before, after),
