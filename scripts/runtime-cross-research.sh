@@ -27,4 +27,7 @@ record exact-exports env NEXORA_CANDIDATE_WASM="$root/modules/stage16h" NEXORA_S
 record exact-identity env NEXORA_PROOF_DIR="$root/exact-exports" node scripts/runtime-identity-gate.mjs
 record exact-budget env NEXORA_PROOF_DIR="$root/exact-exports" node scripts/inverse-hotpath-budget-gate.mjs
 record exact-editability env NEXORA_PROOF_DIR="$root/exact-exports/runtime-identity" node scripts/low-resolution-editability.mjs
+# Optional sampling is a separate experiment, never pooled into latency claims.
+record cpu-sampling env NEXORA_CROSS_ROOT="$root/cpu-sampling" NEXORA_CROSS_FIXTURES=wave-1024,triangle-512,rounded-1024 NEXORA_CROSS_MODULES=stage16h NEXORA_CROSS_MODES=direct NEXORA_CROSS_SESSIONS=3 NEXORA_CROSS_WARMS=2 NEXORA_CROSS_CPU_PROFILE=1 node scripts/runtime-cross-harness.mjs
+record cpu-sampling-analysis env NEXORA_CROSS_ROOT="$root/cpu-sampling" node scripts/runtime-cross-analysis.mjs
 exit "$status"

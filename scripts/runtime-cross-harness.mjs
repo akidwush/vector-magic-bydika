@@ -14,6 +14,8 @@ const root = resolve(process.env.NEXORA_CROSS_ROOT);
 await mkdir(root);
 await mkdir(root + "/exports");
 await mkdir(root + "/traces");
+if (process.env.NEXORA_CROSS_CPU_PROFILE === "1")
+  await mkdir(root + "/cpu-profiles");
 const buildIds = (
   process.env.NEXORA_CROSS_MODULES || "stage16f,stage16h"
 ).split(",");
@@ -181,6 +183,7 @@ const env = {
   traceEnabled: process.env.NEXORA_CROSS_TRACE !== "0",
   tracePattern: tracePattern ?? null,
   flags: process.env.NEXORA_CROSS_JS_FLAGS || "default",
+  cpuSampling: process.env.NEXORA_CROSS_CPU_PROFILE === "1",
   policy:
     "All observations retained; sessions use separate browser processes. Two A/A slots per binary and mode, alternating execution order. Work counters absent from production modules are null, never invented. Timers overlap. No historical gate is replaced.",
 };
@@ -404,6 +407,15 @@ try {
                   }
                   const page = holder.page;
                   const traceId = `s${rep}-${f.key}-${id}-${mode}-${slot}-${round}`;
+                  let sampling;
+                  if (env.cpuSampling && mode === "direct") {
+                    sampling = await holder.context.newCDPSession(page);
+                    await sampling.send("Profiler.enable");
+                    await sampling.send("Profiler.setSamplingInterval", {
+                      interval: 1000,
+                    });
+                    await sampling.send("Profiler.start");
+                  }
                   const before = await snapshot(cdp);
                   const controllerStarted = process.cpuUsage();
                   const started = process.hrtime.bigint();
@@ -467,6 +479,16 @@ try {
                     Number(process.hrtime.bigint() - started) / 1e6;
                   const controllerCPU = process.cpuUsage(controllerStarted);
                   const after = await snapshot(cdp);
+                  let cpuProfilePath = null;
+                  if (sampling) {
+                    const { profile } = await sampling.send("Profiler.stop");
+                    cpuProfilePath = "cpu-profiles/" + traceId + ".json";
+                    await writeFile(
+                      root + "/" + cpuProfilePath,
+                      JSON.stringify(profile),
+                    );
+                    await sampling.detach();
+                  }
                   const downloadStart = process.hrtime.bigint();
                   const event = page.waitForEvent("download");
                   if (mode === "app")
@@ -575,6 +597,7 @@ try {
                     resultWallMs,
                     downloadEventMs,
                     downloadCompleteMs,
+                    cpuProfilePath,
                     controllerCPU: {
                       userMs: controllerCPU.user / 1000,
                       systemMs: controllerCPU.system / 1000,

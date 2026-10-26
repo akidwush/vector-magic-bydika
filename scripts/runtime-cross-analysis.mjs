@@ -71,6 +71,50 @@ function cgroup(text) {
       .map(([k, v]) => [k, Number(v)]),
   );
 }
+// CPU-profiler weights use sampled wall intervals, not hardware CPU cycles.
+// Restrict to the same marked binding window; kernel CPU remains independent.
+function sampleStacks(profile, start, end) {
+  const nodes = new Map(profile.nodes.map((n) => [n.id, n]));
+  const parents = new Map();
+  for (const n of profile.nodes)
+    for (const child of n.children ?? []) parents.set(child, n.id);
+  let at = profile.startTime,
+    count = 0;
+  const self = new Map(),
+    inclusive = new Map();
+  for (let i = 0; i < (profile.samples?.length ?? 0); i++) {
+    const dt = profile.timeDeltas[i];
+    at += dt;
+    const weight = Math.max(0, Math.min(at, end) - Math.max(at - dt, start));
+    if (!weight) continue;
+    count++;
+    const id = profile.samples[i];
+    self.set(id, (self.get(id) ?? 0) + weight);
+    let parent = id,
+      limit = 0;
+    while (parent != null && limit++ < 256) {
+      inclusive.set(parent, (inclusive.get(parent) ?? 0) + weight);
+      parent = parents.get(parent);
+    }
+  }
+  const top = (values) =>
+    [...values]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 15)
+      .map(([id, us]) => ({
+        id,
+        frame: nodes.get(id)?.callFrame,
+        weightedWallMs: us / 1000,
+      }));
+  return {
+    inCoreSamples: count,
+    windowMs: (end - start) / 1000,
+    self: top(self),
+    inclusive: top(inclusive),
+    policy:
+      "Sampling weights, not exclusive CPU counters; inline frames may obscure individual Rust functions. Kernel scheduling data is separate.",
+  };
+}
 const missing = [];
 for (const r of rows) {
   if (r.traceEnabled === false) {
@@ -83,6 +127,12 @@ for (const r of rows) {
     missing.push(r.traceId);
     continue;
   }
+  if (r.cpuProfilePath)
+    r.cpuSamples = sampleStacks(
+      JSON.parse(await read(root + "/" + r.cpuProfilePath)),
+      a.ts,
+      b.ts,
+    );
   const id = a.pid + ":" + a.tid,
     events = (threadEvents.get(r.rep + ":" + id) || []).filter(
       (e) => e.end > a.ts && e.start < b.ts,
@@ -202,11 +252,12 @@ await write(
       slowest: rows
         .toSorted((a, b) => b.coreMs - a.coreMs)
         .slice(0, 20)
-        .map(({ traceId, coreMs, stages, attribution }) => ({
+        .map(({ traceId, coreMs, stages, attribution, cpuSamples }) => ({
           traceId,
           coreMs,
           stages,
           attribution,
+          cpuSamples,
         })),
     },
     null,
@@ -217,7 +268,7 @@ await write(
   output + "/analysis-metadata.json",
   JSON.stringify(
     {
-      schema: 2,
+      schema: 3,
       inputRoot: root,
       analysisSHA256: createHash("sha256")
         .update(await read(new URL(import.meta.url)))
