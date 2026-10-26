@@ -200,3 +200,9 @@ The bounded exact-area `runtime_cache` prototype is opt-in: measured work saving
 and Cubic improvements do not establish a universal speedup. Ordinary
 `source_geometry`/`large_apex` retain their previous scoring path. Physical
 Android performance remains unverified; runtime stabilization is research-only.
+
+[Stage 1.6G runtime report](docs/STAGE_01_6G_RUNTIME_STABILIZATION_REPORT.md):
+PARTIAL. A/A/A/B data and profiling are retained, 45 F/G SVGs are byte-identical,
+and cache work savings do not establish a universal speedup. The local historical
+thin-ellipse runtime gate remains FAIL; the complete c6cda33 CI passed. See the
+report for later workflow status and the unverified physical Android procedure.
