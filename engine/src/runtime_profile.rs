@@ -34,12 +34,12 @@ const NAMES: [&str; 32] = [
     "large_joint_solves",
     "region_fitter",
 ];
-thread_local! {static DATA:RefCell<[f64;64]>=const{RefCell::new([0.;64])};}
+thread_local! {static DATA:RefCell<[f64;96]>=const{RefCell::new([0.;96])};}
 pub fn reset() {
-    DATA.with(|d| *d.borrow_mut() = [0.; 64]);
+    DATA.with(|d| *d.borrow_mut() = [0.; 96]);
 }
 pub fn values() -> Vec<f64> {
-    DATA.with(|d| d.borrow().to_vec())
+    DATA.with(|d| d.borrow()[..64].to_vec())
 }
 pub fn names() -> String {
     NAMES.join("|")
@@ -78,6 +78,59 @@ impl Drop for Scope {
         DATA.with(|d| d.borrow_mut()[32 + self.index] += clock() - self.start);
     }
 }
+// Counts and inclusive times; appended storage preserves the Stage G ABI.
+const WORK_NAMES: [&str; 16] = [
+    "loss",
+    "clamp_calls",
+    "clamp_heap_vectors",
+    "area_samples",
+    "row_edges",
+    "flatten_curves",
+    "flatten_points",
+    "flat_hits",
+    "flat_misses",
+    "flat_points_peak",
+    "samples_prepare",
+    "candidate_fitter",
+    "sample_rows",
+    "clamp_constant",
+    "loss_samples",
+    "flat_fallback",
+];
+pub fn work_count(i: usize, n: f64) {
+    DATA.with(|d| d.borrow_mut()[64 + i] += n);
+}
+#[cfg(feature = "inverse_hotpath")]
+pub fn work_max(i: usize, n: f64) {
+    DATA.with(|d| {
+        let mut d = d.borrow_mut();
+        d[64 + i] = d[64 + i].max(n);
+    });
+}
+pub fn work_values() -> Vec<f64> {
+    DATA.with(|d| d.borrow()[64..].to_vec())
+}
+pub fn work_names() -> String {
+    WORK_NAMES.join("|")
+}
+pub struct WorkScope {
+    index: usize,
+    start: f64,
+}
+impl WorkScope {
+    pub fn new(index: usize) -> Self {
+        work_count(index, 1.);
+        Self {
+            index,
+            start: clock(),
+        }
+    }
+}
+impl Drop for WorkScope {
+    fn drop(&mut self) {
+        DATA.with(|d| d.borrow_mut()[80 + self.index] += clock() - self.start);
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -98,6 +151,8 @@ mod tests {
         assert!(d[32] >= d[47]);
         reset();
         assert!(values().iter().all(|v| *v == 0.));
+        assert!(work_values().iter().all(|v| *v == 0.));
+        assert_eq!(work_names().split('|').count(), 16);
         assert_eq!(names().split('|').count(), 32);
     }
 }

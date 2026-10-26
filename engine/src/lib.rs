@@ -11,6 +11,19 @@ macro_rules! runtime_count {
         crate::runtime_profile::count($i, $n as f64);
     };
 }
+// Additional inverse-work diagnostics share the existing per-trace profiler.
+macro_rules! inverse_count {
+    ($i:expr,$n:expr) => {
+        #[cfg(feature = "runtime_profile")]
+        crate::runtime_profile::work_count($i, $n as f64);
+    };
+}
+macro_rules! inverse_scope {
+    ($i:expr) => {
+        #[cfg(feature = "runtime_profile")]
+        let _inverse_scope = crate::runtime_profile::WorkScope::new($i);
+    };
+}
 #[cfg(feature = "runtime_profile")]
 mod runtime_profile;
 #[cfg(feature = "runtime_profile")]
@@ -22,6 +35,16 @@ pub fn last_runtime_profile() -> Vec<f64> {
 #[wasm_bindgen]
 pub fn runtime_profile_names() -> String {
     runtime_profile::names()
+}
+#[cfg(feature = "runtime_profile")]
+#[wasm_bindgen]
+pub fn last_inverse_work() -> Vec<f64> {
+    runtime_profile::work_values()
+}
+#[cfg(feature = "runtime_profile")]
+#[wasm_bindgen]
+pub fn inverse_work_names() -> String {
+    runtime_profile::work_names()
 }
 mod alpha;
 mod inverse;

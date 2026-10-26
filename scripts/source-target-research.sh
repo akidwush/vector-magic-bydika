@@ -5,7 +5,7 @@ cd "$(dirname "$0")/.."
 repo_dir="$PWD"
 # One immutable artifact namespace per execution. Historical Stage 1.6B output
 # is never used as a writable destination.
-proof_dir="${NEXORA_PROOF_DIR:-$repo_dir/benchmark-results/stage16g/$(git rev-parse --short HEAD)-$(date -u +%Y%m%dT%H%M%S)-$$}"
+proof_dir="${NEXORA_PROOF_DIR:-$repo_dir/benchmark-results/${NEXORA_RESEARCH_STAGE:-stage16g}/$(git rev-parse --short HEAD)-$(date -u +%Y%m%dT%H%M%S)-$$}"
 if [[ "$proof_dir" != /* ]]; then proof_dir="$repo_dir/$proof_dir"; fi
 mkdir -p "$(dirname "$proof_dir")"
 mkdir "$proof_dir"
@@ -109,3 +109,12 @@ cargo build --manifest-path engine/Cargo.toml --locked --release --target wasm32
 wasm-bindgen engine/target/wasm32-unknown-unknown/release/nexora_wasm.wasm --target web --out-dir "$proof_dir/runtime-cache-wasm"
 NEXORA_CANDIDATE_WASM="$proof_dir/runtime-cache-wasm" NEXORA_COMPARE_STAGE=16g NEXORA_STAGE16B_WASM="$proof_dir/stage16f-wasm" NEXORA_PROOF_DIR="$proof_dir/runtime-identity" node scripts/low-resolution-benchmark.mjs
 node scripts/runtime-identity-gate.mjs
+
+# Stage H is a separate opt-in path; never changes the ordinary historical builds.
+if [[ "${NEXORA_INVERSE_HOTPATH:-0}" == 1 ]]; then
+ cargo test --manifest-path engine/Cargo.toml --locked --features large_apex,inverse_hotpath
+ cargo build --manifest-path engine/Cargo.toml --locked --release --target wasm32-unknown-unknown --features large_apex,inverse_hotpath -j2
+ wasm-bindgen engine/target/wasm32-unknown-unknown/release/nexora_wasm.wasm --target web --out-dir "$proof_dir/inverse-hotpath-wasm"
+ NEXORA_CANDIDATE_WASM="$proof_dir/inverse-hotpath-wasm" NEXORA_COMPARE_STAGE=16g NEXORA_STAGE16B_WASM="$proof_dir/stage16f-wasm" NEXORA_PROOF_DIR="$proof_dir/inverse-identity" node scripts/low-resolution-benchmark.mjs
+ NEXORA_PROOF_DIR="$proof_dir/inverse-identity" NEXORA_IDENTITY_SUBDIR=. node scripts/runtime-identity-gate.mjs
+fi

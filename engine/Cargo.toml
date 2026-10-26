@@ -27,3 +27,6 @@ runtime_profile = ["large_apex", "runtime_cache"]
 
 # Diagnostic A/B baseline: same fitter and guards, exact-area cache disabled.
 runtime_uncached = ["runtime_profile"]
+
+# Source-exact inverse scoring experiment; no global cache or geometry changes.
+inverse_hotpath = ["source_geometry"]

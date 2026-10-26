@@ -557,6 +557,7 @@ fn samples_mask(
     img: &ColorImage,
     sparse: bool,
 ) -> Option<Vec<Sample>> {
+    inverse_scope!(10);
     let mut pixels = Vec::new();
     let mut seen = HashSet::new();
     let mut groups = [Vec::<[f64; 3]>::new(), Vec::<[f64; 3]>::new()];

@@ -29,7 +29,7 @@ if (repetitions < 2 || warms < 2)
   throw Error("Independent repetitions and warm samples required");
 const fixtures = [
   ...["cubic", "wave"].flatMap((n) =>
-    (n === "wave" ? [128, 1024] : [128, 1024]).map((size) => ({
+    [128, 512, 1024].map((size) => ({
       key: n + "-" + size,
       path: `tests/fixtures/curve-optimization/${n}-${size}.png`,
       size,
@@ -55,13 +55,24 @@ fixtures.push(
     negative: true,
   },
 );
+fixtures.push(
+  ...[
+    ["thin-ellipse-1024", "thin-ellipse-native-srgb-1024", 1024],
+    ["blade-512", "blade-narrow-native-srgb-512", 512],
+  ].map(([key, name, size]) => ({
+    key,
+    path: `tests/fixtures/acute-geometry/${name}.png`,
+    size,
+    negative: true,
+  })),
+);
 const selected = process.env.NEXORA_RUNTIME_FIXTURES?.split(",");
 const cases = fixtures.filter((f) =>
   selected ? selected.includes(f.key) : !f.negative,
 );
 if (!cases.length || !Number.isInteger(repetitions) || !Number.isInteger(warms))
   throw Error("Invalid empty/runtime sample configuration");
-const workerCode = `let m, memory;self.onmessage=async({data:d})=>{try{if(d.init){const t=performance.now();m=await import('/'+d.init+'/nexora_wasm.js');const imported=performance.now();const w=await m.default();memory=w.memory;postMessage({id:d.id,importMs:imported-t,instantiateMs:performance.now()-imported});return;}const start=performance.now();const svg=m.trace_quality(new Uint8Array(d.bytes),d.size,d.size,'illustration','inverse-reduce-reconstruct');const wasmMs=performance.now()-start;const g=performance.now();const r={svg,wasmMs,stages:[...m.last_stage_timings()],recovery:m.last_recovery?[...m.last_recovery()]:[],inverse:[...m.last_inverse()],large:m.last_large_apex?[...m.last_large_apex()]:[],runtime:m.last_runtime_profile?[...m.last_runtime_profile()]:[],memory:memory.buffer.byteLength};r.profileNames=m.runtime_profile_names?m.runtime_profile_names().split("|"):[];r.gettersMs=performance.now()-g;postMessage({id:d.id,...r});}catch(e){postMessage({id:d.id,error:String(e)});}};`;
+const workerCode = `let m, memory;self.onmessage=async({data:d})=>{try{if(d.init){const t=performance.now();m=await import('/'+d.init+'/nexora_wasm.js');const imported=performance.now();const w=await m.default();memory=w.memory;postMessage({id:d.id,importMs:imported-t,instantiateMs:performance.now()-imported});return;}const start=performance.now();const svg=m.trace_quality(new Uint8Array(d.bytes),d.size,d.size,'illustration','inverse-reduce-reconstruct');const wasmMs=performance.now()-start;const g=performance.now();const r={svg,wasmMs,stages:[...m.last_stage_timings()],recovery:m.last_recovery?[...m.last_recovery()]:[],inverse:[...m.last_inverse()],large:m.last_large_apex?[...m.last_large_apex()]:[],inverseWork:m.last_inverse_work?[...m.last_inverse_work()]:[],inverseWorkNames:m.inverse_work_names?m.inverse_work_names().split("|"):[],runtime:m.last_runtime_profile?[...m.last_runtime_profile()]:[],memory:memory.buffer.byteLength};r.profileNames=m.runtime_profile_names?m.runtime_profile_names().split("|"):[];r.gettersMs=performance.now()-g;postMessage({id:d.id,...r});}catch(e){postMessage({id:d.id,error:String(e)});}};`;
 const files = {};
 for (const f of cases) files["/input/" + f.key] = await readFile(f.path);
 const server = createServer(async (req, res) => {

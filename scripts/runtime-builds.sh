@@ -8,7 +8,11 @@ mkdir -p "$(dirname "$proof")"
 mkdir "$proof"
 work=""
 trap 'if [[ -n "$work" ]]; then git worktree remove "$work"; fi' EXIT
-for entry in '0b67da0cce87476adc59acc7396eb8cfd542452a E source_geometry' 'c7f47512598cec01ad0adc9516af94e3ff58c963 F large_apex'; do
+entries=('0b67da0cce87476adc59acc7396eb8cfd542452a E source_geometry' 'c7f47512598cec01ad0adc9516af94e3ff58c963 F large_apex')
+if [[ "${NEXORA_RUNTIME_STAGE:-16g}" == 16h ]]; then
+ entries=('a9e104a1b5a42736d91abf89db64a4e2d2a77c3f E large_apex,runtime_cache' 'c7f47512598cec01ad0adc9516af94e3ff58c963 F large_apex')
+fi
+for entry in "${entries[@]}"; do
  read -r revision label features <<< "$entry"
  if ! git cat-file -e "$revision^{commit}" 2>/dev/null; then git fetch --depth=1 origin "$revision"; fi
  work=$(mktemp -d /tmp/nexora-runtime-baseline-XXXXXX)

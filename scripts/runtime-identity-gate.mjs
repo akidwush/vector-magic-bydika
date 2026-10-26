@@ -1,8 +1,10 @@
 import { readFile, writeFile } from "node:fs/promises";
 const root = process.env.NEXORA_PROOF_DIR;
 if (!root) throw Error("Set isolated runtime geometry proof root");
+const evidence =
+  root + "/" + (process.env.NEXORA_IDENTITY_SUBDIR || "runtime-identity");
 const rows = JSON.parse(
-  await readFile(root + "/runtime-identity/low-resolution/comparison.json"),
+  await readFile(evidence + "/low-resolution/comparison.json"),
 );
 const failures = [];
 if (rows.length !== 45) failures.push("45 pairs required");
@@ -19,7 +21,7 @@ const result = {
     "Stage1.6F versus runtime-optimized exact SVG and Auto identity; no performance threshold is replaced",
 };
 await writeFile(
-  root + "/runtime-identity/identity-gate.json",
+  evidence + "/identity-gate.json",
   JSON.stringify(result, null, 2),
 );
 console.log(result);

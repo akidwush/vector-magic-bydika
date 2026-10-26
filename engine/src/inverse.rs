@@ -70,12 +70,27 @@ fn distance(a: P, b: P) -> f64 {
     (a.x - b.x).hypot(a.y - b.y)
 }
 // Exact integral of clamp(linear x(y)-pixel_x,0,1), over a clipped y interval.
+#[cfg(feature = "inverse_hotpath")]
+mod hotpath;
 fn clamped_integral(a: f64, b: f64, dy: f64) -> f64 {
+    inverse_count!(1, 1);
+    #[cfg(feature = "inverse_hotpath")]
+    {
+        hotpath::clamped_integral(a, b, dy)
+    }
+    #[cfg(not(feature = "inverse_hotpath"))]
+    {
+        clamped_integral_legacy(a, b, dy)
+    }
+}
+#[cfg(any(test, not(feature = "inverse_hotpath")))]
+fn clamped_integral_legacy(a: f64, b: f64, dy: f64) -> f64 {
     if (a - b).abs() < 1e-12 {
         return a.clamp(0., 1.) * dy;
     }
     // Integrate piecewise at clamp breakpoints. Avoid subtracting large
     // antiderivatives for edges far outside the pixel (catastrophic cancellation).
+    inverse_count!(2, 1);
     let mut knots = vec![0., 1.];
     for boundary in [0., 1.] {
         let t = (boundary - a) / (b - a);
@@ -109,6 +124,17 @@ pub fn coverages(poly: &[P], ss: &[Sample]) -> Option<Vec<f64>> {
 /// until all chains are summed; uses the identical validated Green integral.
 pub(crate) fn signed_edge_areas(poly: &[P], ss: &[Sample]) -> Option<Vec<f64>> {
     runtime_scope!(16);
+    #[cfg(feature = "inverse_hotpath")]
+    {
+        hotpath::signed_edge_areas(poly, ss)
+    }
+    #[cfg(not(feature = "inverse_hotpath"))]
+    {
+        signed_edge_areas_legacy(poly, ss)
+    }
+}
+#[cfg(any(test, not(feature = "inverse_hotpath")))]
+fn signed_edge_areas_legacy(poly: &[P], ss: &[Sample]) -> Option<Vec<f64>> {
     if poly.len() < 2
         || poly.len() > 32768
         || poly.iter().any(|p| !p.x.is_finite() || !p.y.is_finite())
@@ -119,6 +145,8 @@ pub(crate) fn signed_edge_areas(poly: &[P], ss: &[Sample]) -> Option<Vec<f64>> {
     for s in ss {
         rows.entry(s.y).or_default();
     }
+    inverse_count!(3, ss.len());
+    inverse_count!(12, rows.len());
     let mut count = 0;
     for w in poly.windows(2) {
         let (a, b) = (w[0], w[1]);
@@ -131,6 +159,7 @@ pub(crate) fn signed_edge_areas(poly: &[P], ss: &[Sample]) -> Option<Vec<f64>> {
         for y in a.y.min(b.y).floor() as i32..b.y.max(a.y).ceil() as i32 {
             if let Some(row) = rows.get_mut(&y) {
                 count += 1;
+                inverse_count!(4, 1);
                 if count > 65536 {
                     return None;
                 }
@@ -201,15 +230,19 @@ pub(crate) fn flatten(g: &G, tolerance: f64) -> Option<Vec<P>> {
     match g {
         G::Polyline(ps) => Some(ps.clone()),
         G::Beziers(cs) => {
+            inverse_count!(5, cs.len());
             let mut out = vec![cs.first()?[0]];
             for c in cs {
                 split(*c, tolerance, 0, &mut out)?;
             }
+            inverse_count!(6, out.len());
             Some(out)
         }
     }
 }
 fn loss(g: &G, ss: &[Sample], tol: f64) -> f64 {
+    inverse_scope!(0);
+    inverse_count!(14, ss.len());
     runtime_count!(29, 1);
     LAST.with(|s| s.borrow_mut().evaluations += 1);
     let Some(p) = flatten(g, tol) else {
@@ -218,6 +251,9 @@ fn loss(g: &G, ss: &[Sample], tol: f64) -> f64 {
     let Some(values) = coverages(&p, ss) else {
         return f64::INFINITY;
     };
+    coverage_loss(&values, ss)
+}
+fn coverage_loss(values: &[f64], ss: &[Sample]) -> f64 {
     values
         .iter()
         .zip(ss)
@@ -540,7 +576,10 @@ pub fn refine(seg: &Segment, img: &ColorImage, old: &G, ss: &[Sample]) -> Option
             })
             .collect();
         // Reuse upstream crack-chain corner fitter to repair a poor initialization.
-        let mut candidate = crate::corners::fit_source(seg, 0, Some(img), &fixed)?;
+        let mut candidate = {
+            inverse_scope!(11);
+            crate::corners::fit_source(seg, 0, Some(img), &fixed)?
+        };
         LAST.with(|s| s.borrow_mut().phase = 2);
         let G::Beziers(ref curves) = candidate else {
             return None;
@@ -599,13 +638,19 @@ pub fn refine(seg: &Segment, img: &ColorImage, old: &G, ss: &[Sample]) -> Option
             if local.len() < 8 {
                 continue;
             }
+            #[cfg(feature = "inverse_hotpath")]
+            let mut local_loss = hotpath::LocalLoss::new(&local);
             for step in [0.4, 0.15, 0.05] {
                 for handle in [1, 2] {
                     for _ in 0..1 {
                         let G::Beziers(current) = &candidate else {
                             unreachable!()
                         };
-                        let local_best = loss(&candidate, &local, 0.01)
+                        #[cfg(feature = "inverse_hotpath")]
+                        let local_value = local_loss.score(&candidate, 0.01);
+                        #[cfg(not(feature = "inverse_hotpath"))]
+                        let local_value = loss(&candidate, &local, 0.01);
+                        let local_best = local_value
                             + 1e-6 * distance(current[i][handle], init[i][handle]).powi(2);
                         let mut chosen = candidate.clone();
                         let mut chosen_loss = local_best;
@@ -626,6 +671,9 @@ pub fn refine(seg: &Segment, img: &ColorImage, old: &G, ss: &[Sample]) -> Option
                             }
                             let regularization =
                                 1e-6 * distance(c[i][handle], init[i][handle]).powi(2);
+                            #[cfg(feature = "inverse_hotpath")]
+                            let value = local_loss.score(&trial, 0.01) + regularization;
+                            #[cfg(not(feature = "inverse_hotpath"))]
                             let value = loss(&trial, &local, 0.01) + regularization;
                             if value < chosen_loss {
                                 chosen_loss = value;
