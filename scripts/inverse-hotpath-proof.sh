@@ -30,7 +30,7 @@ cargo build --manifest-path engine/Cargo.toml --locked --release --target wasm32
 wasm-bindgen engine/target/wasm32-unknown-unknown/release/nexora_wasm.wasm --target web --out-dir "$proof/H"
 wasm-bindgen engine/target/wasm32-unknown-unknown/release/nexora_wasm.wasm --target web --out-dir src/engine/wasm
 npm run build
-NEXORA_LARGE_APEX=1 NEXORA_STAGE15_ROOT="$proof/regression" NEXORA_LOW_RES_ROOT="$proof/browser" NEXORA_TEST_PORT="${NEXORA_TEST_PORT:-4187}" npm run test:e2e -- --output="$proof/e2e"
+NEXORA_LARGE_APEX=1 NEXORA_STAGE15_ROOT="$proof/regression" NEXORA_LOW_RES_ROOT="$proof/browser" NEXORA_TEST_PORT="${NEXORA_TEST_PORT:-4187}" NEXORA_BROWSER_EVIDENCE_ROOT="$proof/compatibility" bash scripts/isolated-browser-evidence.sh npm run test:e2e -- --output="$proof/e2e"
 NEXORA_CANDIDATE_WASM="$proof/H" NEXORA_COMPARE_STAGE=16g NEXORA_STAGE16B_WASM="$proof/F" NEXORA_PROOF_DIR="$proof/runtime-identity" node scripts/low-resolution-benchmark.mjs
 NEXORA_PROOF_DIR="$proof" node scripts/runtime-identity-gate.mjs
 NEXORA_PROOF_DIR="$proof/runtime-identity" node scripts/low-resolution-editability.mjs
