@@ -146,6 +146,13 @@ await new Promise((r) => server.listen(0, "127.0.0.1", r));
 const origin = "http://127.0.0.1:" + server.address().port;
 const observations = [],
   failures = [];
+const tracePattern = process.env.NEXORA_CROSS_TRACE_PATTERN?.split(",");
+if (
+  tracePattern &&
+  (tracePattern.length !== repetitions ||
+    tracePattern.some((x) => !["on", "off"].includes(x)))
+)
+  throw Error("Trace pattern must explicitly cover each session");
 const env = {
   commit:
     "3268ab3fb15c0ce650bc45ab3ff9b0c458f9b2d4 engine source; runtime harness hash identifies instrumentation",
@@ -168,6 +175,7 @@ const env = {
   fixtures: fixtures.map(({ png, ...f }) => f),
   harnessSHA256: hash(await readFile(new URL(import.meta.url))),
   traceEnabled: process.env.NEXORA_CROSS_TRACE !== "0",
+  tracePattern: tracePattern ?? null,
   flags: process.env.NEXORA_CROSS_JS_FLAGS || "default",
   policy:
     "All observations retained; sessions use separate browser processes. Two A/A slots per binary and mode, alternating execution order. Work counters absent from production modules are null, never invented. Timers overlap. No historical gate is replaced.",
@@ -260,6 +268,10 @@ async function setup(page, id, mode, f) {
 }
 try {
   for (let rep = 0; rep < repetitions; rep++) {
+    const tracing = tracePattern
+      ? tracePattern[rep] === "on"
+      : env.traceEnabled;
+    const designRep = tracePattern ? Math.floor(rep / 2) : rep;
     const browser = await chromium.launch({
       executablePath: process.env.NEXORA_CHROMIUM_PATH,
       args: process.env.NEXORA_CROSS_JS_FLAGS
@@ -269,7 +281,7 @@ try {
     const cdp = await browser.newBrowserCDPSession();
     const tracePath = root + `/traces/session-${rep}.jsonl`;
     let traceWrites = Promise.resolve();
-    if (env.traceEnabled) {
+    if (tracing) {
       cdp.on("Tracing.dataCollected", (e) => {
         const text = e.value.map((x) => JSON.stringify(x)).join("\n") + "\n";
         traceWrites = traceWrites.then(() => appendFile(tracePath, text));
@@ -284,17 +296,21 @@ try {
       root + `/browser-${rep}.json`,
       JSON.stringify({
         version: browser.version(),
+        tracing,
+        designRep,
         processInfo: (await cdp.send("SystemInfo.getProcessInfo")).processInfo,
       }),
     );
     try {
-      const orderedFixtures = rep % 2 ? [...fixtures].reverse() : fixtures;
+      const orderedFixtures =
+        designRep % 2 ? [...fixtures].reverse() : fixtures;
       for (let fi = 0; fi < orderedFixtures.length; fi++) {
         const f = orderedFixtures[fi];
-        const orderBuilds = (rep + fi) % 2 ? [...buildIds].reverse() : buildIds;
+        const orderBuilds =
+          (designRep + fi) % 2 ? [...buildIds].reverse() : buildIds;
         for (const id of orderBuilds)
           for (let mi = 0; mi < modes.length; mi++) {
-            const mode = modes[(mi + rep) % modes.length];
+            const mode = modes[(mi + designRep) % modes.length];
             const holders = [];
             for (const slot of [0, 1]) {
               const context = await browser.newContext({
@@ -355,7 +371,7 @@ try {
             }
             try {
               for (let round = 0; round < warms + 2; round++)
-                for (const slot of (round + rep + fi + mi) % 2
+                for (const slot of (round + designRep + fi + mi) % 2
                   ? [1, 0]
                   : [0, 1]) {
                   const holder = holders[slot],
@@ -531,6 +547,8 @@ try {
                   const row = {
                     traceId,
                     rep,
+                    designRep,
+                    traceEnabled: tracing,
                     fixture: f.key,
                     width: f.size,
                     height: f.size,
@@ -575,7 +593,7 @@ try {
           }
       }
     } finally {
-      if (env.traceEnabled) {
+      if (tracing) {
         const completed = new Promise((r) =>
           cdp.once("Tracing.tracingComplete", r),
         );
@@ -590,42 +608,47 @@ try {
   for (const f of fixtures)
     for (const id of buildIds)
       for (const mode of modes)
-        for (const state of ["first", "warm", "reset"]) {
-          const r = observations.filter(
-            (r) =>
-              r.fixture === f.key &&
-              r.buildId === id &&
-              r.mode === mode &&
-              r.state === state,
-          );
-          const sessions = Array.from({ length: repetitions }, (_, rep) => ({
-            rep,
-            slots: [0, 1].map((slot) =>
-              distribution(
-                r
-                  .filter((r) => r.rep === rep && r.slot === slot)
-                  .map((r) => r.coreMs),
+        for (const state of ["first", "warm", "reset"])
+          for (const tracing of env.tracePattern
+            ? [true, false]
+            : [env.traceEnabled]) {
+            const r = observations.filter(
+              (r) =>
+                r.fixture === f.key &&
+                r.buildId === id &&
+                r.mode === mode &&
+                r.state === state &&
+                (r.traceEnabled ?? env.traceEnabled) === tracing,
+            );
+            const sessions = Array.from({ length: repetitions }, (_, rep) => ({
+              rep,
+              slots: [0, 1].map((slot) =>
+                distribution(
+                  r
+                    .filter((r) => r.rep === rep && r.slot === slot)
+                    .map((r) => r.coreMs),
+                ),
               ),
-            ),
-          }));
-          summary.push({
-            fixture: f.key,
-            buildId: id,
-            mode,
-            state,
-            core: distribution(r.map((r) => r.coreMs)),
-            rust: distribution(
-              r.flatMap((r) => (r.runtime ? [r.runtime[32]] : [])),
-            ),
-            pageResult: distribution(
-              r.map((r) => r.pageResultMs ?? r.appResultReadyMs),
-            ),
-            resultWall: distribution(r.map((r) => r.resultWallMs)),
-            getters: distribution(r.map((r) => r.gettersMs)),
-            hash: distribution(r.map((r) => r.hashMs)),
-            sessions,
-          });
-        }
+            }));
+            summary.push({
+              fixture: f.key,
+              buildId: id,
+              mode,
+              state,
+              tracing,
+              core: distribution(r.map((r) => r.coreMs)),
+              rust: distribution(
+                r.flatMap((r) => (r.runtime ? [r.runtime[32]] : [])),
+              ),
+              pageResult: distribution(
+                r.map((r) => r.pageResultMs ?? r.appResultReadyMs),
+              ),
+              resultWall: distribution(r.map((r) => r.resultWallMs)),
+              getters: distribution(r.map((r) => r.gettersMs)),
+              hash: distribution(r.map((r) => r.hashMs)),
+              sessions,
+            });
+          }
   for (const f of fixtures) {
     const r = observations.filter((r) => r.fixture === f.key);
     check(

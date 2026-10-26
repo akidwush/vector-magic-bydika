@@ -1,17 +1,27 @@
 // Attribute marks to OS threads. GC/compile intervals overlap: report their union,
 // never sum nested V8 timers. CPU snapshots envelope the call, not just its marks.
 import { createReadStream } from "node:fs";
-import { readFile as read, writeFile as write } from "node:fs/promises";
+import { readFile as read, writeFile as write, mkdir } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import { createInterface } from "node:readline";
 import { resolve } from "node:path";
 import { distribution } from "./runtime-statistics.mjs";
 const root = resolve(process.env.NEXORA_CROSS_ROOT);
+const output = process.env.NEXORA_CROSS_ANALYSIS_ROOT
+  ? resolve(process.env.NEXORA_CROSS_ANALYSIS_ROOT)
+  : root;
+if (output !== root) await mkdir(output);
 const rows = JSON.parse(await read(root + "/observations.json"));
 const env = JSON.parse(await read(root + "/environment.json"));
 const threadEvents = new Map(),
   marks = new Map(),
   eventNames = new Map();
 for (let rep = 0; rep < env.repetitions; rep++) {
+  if (
+    env.tracePattern?.[rep] === "off" ||
+    (!env.tracePattern && !env.traceEnabled)
+  )
+    continue;
   const lines = createInterface({
     input: createReadStream(root + `/traces/session-${rep}.jsonl`),
     crlfDelay: Infinity,
@@ -63,6 +73,10 @@ function cgroup(text) {
 }
 const missing = [];
 for (const r of rows) {
+  if (r.traceEnabled === false) {
+    r.attribution = null;
+    continue;
+  }
   const a = marks.get("nexora-core-start-" + r.markId),
     b = marks.get("nexora-core-end-" + r.markId);
   if (!a || !b) {
@@ -109,7 +123,9 @@ for (const r of rows) {
     ).length,
     otherRendererMainCPU: cpu
       .filter(
-        (t) => t.processType === "renderer" && t.comm === "CrRendererMain",
+        (t) =>
+          t.processType === "renderer" &&
+          t.id.split(":")[0] === t.id.split(":")[1],
       )
       .reduce((s, t) => s + t.cpuMs, 0),
     otherThreadCPU: cpu.reduce((s, t) => s + t.cpuMs, 0),
@@ -127,52 +143,57 @@ const groups = [];
 for (const fixture of new Set(rows.map((r) => r.fixture)))
   for (const build of new Set(rows.map((r) => r.buildId)))
     for (const mode of env.modes)
-      for (const state of ["first", "warm", "reset"]) {
-        const rs = rows.filter(
-          (r) =>
-            r.fixture === fixture &&
-            r.buildId === build &&
-            r.mode === mode &&
-            r.state === state,
-        );
-        const dist = (fn) => distribution(rs.map(fn).filter(Number.isFinite));
-        const sessions = Array.from({ length: env.repetitions }, (_, rep) => {
-          const slots = [0, 1].map((slot) =>
-            distribution(
-              rs
-                .filter((r) => r.rep === rep && r.slot === slot)
-                .map((r) => r.coreMs),
-            ),
+      for (const state of ["first", "warm", "reset"])
+        for (const tracing of env.tracePattern
+          ? [true, false]
+          : [env.traceEnabled]) {
+          const rs = rows.filter(
+            (r) =>
+              r.fixture === fixture &&
+              r.buildId === build &&
+              r.mode === mode &&
+              r.state === state &&
+              (r.traceEnabled ?? env.traceEnabled) === tracing,
           );
-          return {
-            rep,
-            slots,
-            aaMedianDifferenceMs: slots.every(Boolean)
-              ? slots[1].median - slots[0].median
-              : null,
-          };
-        });
-        groups.push({
-          fixture,
-          build,
-          mode,
-          state,
-          core: dist((r) => r.coreMs),
-          rust: dist((r) => r.runtime?.[32]),
-          cpu: dist((r) => r.attribution?.execution?.cpuMs),
-          runqueue: dist((r) => r.attribution?.execution?.runqueueMs),
-          gc: dist((r) => r.attribution?.gcUnionMs),
-          compile: dist((r) => r.attribution?.compileUnionMs),
-          otherCPU: dist((r) => r.attribution?.otherThreadCPU),
-          wall: dist((r) => r.resultWallMs),
-          page: dist((r) => r.pageResultMs ?? r.appResultReadyMs),
-          memory: dist((r) => r.memory),
-          sessions,
-        });
-      }
-await write(root + "/attribution.json", JSON.stringify(rows));
+          const dist = (fn) => distribution(rs.map(fn).filter(Number.isFinite));
+          const sessions = Array.from({ length: env.repetitions }, (_, rep) => {
+            const slots = [0, 1].map((slot) =>
+              distribution(
+                rs
+                  .filter((r) => r.rep === rep && r.slot === slot)
+                  .map((r) => r.coreMs),
+              ),
+            );
+            return {
+              rep,
+              slots,
+              aaMedianDifferenceMs: slots.every(Boolean)
+                ? slots[1].median - slots[0].median
+                : null,
+            };
+          });
+          groups.push({
+            fixture,
+            build,
+            mode,
+            state,
+            tracing,
+            core: dist((r) => r.coreMs),
+            rust: dist((r) => r.runtime?.[32]),
+            cpu: dist((r) => r.attribution?.execution?.cpuMs),
+            runqueue: dist((r) => r.attribution?.execution?.runqueueMs),
+            gc: dist((r) => r.attribution?.gcUnionMs),
+            compile: dist((r) => r.attribution?.compileUnionMs),
+            otherCPU: dist((r) => r.attribution?.otherThreadCPU),
+            wall: dist((r) => r.resultWallMs),
+            page: dist((r) => r.pageResultMs ?? r.appResultReadyMs),
+            memory: dist((r) => r.memory),
+            sessions,
+          });
+        }
+await write(output + "/attribution.json", JSON.stringify(rows), { flag: "wx" });
 await write(
-  root + "/attribution-summary.json",
+  output + "/attribution-summary.json",
   JSON.stringify(
     {
       missing,
@@ -191,6 +212,23 @@ await write(
     null,
     2,
   ),
+);
+await write(
+  output + "/analysis-metadata.json",
+  JSON.stringify(
+    {
+      schema: 2,
+      inputRoot: root,
+      analysisSHA256: createHash("sha256")
+        .update(await read(new URL(import.meta.url)))
+        .digest("hex"),
+      policy:
+        "Renderer main thread identified by PID=TID, independent of Linux comm; raw observations and previous analyses untouched.",
+    },
+    null,
+    2,
+  ),
+  { flag: "wx" },
 );
 console.log(
   JSON.stringify({
