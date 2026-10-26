@@ -11,6 +11,7 @@ use vtracer::{
 };
 type C = [P; 4];
 mod acute;
+mod apex_trace;
 mod continuity;
 #[derive(Clone)]
 struct Context {
@@ -23,6 +24,7 @@ struct Context {
 thread_local! {static CONTEXTS:RefCell<Vec<Context>>=const{RefCell::new(Vec::new())};static STATS:RefCell<[f64;35]>=const{RefCell::new([0.;35])};static INITIALIZATION:RefCell<Vec<f64>>=const{RefCell::new(Vec::new())};}
 pub fn reset() {
     acute::reset();
+    apex_trace::reset();
     continuity::reset();
     CONTEXTS.with(|c| c.borrow_mut().clear());
     STATS.with(|s| *s.borrow_mut() = [0.; 35]);
@@ -30,6 +32,9 @@ pub fn reset() {
 }
 pub fn acute_evidence() -> Vec<f64> {
     acute::evidence()
+}
+pub fn apex_evidence() -> Vec<f64> {
+    apex_trace::values()
 }
 pub fn continuity_evidence() -> Vec<f64> {
     continuity::evidence()
@@ -530,7 +535,14 @@ pub fn document(doc: &mut VectorDoc, img: &ColorImage) {
             continuity::refine(&mut candidate, img, &matte);
         }
         round(&mut candidate);
-        if !source_safe(&candidate, &old, img) || !self_clear(&candidate) {
+        let validation_started = now();
+        if !source_safe(&candidate, &old, img) {
+            apex_trace::component(100., &old, &candidate, now() - validation_started, None);
+            count(10, 1.);
+            continue;
+        }
+        if !self_clear(&candidate) {
+            apex_trace::component(104., &old, &candidate, now() - validation_started, None);
             count(10, 1.);
             continue;
         }
@@ -548,6 +560,7 @@ pub fn document(doc: &mut VectorDoc, img: &ColorImage) {
             })
             .collect();
         if !crate::planar::replacement_clear(&G::Beziers(candidate.clone()), &others) {
+            apex_trace::component(101., &old, &candidate, now() - validation_started, None);
             count(10, 1.);
             continue;
         }
@@ -558,6 +571,7 @@ pub fn document(doc: &mut VectorDoc, img: &ColorImage) {
                 .first()
                 .is_some_and(|p| crate::reduce::inside(&a, *p) != crate::reduce::inside(&b, *p))
         }) {
+            apex_trace::component(102., &old, &candidate, now() - validation_started, None);
             count(10, 1.);
             continue;
         }
@@ -566,8 +580,23 @@ pub fn document(doc: &mut VectorDoc, img: &ColorImage) {
         count(8, before.0);
         count(9, after.0);
         if after.0 < before.0 && after.1 <= before.1 {
+            apex_trace::component(
+                110.,
+                &old,
+                &candidate,
+                now() - validation_started,
+                Some((before, after)),
+            );
             doc.shapes[i].path.subpaths[j] = G::Beziers(candidate).into_closed_subpath();
             count(1, 1.);
+        } else {
+            apex_trace::component(
+                103.,
+                &old,
+                &candidate,
+                now() - validation_started,
+                Some((before, after)),
+            );
         }
     }
     count(11, now() - started);

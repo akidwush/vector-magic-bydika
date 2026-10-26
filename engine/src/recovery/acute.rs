@@ -427,7 +427,7 @@ fn propose(cs: &[C], i: usize, q: P, u: P, v: P, handles: [f64; 4]) -> Vec<C> {
     result
 }
 
-fn local_clear(cs: &[C], i: usize) -> bool {
+fn local_reason(cs: &[C], i: usize) -> u8 {
     let prev = (i + cs.len() - 1) % cs.len();
     let q = cs[i][0];
     let a = cs[prev][0];
@@ -437,28 +437,32 @@ fn local_clear(cs: &[C], i: usize) -> bool {
     let sa = dot(sub(a, q), side);
     let sb = dot(sub(b, q), side);
     if sa * sb >= -1e-8 {
-        return false;
+        return 1;
     }
     for (edge, sign) in [(prev, sa.signum()), (i, sb.signum())] {
         let c = cs[edge];
         let chord = sub(c[3], c[0]);
         let len = norm(chord);
         if len < 0.1 || c.iter().any(|p| !p.x.is_finite() || !p.y.is_finite()) {
-            return false;
+            return 2;
         }
         let projection = |p: P| dot(sub(p, c[0]), unit(chord));
         let h1 = projection(c[1]);
         let h2 = projection(c[2]);
         // Monotone chord projection rules out a loop within either cubic.
         if h1 < -1e-7 || h2 < h1 - 1e-7 || h2 > len + 1e-7 {
-            return false;
+            return 3;
         }
         // Opposite convex half-planes separate the two arms except at the apex.
         if c.iter().any(|p| sign * dot(sub(*p, q), side) < -1e-7) {
-            return false;
+            return 4;
         }
     }
-    true
+    0
+}
+
+fn local_clear(cs: &[C], i: usize) -> bool {
+    local_reason(cs, i) == 0
 }
 
 pub(super) fn initialize(cs: &mut Vec<C>, img: &ColorImage, matte: &Matte) -> bool {
@@ -688,6 +692,111 @@ pub(super) fn initialize(cs: &mut Vec<C>, img: &ColorImage, matte: &Matte) -> bo
     accepted
 }
 
+// Fallback only after the established Stage 1.6D proposal is rejected.
+// Keep the evidence apex fixed: improve the incident handles jointly, without
+// moving an uncertain corner to chase a lower image loss.
+fn joint_sharp(
+    old: &[C],
+    i: usize,
+    h: &Hypothesis,
+    cache: &Patch<'_>,
+    before: (f64, f64),
+    img: &ColorImage,
+) -> Option<Vec<C>> {
+    let evaluation_started = now();
+    let prev = (i + old.len() - 1) % old.len();
+    let handles = [
+        dist(old[prev][0], old[prev][1]),
+        dist(old[prev][0], h.q) / 3.,
+        dist(old[i][3], h.q) / 3.,
+        dist(old[i][2], old[i][3]),
+    ];
+    let mut chosen = propose(old, i, h.q, h.u, h.v, handles);
+    round(&mut chosen);
+    if !local_clear(&chosen, i) {
+        return None;
+    }
+    let baseline = chosen.clone();
+    let mut score = cache.score(&chosen);
+    let objective = |s: (f64, f64)| s.0 + 0.1 * s.1 * s.1;
+    for step in [0.5, 0.2, 0.08, 0.03] {
+        let initial = objective(score);
+        for dim in 0..4 {
+            let (edge, handle, anchor) = [
+                (prev, 1, old[prev][0]),
+                (prev, 2, h.q),
+                (i, 1, h.q),
+                (i, 2, old[i][3]),
+            ][dim];
+            let mut best = chosen.clone();
+            let mut next = score;
+            for sign in [-1., 1.] {
+                let mut trial = chosen.clone();
+                let delta = sub(trial[edge][handle], anchor);
+                let len = norm(delta);
+                let new_len = (len + sign * step).max(0.1);
+                if new_len > handles[dim] + 2. || (new_len - handles[dim]).abs() > 2. {
+                    continue;
+                }
+                trial[edge][handle] = add(anchor, mul(unit(delta), new_len));
+                round(&mut trial);
+                if !local_clear(&trial, i) {
+                    continue;
+                }
+                let val = cache.score(&trial);
+                let reg = 1e-6
+                    * trial
+                        .iter()
+                        .zip(&baseline)
+                        .map(|(a, b)| {
+                            a.iter()
+                                .zip(b)
+                                .map(|(a, b)| dist(*a, *b).powi(2))
+                                .sum::<f64>()
+                        })
+                        .sum::<f64>();
+                if objective(val) + reg < objective(next) {
+                    best = trial;
+                    next = val;
+                }
+            }
+            chosen = best;
+            score = next;
+        }
+        if (initial - objective(score)).abs() < 1e-9 {
+            break;
+        }
+    }
+    let mut audit = [-1.; 32];
+    audit[0] = 5.;
+    audit[1] = i as f64;
+    audit[2] = old[i][0].x;
+    audit[3] = old[i][0].y;
+    audit[4] = h.q.x;
+    audit[5] = h.q.y;
+    audit[6] = h.condition;
+    audit[7] = h.uncertainty;
+    audit[8] = dist(h.q, old[i][0]);
+    audit[9] = turn(&chosen, i);
+    audit[10] = local_reason(&chosen, i) as f64;
+    audit[11] = before.0;
+    audit[12] = score.0;
+    audit[13] = before.1;
+    audit[14] = score.1;
+    let safety_started = now();
+    audit[15] = self_clear(&chosen) as u8 as f64;
+    audit[16] = source_safe(&chosen, old, img) as u8 as f64;
+    audit[27] = now() - safety_started;
+    audit[25] = now() - evaluation_started;
+    apex_trace::record(audit);
+    (score.0 < before.0 * 0.85
+        && score.1 < before.1
+        && audit[9] > 2.6
+        && audit[15] == 1.
+        && audit[16] == 1.)
+        .then_some(chosen)
+}
+
 /// Separate hypothesis class: an existing, genuinely discontinuous apex.
 /// Only deferred components without accepted rounded-cap initialization enter.
 /// Agreement/conditioning and the original trust region are not relaxed.
@@ -730,6 +839,16 @@ pub(super) fn refine_sharp(cs: &mut Vec<C>, img: &ColorImage, matte: &Matte) -> 
     }
     let positions: Vec<_> = hypotheses.iter().map(|h| h.q).collect();
     hypotheses.retain(|h| positions.iter().filter(|q| dist(h.q, **q) < 1.25).count() >= 2);
+    let initialized_at = now();
+    if hypotheses.is_empty() {
+        let mut r = [-1.; 32];
+        r[0] = 0.;
+        r[1] = i as f64;
+        r[2] = origin.x;
+        r[3] = origin.y;
+        r[26] = initialized_at - started;
+        apex_trace::record(r);
+    }
     let patch = matte.patch(img, origin, 6);
     let mut changed = false;
     if patch.len() == 169 && !hypotheses.is_empty() {
@@ -737,10 +856,30 @@ pub(super) fn refine_sharp(cs: &mut Vec<C>, img: &ColorImage, matte: &Matte) -> 
             let before = cache.score(cs);
             let mut best = before;
             let mut chosen = old.clone();
-            for h in hypotheses.into_iter().take(3) {
+            for h in hypotheses.iter().take(3) {
+                let evaluation_started = now();
+                let mut audit = [-1.; 32];
+                audit[26] = initialized_at - started;
+                audit[0] = 1.;
+                audit[1] = i as f64;
+                audit[2] = origin.x;
+                audit[3] = origin.y;
+                audit[4] = h.q.x;
+                audit[5] = h.q.y;
+                audit[6] = h.condition;
+                audit[7] = h.uncertainty;
+                audit[8] = dist(h.q, origin);
+                audit[11] = before.0;
+                audit[13] = before.1;
+                audit[28] = h.u.x;
+                audit[29] = h.u.y;
+                audit[30] = h.v.x;
+                audit[31] = h.v.y;
                 // Do not clamp a distant/ill-conditioned extrapolated apex into
                 // an apparently supported update at the edge of the budget.
                 if dist(h.q, origin) > 3. {
+                    audit[0] = 2.;
+                    apex_trace::record(audit);
                     continue;
                 }
                 let handles = [
@@ -751,10 +890,21 @@ pub(super) fn refine_sharp(cs: &mut Vec<C>, img: &ColorImage, matte: &Matte) -> 
                 ];
                 let mut trial = propose(&old, i, h.q, h.u, h.v, handles);
                 round(&mut trial);
-                if turn(&trial, i) < 2.6 || !local_clear(&trial, i) {
+                audit[9] = turn(&trial, i);
+                audit[10] = local_reason(&trial, i) as f64;
+                if audit[9] < 2.6 || audit[10] != 0. {
+                    audit[0] = 3.;
+                    apex_trace::record(audit);
                     continue;
                 }
                 let score = cache.score(&trial);
+                audit[25] = now() - evaluation_started;
+                audit[0] = 4.;
+                audit[12] = score.0;
+                audit[14] = score.1;
+                audit[15] = self_clear(&trial) as u8 as f64;
+                audit[16] = source_safe(&trial, &old, img) as u8 as f64;
+                apex_trace::record(audit);
                 if score.0 < best.0 && score.1 < best.1 {
                     best = score;
                     chosen = trial;
@@ -768,6 +918,30 @@ pub(super) fn refine_sharp(cs: &mut Vec<C>, img: &ColorImage, matte: &Matte) -> 
                 *cs = chosen;
                 changed = true;
                 count(33, 1.);
+            }
+
+            if !changed {
+                let mut selected = None;
+                let mut selected_loss = f64::INFINITY;
+                for h in hypotheses.iter().take(3) {
+                    if dist(h.q, origin) > 3. {
+                        continue;
+                    }
+                    if let Some(trial) = joint_sharp(&old, i, h, &cache, before, img) {
+                        let score = cache.score(&trial);
+                        let objective =
+                            score.0 + 0.1 * score.1 * score.1 + 1e-6 * h.uncertainty.powi(2);
+                        if objective < selected_loss {
+                            selected_loss = objective;
+                            selected = Some(trial);
+                        }
+                    }
+                }
+                if let Some(trial) = selected {
+                    *cs = trial;
+                    changed = true;
+                    count(33, 1.);
+                }
             }
         }
     }
@@ -792,6 +966,28 @@ pub(super) fn refine_sharp(cs: &mut Vec<C>, img: &ColorImage, matte: &Matte) -> 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn joint_parameterization_keeps_evidence_apex_outer_positions_and_tangent_rays() {
+        let old = vec![
+            [p(10., 5.), p(12., 9.), p(14., 13.), p(16., 17.)],
+            [p(16., 17.), p(14., 13.), p(12., 9.), p(8., 5.)],
+        ];
+        let q = p(15.8, 16.2);
+        let c = propose(
+            &old,
+            1,
+            q,
+            unit(p(1., 3.)),
+            unit(p(-1., -3.)),
+            [1., 2., 3., 1.5],
+        );
+        assert_eq!(c[0][0], old[0][0]);
+        assert_eq!(c[1][3], old[1][3]);
+        assert_eq!(c[0][3], q);
+        assert_eq!(c[1][0], q);
+        assert!(cross(sub(c[0][1], c[0][0]), sub(old[0][1], old[0][0])).abs() < 1e-10);
+        assert!(cross(sub(c[1][3], c[1][2]), sub(old[1][3], old[1][2])).abs() < 1e-10);
+    }
     fn model(slope: f64, scale: f64) -> Arm {
         Arm {
             coeff: [slope * 2., slope * scale, 0.],

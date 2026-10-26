@@ -28,6 +28,11 @@ pub fn last_acute_evidence() -> Vec<f64> {
 }
 #[cfg(feature = "source_geometry")]
 #[wasm_bindgen]
+pub fn last_apex_evidence() -> Vec<f64> {
+    recovery::apex_evidence()
+}
+#[cfg(feature = "source_geometry")]
+#[wasm_bindgen]
 pub fn last_continuity() -> Vec<f64> {
     recovery::continuity_evidence()
 }
