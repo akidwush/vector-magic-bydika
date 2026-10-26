@@ -10,5 +10,5 @@ for pair in 'runtime_uncached P' 'runtime_profile Q' 'large_apex,runtime_cache G
  wasm-bindgen engine/target/wasm32-unknown-unknown/release/nexora_wasm.wasm --target web --out-dir "$proof/$label"
 done
 NEXORA_RUNTIME_BUILDS="{\"E\":\"$proof/E\",\"F\":\"$proof/F\",\"G\":\"$proof/G\"}" NEXORA_RUNTIME_PAIRS='[["E","E"],["F","F"],["E","F"],["F","G"]]' NEXORA_RUNTIME_ROOT="$proof/distributions" node scripts/runtime-benchmark.mjs
-NEXORA_RUNTIME_BUILDS="{\"F\":\"$proof/P\",\"G\":\"$proof/Q\"}" NEXORA_RUNTIME_PAIRS='[["F","G"]]' NEXORA_RUNTIME_FIXTURES=triangle-128,triangle-512,cubic-1024,wave-1024 NEXORA_RUNTIME_REPETITIONS=2 NEXORA_RUNTIME_WARMS=2 NEXORA_RUNTIME_ROOT="$proof/profile" node scripts/runtime-benchmark.mjs
+NEXORA_RUNTIME_BUILDS="{\"F\":\"$proof/P\",\"G\":\"$proof/Q\"}" NEXORA_RUNTIME_PAIRS='[["F","G"]]' NEXORA_RUNTIME_FIXTURES=triangle-128,triangle-512,cubic-1024,wave-1024,rounded-128,parallel-512 NEXORA_RUNTIME_REPETITIONS=2 NEXORA_RUNTIME_WARMS=2 NEXORA_RUNTIME_ROOT="$proof/profile" node scripts/runtime-benchmark.mjs
 NEXORA_RUNTIME_ROOT="$proof" node scripts/runtime-reliability.mjs

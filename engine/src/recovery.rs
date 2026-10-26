@@ -556,6 +556,7 @@ pub fn document(doc: &mut VectorDoc, img: &ColorImage) {
                 {
                     extended = acute::large::refine(&old, img, &matte);
                     let Some(ref proof) = extended else {
+                        runtime_count!(22, 1);
                         continue;
                     };
                     candidate = proof.geometry().to_vec();

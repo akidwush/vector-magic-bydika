@@ -68,6 +68,12 @@ for (const fixture of [...new Set(profile.map((r) => r.fixture))])
         slot,
         reason: "profiling did not reset at every trace entry",
       });
+    if (rows.some((r) => r.runtime[21] !== r.recovery[1] + r.runtime[22]))
+      failures.push({
+        fixture,
+        slot,
+        reason: "eligible component accounting mismatch",
+      });
     const signatures = [
       ...new Set(rows.map((r) => JSON.stringify(r.runtime.slice(0, 32)))),
     ];

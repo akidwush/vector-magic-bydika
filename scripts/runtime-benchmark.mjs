@@ -41,8 +41,26 @@ const fixtures = [
     size,
   })),
 ];
+fixtures.push(
+  {
+    key: "rounded-128",
+    path: "tests/fixtures/acute-geometry/rounded-blade-native-srgb-128.png",
+    size: 128,
+    negative: true,
+  },
+  {
+    key: "parallel-512",
+    path: "tests/fixtures/acute-geometry/parallel-uncertain-native-srgb-512.png",
+    size: 512,
+    negative: true,
+  },
+);
 const selected = process.env.NEXORA_RUNTIME_FIXTURES?.split(",");
-const cases = fixtures.filter((f) => !selected || selected.includes(f.key));
+const cases = fixtures.filter((f) =>
+  selected ? selected.includes(f.key) : !f.negative,
+);
+if (!cases.length || !Number.isInteger(repetitions) || !Number.isInteger(warms))
+  throw Error("Invalid empty/runtime sample configuration");
 const workerCode = `let m, memory;self.onmessage=async({data:d})=>{try{if(d.init){const t=performance.now();m=await import('/'+d.init+'/nexora_wasm.js');const imported=performance.now();const w=await m.default();memory=w.memory;postMessage({id:d.id,importMs:imported-t,instantiateMs:performance.now()-imported});return;}const start=performance.now();const svg=m.trace_quality(new Uint8Array(d.bytes),d.size,d.size,'illustration','inverse-reduce-reconstruct');const wasmMs=performance.now()-start;const g=performance.now();const r={svg,wasmMs,stages:[...m.last_stage_timings()],recovery:m.last_recovery?[...m.last_recovery()]:[],inverse:[...m.last_inverse()],large:m.last_large_apex?[...m.last_large_apex()]:[],runtime:m.last_runtime_profile?[...m.last_runtime_profile()]:[],memory:memory.buffer.byteLength};r.profileNames=m.runtime_profile_names?m.runtime_profile_names().split("|"):[];r.gettersMs=performance.now()-g;postMessage({id:d.id,...r});}catch(e){postMessage({id:d.id,error:String(e)});}};`;
 const files = {};
 for (const f of cases) files["/input/" + f.key] = await readFile(f.path);
