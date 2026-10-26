@@ -26,6 +26,11 @@ pub fn last_initialization() -> Vec<f64> {
 pub fn last_acute_evidence() -> Vec<f64> {
     recovery::acute_evidence()
 }
+#[cfg(feature = "source_geometry")]
+#[wasm_bindgen]
+pub fn last_continuity() -> Vec<f64> {
+    recovery::continuity_evidence()
+}
 
 mod source_fit;
 #[wasm_bindgen]

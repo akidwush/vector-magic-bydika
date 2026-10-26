@@ -11,6 +11,7 @@ use vtracer::{
 };
 type C = [P; 4];
 mod acute;
+mod continuity;
 #[derive(Clone)]
 struct Context {
     path: SubPath,
@@ -19,15 +20,19 @@ struct Context {
     location: Option<(usize, usize)>,
     deferred: bool,
 }
-thread_local! {static CONTEXTS:RefCell<Vec<Context>>=const{RefCell::new(Vec::new())};static STATS:RefCell<[f64;30]>=const{RefCell::new([0.;30])};static INITIALIZATION:RefCell<Vec<f64>>=const{RefCell::new(Vec::new())};}
+thread_local! {static CONTEXTS:RefCell<Vec<Context>>=const{RefCell::new(Vec::new())};static STATS:RefCell<[f64;35]>=const{RefCell::new([0.;35])};static INITIALIZATION:RefCell<Vec<f64>>=const{RefCell::new(Vec::new())};}
 pub fn reset() {
     acute::reset();
+    continuity::reset();
     CONTEXTS.with(|c| c.borrow_mut().clear());
-    STATS.with(|s| *s.borrow_mut() = [0.; 30]);
+    STATS.with(|s| *s.borrow_mut() = [0.; 35]);
     INITIALIZATION.with(|s| s.borrow_mut().clear());
 }
 pub fn acute_evidence() -> Vec<f64> {
     acute::evidence()
+}
+pub fn continuity_evidence() -> Vec<f64> {
+    continuity::evidence()
 }
 pub fn initialization() -> Vec<f64> {
     INITIALIZATION.with(|s| s.borrow().clone())
@@ -511,7 +516,10 @@ pub fn document(doc: &mut VectorDoc, img: &ColorImage) {
         count(0, 1.);
         let mut candidate = old.clone();
         if ctx.deferred {
-            if !acute::initialize(&mut candidate, img, &matte) {
+            let acute = acute::initialize(&mut candidate, img, &matte);
+            let sharp = !acute && acute::refine_sharp(&mut candidate, img, &matte);
+            let continuous = continuity::refine(&mut candidate, img, &matte);
+            if !acute && !sharp && !continuous {
                 continue;
             }
             let span_started = now();
@@ -519,6 +527,7 @@ pub fn document(doc: &mut VectorDoc, img: &ColorImage) {
             count(17, now() - span_started);
         } else {
             recover(&mut candidate, &ctx.ss, img, &matte);
+            continuity::refine(&mut candidate, img, &matte);
         }
         round(&mut candidate);
         if !source_safe(&candidate, &old, img) || !self_clear(&candidate) {
@@ -1277,7 +1286,10 @@ fn span_recover(cs: &mut Vec<C>, ss: &[Sample], img: &ColorImage, matte: &Matte)
                 }
             }
         }
-        let initial_score = matte.score(cs, &band, img);
+        let Some(cache) = Patch::new(cs, &edges, &band, img, matte) else {
+            continue;
+        };
+        let initial_score = cache.score(cs);
         let mut score = initial_score;
         let mut accepted = false;
         for iteration in 0..3 {
@@ -1356,7 +1368,7 @@ fn span_recover(cs: &mut Vec<C>, ss: &[Sample], img: &ColorImage, matte: &Matte)
                 if !control_safe(&trial, &before_span, img, 1.25) {
                     continue;
                 }
-                let next = matte.score(&trial, &band, img);
+                let next = cache.score(&trial);
                 if next.0 + 1e-9 < score.0 && next.1 <= score.1 {
                     *cs = trial;
                     score = next;
@@ -1411,10 +1423,14 @@ impl<'a> Patch<'a> {
         })
     }
     fn score(&self, cs: &[C]) -> (f64, f64) {
+        let changed: Vec<_> = self.indices.iter().map(|&i| cs[i]).collect();
+        self.score_changed(&changed)
+    }
+    fn score_changed(&self, changed: &[C]) -> (f64, f64) {
         count(2, 1.);
         let mut areas = self.fixed.clone();
-        for &i in &self.indices {
-            let Some(flat) = crate::inverse::flatten(&G::Beziers(vec![cs[i]]), 0.001) else {
+        for c in changed {
+            let Some(flat) = crate::inverse::flatten(&G::Beziers(vec![*c]), 0.001) else {
                 return (f64::INFINITY, f64::INFINITY);
             };
             let Some(v) = crate::inverse::signed_edge_areas(&flat, self.ss) else {

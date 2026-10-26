@@ -66,6 +66,11 @@ export interface TraceResult {
     capLossBefore: number;
     capLossAfter: number;
     canonicalOwners: number;
+    continuityPairs: number;
+    continuityMs: number;
+    sharpAttempts: number;
+    sharpAccepted: number;
+    sharpMs: number;
   };
   optimization?: {
     attempts: number;

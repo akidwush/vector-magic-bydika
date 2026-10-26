@@ -5,7 +5,7 @@ cd "$(dirname "$0")/.."
 repo_dir="$PWD"
 # One immutable artifact namespace per execution. Historical Stage 1.6B output
 # is never used as a writable destination.
-proof_dir="${NEXORA_PROOF_DIR:-$repo_dir/benchmark-results/stage16c/$(git rev-parse --short HEAD)-$(date -u +%Y%m%dT%H%M%S)-$$}"
+proof_dir="${NEXORA_PROOF_DIR:-$repo_dir/benchmark-results/stage16d/$(git rev-parse --short HEAD)-$(date -u +%Y%m%dT%H%M%S)-$$}"
 if [[ "$proof_dir" != /* ]]; then proof_dir="$repo_dir/$proof_dir"; fi
 mkdir -p "$(dirname "$proof_dir")"
 mkdir "$proof_dir"
@@ -44,13 +44,13 @@ cleanup() {
   exit "$research_status"
 }
 trap cleanup EXIT
-for entry in '6084faffbd18313c80b7d4bc8bec349dd88b63c8 stage15-wasm' 'db06a032f7180f349b275ef3801854c048bb674d baseline-wasm' '564b643d53ecc5897f6c3b8a0174ccd807c47dcd stage16b-wasm'; do
+for entry in '6084faffbd18313c80b7d4bc8bec349dd88b63c8 stage15-wasm' 'db06a032f7180f349b275ef3801854c048bb674d baseline-wasm' '564b643d53ecc5897f6c3b8a0174ccd807c47dcd stage16b-wasm' '5f69567c357eb0bb5930925fa7d35d132de2f3a5 stage16c-wasm'; do
   read -r baseline_commit output_name <<< "$entry"
   if ! git cat-file -e "$baseline_commit^{commit}" 2>/dev/null; then git fetch --depth=1 origin "$baseline_commit"; fi
   work_dir=$(mktemp -d /tmp/nexora-target-baseline-XXXXXX)
   git worktree add --detach "$work_dir" "$baseline_commit"
   baseline_features=()
-  if [[ "$output_name" == stage16b-wasm ]]; then baseline_features=(--features source_geometry); fi
+  if [[ "$output_name" == stage16b-wasm || "$output_name" == stage16c-wasm ]]; then baseline_features=(--features source_geometry); fi
   CARGO_TARGET_DIR="$repo_dir/engine/target" cargo build --manifest-path "$work_dir/engine/Cargo.toml" --locked --release --target wasm32-unknown-unknown "${baseline_features[@]}" -j2
   wasm-bindgen engine/target/wasm32-unknown-unknown/release/nexora_wasm.wasm --target web --out-dir "$proof_dir/$output_name"
   git worktree remove "$work_dir"
@@ -59,7 +59,7 @@ done
 cargo build --manifest-path engine/Cargo.toml --locked --release --target wasm32-unknown-unknown --features source_geometry -j2
 wasm-bindgen engine/target/wasm32-unknown-unknown/release/nexora_wasm.wasm --target web --out-dir src/engine/wasm
 npm run build
-NEXORA_TEST_PORT="${NEXORA_TEST_PORT:-4187}" npm run test:e2e -- tests/e2e/source-refinement.spec.ts tests/e2e/recovery.spec.ts tests/e2e/low-resolution.spec.ts --output="$proof_dir/feature-e2e"
+NEXORA_TEST_PORT="${NEXORA_TEST_PORT:-4187}" npm run test:e2e -- tests/e2e/source-refinement.spec.ts tests/e2e/recovery.spec.ts tests/e2e/low-resolution.spec.ts tests/e2e/false-corner.spec.ts --output="$proof_dir/feature-e2e"
 node scripts/source-refinement-evidence.mjs
 node scripts/source-refinement-editability.mjs
 # Retain the old gate files and their thresholds byte-for-byte. Their relative
@@ -83,3 +83,7 @@ node scripts/source-target-benchmark.mjs
 node scripts/low-resolution-benchmark.mjs
 node scripts/low-resolution-quality-gate.mjs
 node scripts/low-resolution-editability.mjs
+
+NEXORA_COMPARE_STAGE=16d NEXORA_STAGE16B_WASM="$proof_dir/stage16c-wasm" NEXORA_PROOF_DIR="$proof_dir/false-corner" node scripts/low-resolution-benchmark.mjs
+node scripts/false-corner-quality-gate.mjs
+node scripts/false-corner-evidence.mjs

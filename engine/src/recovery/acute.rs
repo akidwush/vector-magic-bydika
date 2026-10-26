@@ -688,6 +688,107 @@ pub(super) fn initialize(cs: &mut Vec<C>, img: &ColorImage, matte: &Matte) -> bo
     accepted
 }
 
+/// Separate hypothesis class: an existing, genuinely discontinuous apex.
+/// Only deferred components without accepted rounded-cap initialization enter.
+/// Agreement/conditioning and the original trust region are not relaxed.
+pub(super) fn refine_sharp(cs: &mut Vec<C>, img: &ColorImage, matte: &Matte) -> bool {
+    let started = now();
+    let old = cs.clone();
+    let n = cs.len();
+    let selected = (0..n)
+        .filter(|&i| {
+            if turn(cs, i) <= 0.65 {
+                return false;
+            }
+            let a = arm_samples(cs, i, true, 3., 10.);
+            let b = arm_samples(cs, i, false, 3., 10.);
+            a.last().zip(b.last()).is_some_and(|((a, _), (b, _))| {
+                dot(unit(sub(cs[i][0], *a)), unit(sub(*b, cs[i][0]))) < -0.8
+            })
+        })
+        .max_by(|&a, &b| turn(cs, a).total_cmp(&turn(cs, b)));
+    let Some(i) = selected else { return false };
+    count(32, 1.);
+    let origin = cs[i][0];
+    let prev = (i + n - 1) % n;
+    let depth = unit(sub(
+        unit(sub(cs[i][3], origin)),
+        unit(sub(origin, cs[prev][0])),
+    ));
+    let side = p(-depth.y, depth.x);
+    let mut hypotheses = vec![];
+    for radius in [12., 16., 20., 28.] {
+        let Some(a) = arm(cs, i, true, origin, depth, side, radius, img, matte) else {
+            continue;
+        };
+        let Some(b) = arm(cs, i, false, origin, depth, side, radius, img, matte) else {
+            continue;
+        };
+        if let Some(h) = hypothesis(&a, &b, origin, depth, side) {
+            hypotheses.push(h);
+        }
+    }
+    let positions: Vec<_> = hypotheses.iter().map(|h| h.q).collect();
+    hypotheses.retain(|h| positions.iter().filter(|q| dist(h.q, **q) < 1.25).count() >= 2);
+    let patch = matte.patch(img, origin, 6);
+    let mut changed = false;
+    if patch.len() == 169 && !hypotheses.is_empty() {
+        if let Some(cache) = Patch::new(cs, &[prev, i], &patch, img, matte) {
+            let before = cache.score(cs);
+            let mut best = before;
+            let mut chosen = old.clone();
+            for h in hypotheses.into_iter().take(3) {
+                // Do not clamp a distant/ill-conditioned extrapolated apex into
+                // an apparently supported update at the edge of the budget.
+                if dist(h.q, origin) > 3. {
+                    continue;
+                }
+                let handles = [
+                    dist(old[prev][0], old[prev][1]),
+                    dist(old[prev][0], h.q) / 3.,
+                    dist(old[i][3], h.q) / 3.,
+                    dist(old[i][2], old[i][3]),
+                ];
+                let mut trial = propose(&old, i, h.q, h.u, h.v, handles);
+                round(&mut trial);
+                if turn(&trial, i) < 2.6 || !local_clear(&trial, i) {
+                    continue;
+                }
+                let score = cache.score(&trial);
+                if score.0 < best.0 && score.1 < best.1 {
+                    best = score;
+                    chosen = trial;
+                }
+            }
+            if best.0 < before.0 * 0.85
+                && best.1 < before.1
+                && self_clear(&chosen)
+                && source_safe(&chosen, &old, img)
+            {
+                *cs = chosen;
+                changed = true;
+                count(33, 1.);
+            }
+        }
+    }
+    note([
+        origin.x,
+        origin.y,
+        0.,
+        3.,
+        if changed { 0. } else { 30. },
+        0.,
+        0.,
+        0.,
+        0.,
+        cs[i][0].x,
+        cs[i][0].y,
+        0.,
+    ]);
+    count(34, now() - started);
+    changed
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

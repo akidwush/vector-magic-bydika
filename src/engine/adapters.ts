@@ -151,6 +151,11 @@ export async function createEngine(
                     capLossBefore: recovery[27] || 0,
                     capLossAfter: recovery[28] || 0,
                     canonicalOwners: recovery[29] || 0,
+                    continuityPairs: recovery[30] || 0,
+                    continuityMs: recovery[31] || 0,
+                    sharpAttempts: recovery[32] || 0,
+                    sharpAccepted: recovery[33] || 0,
+                    sharpMs: recovery[34] || 0,
                   }
                 : undefined,
               optimization: {
