@@ -469,4 +469,3 @@ are unmeasured. The next milestone should profile the remaining safety/correspon
 and full fitting costs without caching validation across proposals, correlate CPU
 frequency/V8/allocator state, and repeat on real Android. Do not promote from a
 single green CI run or pooled median while these uncertainties remain.
-
