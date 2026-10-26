@@ -45,11 +45,7 @@ fn sample_model(img: &ColorImage, x: f64, y: f64, linear: bool) -> Option<[f64; 
         for c in 0..4 {
             let encoded = img.pixels[i + c] as f64 / 255.0;
             let value = if linear && c < 3 {
-                if encoded <= 0.04045 {
-                    encoded / 12.92
-                } else {
-                    ((encoded + 0.055) / 1.055).powf(2.4)
-                }
+                crate::alpha::srgb_to_linear(encoded)
             } else {
                 encoded
             };

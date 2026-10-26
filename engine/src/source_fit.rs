@@ -6,6 +6,9 @@ use vtracer::{
 };
 #[derive(Clone)]
 pub struct Sample {
+    /// Colour/gamma support only; not proof that one line explains pixel coverage.
+    #[cfg_attr(not(any(test, feature = "source_geometry")), allow(dead_code))]
+    pub trusted: bool,
     pub x: i32,
     pub y: i32,
     pub coverage: f64,
@@ -72,6 +75,7 @@ pub fn samples(seg: &Segment, map: &LabelMap, img: &ColorImage) -> Option<Vec<Sa
                     continue;
                 }
                 result.push(Sample {
+                    trusted: false,
                     x,
                     y,
                     coverage: t.clamp(0., 1.),
@@ -492,11 +496,13 @@ mod tests {
         let p = |x, y| PointF64 { x, y };
         let ss = vec![
             Sample {
+                trusted: false,
                 x: 0,
                 y: 0,
                 coverage: 1.,
             },
             Sample {
+                trusted: false,
                 x: 1,
                 y: 0,
                 coverage: 0.,
@@ -639,6 +645,21 @@ fn samples_mask(
     if norm < 2500. {
         return None;
     }
+    // Select once for the entire owned component, with errors in the same
+    // encoded-RGB scale. Ambiguous evidence retains Stage 1.5 sampling.
+    let model = if crate::inverse::enabled() {
+        crate::unmix::select(
+            &pixels
+                .iter()
+                .map(|(_, _, c)| c.map(|x| x / 255.))
+                .collect::<Vec<_>>(),
+            a.map(|x| x / 255.),
+            b.map(|x| x / 255.),
+        )
+    } else {
+        None
+    };
+    let linear = model == Some(true);
     let mut samples = Vec::new();
     let mut bad = 0;
     for (x, y, c) in pixels {
@@ -646,11 +667,28 @@ fn samples_mask(
         let e = (0..3)
             .map(|k| (c[k] - b[k] - t * delta[k]).powi(2))
             .sum::<f64>();
+        let (t, e) = if linear {
+            match crate::unmix::project(
+                c.map(|x| x / 255.),
+                a.map(|x| x / 255.),
+                b.map(|x| x / 255.),
+                true,
+            ) {
+                Some((t, e)) => (t, e * 255. * 255.),
+                None => {
+                    bad += 1;
+                    continue;
+                }
+            }
+        } else {
+            (t, e)
+        };
         if e > norm * 0.003 || !(-0.08..=1.08).contains(&t) {
             bad += 1;
             continue;
         }
         samples.push(Sample {
+            trusted: model.is_some() && e < 3.,
             x,
             y,
             coverage: t.clamp(0., 1.),
@@ -975,7 +1013,10 @@ pub(crate) fn from_path(path: &vtracer::ir::SubPath) -> Option<FittedGeom> {
         Some(FittedGeom::Polyline(points))
     }
 }
-fn quantized(g: FittedGeom, img: &ColorImage) -> Option<(FittedGeom, vtracer::ir::SubPath)> {
+pub(crate) fn quantized(
+    g: FittedGeom,
+    img: &ColorImage,
+) -> Option<(FittedGeom, vtracer::ir::SubPath)> {
     use vtracer::optimize::OptimizerPass;
     let mut doc = model_doc(g, img);
     vtracer::optimize::QuantizePass::new(2).run(&mut doc);

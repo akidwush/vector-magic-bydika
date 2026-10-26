@@ -24,6 +24,7 @@ export function boundary(
   b: number[][][],
 ): { mean: number; p95: number; max: number };
 export function corners(g: Geometry): number[][];
+export function pointBoundaryDistance(p: number[], cs: number[][][]): number;
 export function worstBoundary(
   a: number[][][],
   b: number[][][],

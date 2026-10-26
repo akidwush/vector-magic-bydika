@@ -133,10 +133,14 @@ try {
               : c[0] === "coverage"
                 ? `coverage-${profile}`
                 : c[0] === "clean" ? `coverage-clean-${profile}` : c[0];
-          const svg = m.trace_quality(data, w, h, "illustration", mode);
+          const svg = ["baseline", "coverage", "clean", "adaptive", "denoise"].includes(c[0])
+            ? m.trace_quality(data, w, h, "illustration", c[0] === "denoise" ? profile : mode)
+            : m.experiment(data, w, h, precision, 2, 16, 24, "spline",
+                c[4], c[5], c[1], c[2], c[3] || undefined, c[6], c[7]);
           return {
             svg,
-            evidence: m.last_coverage_evidence(),
+            evidence: ["baseline", "coverage", "clean", "adaptive", "denoise"].includes(c[0])
+              ? m.last_coverage_evidence() : null,
             ms: performance.now() - start,
             precision,
             wasmLinearBytes: core.memory.buffer.byteLength,

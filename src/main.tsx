@@ -476,6 +476,7 @@ function App() {
                   sourceModels: result.sourceModels,
                   optimization: result.optimization,
                   sourceRefinement: result.sourceRefinement,
+                  sourceGeometry: result.sourceGeometry,
                   transitions: result.transitions,
                   diagnostics: result.diagnostics,
                 })}

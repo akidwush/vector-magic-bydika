@@ -1,0 +1,587 @@
+[
+  {
+    "name": "blade-narrow",
+    "filename": "blade-narrow-native-srgb-128.png",
+    "reference": "blade-narrow.svg",
+    "width": 128,
+    "height": 128,
+    "mode": "native-srgb",
+    "rotation": 0,
+    "shift": [
+      0.37,
+      -0.23
+    ],
+    "clipped": false,
+    "expectedUncertain": false
+  },
+  {
+    "name": "blade-narrow",
+    "filename": "blade-narrow-native-srgb-512.png",
+    "reference": "blade-narrow.svg",
+    "width": 512,
+    "height": 512,
+    "mode": "native-srgb",
+    "rotation": 0,
+    "shift": [
+      0.37,
+      -0.23
+    ],
+    "clipped": false,
+    "expectedUncertain": false
+  },
+  {
+    "name": "blade-narrow",
+    "filename": "blade-narrow-native-srgb-1024.png",
+    "reference": "blade-narrow.svg",
+    "width": 1024,
+    "height": 1024,
+    "mode": "native-srgb",
+    "rotation": 0,
+    "shift": [
+      0.37,
+      -0.23
+    ],
+    "clipped": false,
+    "expectedUncertain": false
+  },
+  {
+    "name": "blade-narrow",
+    "filename": "blade-narrow-box4-srgb-128.png",
+    "reference": "blade-narrow.svg",
+    "width": 128,
+    "height": 128,
+    "mode": "box4-srgb",
+    "rotation": 0,
+    "shift": [
+      0.37,
+      -0.23
+    ],
+    "clipped": false,
+    "expectedUncertain": false
+  },
+  {
+    "name": "blade-narrow",
+    "filename": "blade-narrow-box4-srgb-512.png",
+    "reference": "blade-narrow.svg",
+    "width": 512,
+    "height": 512,
+    "mode": "box4-srgb",
+    "rotation": 0,
+    "shift": [
+      0.37,
+      -0.23
+    ],
+    "clipped": false,
+    "expectedUncertain": false
+  },
+  {
+    "name": "blade-narrow",
+    "filename": "blade-narrow-box4-srgb-1024.png",
+    "reference": "blade-narrow.svg",
+    "width": 1024,
+    "height": 1024,
+    "mode": "box4-srgb",
+    "rotation": 0,
+    "shift": [
+      0.37,
+      -0.23
+    ],
+    "clipped": false,
+    "expectedUncertain": false
+  },
+  {
+    "name": "blade-narrow",
+    "filename": "blade-narrow-box4-linear-128.png",
+    "reference": "blade-narrow.svg",
+    "width": 128,
+    "height": 128,
+    "mode": "box4-linear",
+    "rotation": 0,
+    "shift": [
+      0.37,
+      -0.23
+    ],
+    "clipped": false,
+    "expectedUncertain": false
+  },
+  {
+    "name": "blade-narrow",
+    "filename": "blade-narrow-box4-linear-512.png",
+    "reference": "blade-narrow.svg",
+    "width": 512,
+    "height": 512,
+    "mode": "box4-linear",
+    "rotation": 0,
+    "shift": [
+      0.37,
+      -0.23
+    ],
+    "clipped": false,
+    "expectedUncertain": false
+  },
+  {
+    "name": "blade-narrow",
+    "filename": "blade-narrow-box4-linear-1024.png",
+    "reference": "blade-narrow.svg",
+    "width": 1024,
+    "height": 1024,
+    "mode": "box4-linear",
+    "rotation": 0,
+    "shift": [
+      0.37,
+      -0.23
+    ],
+    "clipped": false,
+    "expectedUncertain": false
+  },
+  {
+    "name": "blade-rotated",
+    "filename": "blade-rotated-native-srgb-128.png",
+    "reference": "blade-rotated.svg",
+    "width": 128,
+    "height": 128,
+    "mode": "native-srgb",
+    "rotation": 27,
+    "shift": [
+      -0.31,
+      0.43
+    ],
+    "clipped": false,
+    "expectedUncertain": false
+  },
+  {
+    "name": "blade-rotated",
+    "filename": "blade-rotated-native-srgb-512.png",
+    "reference": "blade-rotated.svg",
+    "width": 512,
+    "height": 512,
+    "mode": "native-srgb",
+    "rotation": 27,
+    "shift": [
+      -0.31,
+      0.43
+    ],
+    "clipped": false,
+    "expectedUncertain": false
+  },
+  {
+    "name": "blade-rotated",
+    "filename": "blade-rotated-native-srgb-1024.png",
+    "reference": "blade-rotated.svg",
+    "width": 1024,
+    "height": 1024,
+    "mode": "native-srgb",
+    "rotation": 27,
+    "shift": [
+      -0.31,
+      0.43
+    ],
+    "clipped": false,
+    "expectedUncertain": false
+  },
+  {
+    "name": "blade-rotated",
+    "filename": "blade-rotated-box4-linear-noise-128.png",
+    "reference": "blade-rotated.svg",
+    "width": 128,
+    "height": 128,
+    "mode": "box4-linear-noise",
+    "rotation": 27,
+    "shift": [
+      -0.31,
+      0.43
+    ],
+    "clipped": false,
+    "expectedUncertain": false
+  },
+  {
+    "name": "blade-rotated",
+    "filename": "blade-rotated-box4-linear-noise-512.png",
+    "reference": "blade-rotated.svg",
+    "width": 512,
+    "height": 512,
+    "mode": "box4-linear-noise",
+    "rotation": 27,
+    "shift": [
+      -0.31,
+      0.43
+    ],
+    "clipped": false,
+    "expectedUncertain": false
+  },
+  {
+    "name": "blade-rotated",
+    "filename": "blade-rotated-box4-linear-noise-1024.png",
+    "reference": "blade-rotated.svg",
+    "width": 1024,
+    "height": 1024,
+    "mode": "box4-linear-noise",
+    "rotation": 27,
+    "shift": [
+      -0.31,
+      0.43
+    ],
+    "clipped": false,
+    "expectedUncertain": false
+  },
+  {
+    "name": "blade-oblique",
+    "filename": "blade-oblique-native-srgb-128.png",
+    "reference": "blade-oblique.svg",
+    "width": 128,
+    "height": 128,
+    "mode": "native-srgb",
+    "rotation": 68,
+    "shift": [
+      0.19,
+      0.37
+    ],
+    "clipped": false,
+    "expectedUncertain": false
+  },
+  {
+    "name": "blade-oblique",
+    "filename": "blade-oblique-native-srgb-512.png",
+    "reference": "blade-oblique.svg",
+    "width": 512,
+    "height": 512,
+    "mode": "native-srgb",
+    "rotation": 68,
+    "shift": [
+      0.19,
+      0.37
+    ],
+    "clipped": false,
+    "expectedUncertain": false
+  },
+  {
+    "name": "blade-oblique",
+    "filename": "blade-oblique-native-srgb-1024.png",
+    "reference": "blade-oblique.svg",
+    "width": 1024,
+    "height": 1024,
+    "mode": "native-srgb",
+    "rotation": 68,
+    "shift": [
+      0.19,
+      0.37
+    ],
+    "clipped": false,
+    "expectedUncertain": false
+  },
+  {
+    "name": "triangle-eight",
+    "filename": "triangle-eight-native-srgb-128.png",
+    "reference": "triangle-eight.svg",
+    "width": 128,
+    "height": 128,
+    "mode": "native-srgb",
+    "rotation": -19,
+    "shift": [
+      0.37,
+      0.21
+    ],
+    "clipped": false,
+    "expectedUncertain": false
+  },
+  {
+    "name": "triangle-eight",
+    "filename": "triangle-eight-native-srgb-512.png",
+    "reference": "triangle-eight.svg",
+    "width": 512,
+    "height": 512,
+    "mode": "native-srgb",
+    "rotation": -19,
+    "shift": [
+      0.37,
+      0.21
+    ],
+    "clipped": false,
+    "expectedUncertain": false
+  },
+  {
+    "name": "triangle-eight",
+    "filename": "triangle-eight-native-srgb-1024.png",
+    "reference": "triangle-eight.svg",
+    "width": 1024,
+    "height": 1024,
+    "mode": "native-srgb",
+    "rotation": -19,
+    "shift": [
+      0.37,
+      0.21
+    ],
+    "clipped": false,
+    "expectedUncertain": false
+  },
+  {
+    "name": "triangle-twentyeight",
+    "filename": "triangle-twentyeight-native-srgb-128.png",
+    "reference": "triangle-twentyeight.svg",
+    "width": 128,
+    "height": 128,
+    "mode": "native-srgb",
+    "rotation": 34,
+    "shift": [
+      -0.27,
+      0.41
+    ],
+    "clipped": false,
+    "expectedUncertain": false
+  },
+  {
+    "name": "triangle-twentyeight",
+    "filename": "triangle-twentyeight-native-srgb-512.png",
+    "reference": "triangle-twentyeight.svg",
+    "width": 512,
+    "height": 512,
+    "mode": "native-srgb",
+    "rotation": 34,
+    "shift": [
+      -0.27,
+      0.41
+    ],
+    "clipped": false,
+    "expectedUncertain": false
+  },
+  {
+    "name": "triangle-twentyeight",
+    "filename": "triangle-twentyeight-native-srgb-1024.png",
+    "reference": "triangle-twentyeight.svg",
+    "width": 1024,
+    "height": 1024,
+    "mode": "native-srgb",
+    "rotation": 34,
+    "shift": [
+      -0.27,
+      0.41
+    ],
+    "clipped": false,
+    "expectedUncertain": false
+  },
+  {
+    "name": "parallel-uncertain",
+    "filename": "parallel-uncertain-native-srgb-128.png",
+    "reference": "parallel-uncertain.svg",
+    "width": 128,
+    "height": 128,
+    "mode": "native-srgb",
+    "rotation": 17,
+    "shift": [
+      0.37,
+      0.21
+    ],
+    "clipped": false,
+    "expectedUncertain": true
+  },
+  {
+    "name": "parallel-uncertain",
+    "filename": "parallel-uncertain-native-srgb-512.png",
+    "reference": "parallel-uncertain.svg",
+    "width": 512,
+    "height": 512,
+    "mode": "native-srgb",
+    "rotation": 17,
+    "shift": [
+      0.37,
+      0.21
+    ],
+    "clipped": false,
+    "expectedUncertain": true
+  },
+  {
+    "name": "parallel-uncertain",
+    "filename": "parallel-uncertain-native-srgb-1024.png",
+    "reference": "parallel-uncertain.svg",
+    "width": 1024,
+    "height": 1024,
+    "mode": "native-srgb",
+    "rotation": 17,
+    "shift": [
+      0.37,
+      0.21
+    ],
+    "clipped": false,
+    "expectedUncertain": true
+  },
+  {
+    "name": "rounded-blade",
+    "filename": "rounded-blade-native-srgb-128.png",
+    "reference": "rounded-blade.svg",
+    "width": 128,
+    "height": 128,
+    "mode": "native-srgb",
+    "rotation": 0,
+    "shift": [
+      0.23,
+      0.31
+    ],
+    "clipped": false,
+    "expectedUncertain": false
+  },
+  {
+    "name": "rounded-blade",
+    "filename": "rounded-blade-native-srgb-512.png",
+    "reference": "rounded-blade.svg",
+    "width": 512,
+    "height": 512,
+    "mode": "native-srgb",
+    "rotation": 0,
+    "shift": [
+      0.23,
+      0.31
+    ],
+    "clipped": false,
+    "expectedUncertain": false
+  },
+  {
+    "name": "rounded-blade",
+    "filename": "rounded-blade-native-srgb-1024.png",
+    "reference": "rounded-blade.svg",
+    "width": 1024,
+    "height": 1024,
+    "mode": "native-srgb",
+    "rotation": 0,
+    "shift": [
+      0.23,
+      0.31
+    ],
+    "clipped": false,
+    "expectedUncertain": false
+  },
+  {
+    "name": "rounded-blade",
+    "filename": "rounded-blade-box4-linear-128.png",
+    "reference": "rounded-blade.svg",
+    "width": 128,
+    "height": 128,
+    "mode": "box4-linear",
+    "rotation": 0,
+    "shift": [
+      0.23,
+      0.31
+    ],
+    "clipped": false,
+    "expectedUncertain": false
+  },
+  {
+    "name": "rounded-blade",
+    "filename": "rounded-blade-box4-linear-512.png",
+    "reference": "rounded-blade.svg",
+    "width": 512,
+    "height": 512,
+    "mode": "box4-linear",
+    "rotation": 0,
+    "shift": [
+      0.23,
+      0.31
+    ],
+    "clipped": false,
+    "expectedUncertain": false
+  },
+  {
+    "name": "rounded-blade",
+    "filename": "rounded-blade-box4-linear-1024.png",
+    "reference": "rounded-blade.svg",
+    "width": 1024,
+    "height": 1024,
+    "mode": "box4-linear",
+    "rotation": 0,
+    "shift": [
+      0.23,
+      0.31
+    ],
+    "clipped": false,
+    "expectedUncertain": false
+  },
+  {
+    "name": "thin-ellipse",
+    "filename": "thin-ellipse-native-srgb-128.png",
+    "reference": "thin-ellipse.svg",
+    "width": 128,
+    "height": 128,
+    "mode": "native-srgb",
+    "rotation": 23,
+    "shift": [
+      0.37,
+      -0.19
+    ],
+    "clipped": false,
+    "expectedUncertain": false
+  },
+  {
+    "name": "thin-ellipse",
+    "filename": "thin-ellipse-native-srgb-512.png",
+    "reference": "thin-ellipse.svg",
+    "width": 512,
+    "height": 512,
+    "mode": "native-srgb",
+    "rotation": 23,
+    "shift": [
+      0.37,
+      -0.19
+    ],
+    "clipped": false,
+    "expectedUncertain": false
+  },
+  {
+    "name": "thin-ellipse",
+    "filename": "thin-ellipse-native-srgb-1024.png",
+    "reference": "thin-ellipse.svg",
+    "width": 1024,
+    "height": 1024,
+    "mode": "native-srgb",
+    "rotation": 23,
+    "shift": [
+      0.37,
+      -0.19
+    ],
+    "clipped": false,
+    "expectedUncertain": false
+  },
+  {
+    "name": "clipped-blade",
+    "filename": "clipped-blade-native-srgb-128.png",
+    "reference": "clipped-blade.svg",
+    "width": 128,
+    "height": 128,
+    "mode": "native-srgb",
+    "rotation": 0,
+    "shift": [
+      42.37,
+      -0.23
+    ],
+    "clipped": true,
+    "expectedUncertain": false
+  },
+  {
+    "name": "clipped-blade",
+    "filename": "clipped-blade-native-srgb-512.png",
+    "reference": "clipped-blade.svg",
+    "width": 512,
+    "height": 512,
+    "mode": "native-srgb",
+    "rotation": 0,
+    "shift": [
+      42.37,
+      -0.23
+    ],
+    "clipped": true,
+    "expectedUncertain": false
+  },
+  {
+    "name": "clipped-blade",
+    "filename": "clipped-blade-native-srgb-1024.png",
+    "reference": "clipped-blade.svg",
+    "width": 1024,
+    "height": 1024,
+    "mode": "native-srgb",
+    "rotation": 0,
+    "shift": [
+      42.37,
+      -0.23
+    ],
+    "clipped": true,
+    "expectedUncertain": false
+  }
+]

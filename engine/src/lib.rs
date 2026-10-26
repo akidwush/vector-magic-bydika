@@ -1,5 +1,6 @@
 mod alpha;
 mod inverse;
+mod unmix;
 #[wasm_bindgen]
 pub fn last_inverse() -> Vec<f64> {
     inverse::values()
@@ -7,7 +8,40 @@ pub fn last_inverse() -> Vec<f64> {
 mod corners;
 mod coverage;
 mod planar;
+#[cfg(any(test, feature = "source_geometry"))]
+mod recovery;
 mod reduce;
+#[cfg(feature = "large_apex")]
+#[wasm_bindgen]
+pub fn last_large_apex() -> Vec<f64> {
+    recovery::large_evidence()
+}
+#[cfg(feature = "source_geometry")]
+#[wasm_bindgen]
+pub fn last_recovery() -> Vec<f64> {
+    recovery::values()
+}
+#[cfg(feature = "source_geometry")]
+#[wasm_bindgen]
+pub fn last_initialization() -> Vec<f64> {
+    recovery::initialization()
+}
+#[cfg(feature = "source_geometry")]
+#[wasm_bindgen]
+pub fn last_acute_evidence() -> Vec<f64> {
+    recovery::acute_evidence()
+}
+#[cfg(feature = "source_geometry")]
+#[wasm_bindgen]
+pub fn last_apex_evidence() -> Vec<f64> {
+    recovery::apex_evidence()
+}
+#[cfg(feature = "source_geometry")]
+#[wasm_bindgen]
+pub fn last_continuity() -> Vec<f64> {
+    recovery::continuity_evidence()
+}
+
 mod source_fit;
 #[wasm_bindgen]
 pub fn last_optimization() -> Vec<f64> {
@@ -213,6 +247,8 @@ fn run_pipeline(
             .map_err(|e| JsValue::from_str(&e.to_string()))?
     };
     inverse::repair(&mut doc).map_err(|e| JsValue::from_str(&e))?;
+    #[cfg(feature = "source_geometry")]
+    recovery::locate(&doc, &img);
     let fitted_at = now();
     let mut evidence = coverage::Evidence::default();
     if profile == "source" {
@@ -247,6 +283,10 @@ fn run_pipeline(
             use vtracer::optimize::OptimizerPass;
             vtracer::optimize::QuantizePass::new(2).run(&mut doc);
             reduce::document(&mut doc);
+            #[cfg(feature = "source_geometry")]
+            if inverse::enabled() && profile == "source" {
+                recovery::document(&mut doc, &img);
+            }
             pipeline.writer.precision = Some(6);
         }
         // Upstream Mosaic gets only exact line canonicalization. Retain its

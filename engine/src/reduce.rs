@@ -586,6 +586,8 @@ fn geom(path: &SubPath) -> Option<G> {
     (!cs.is_empty()).then_some(G::Beziers(cs))
 }
 /// Stacked shapes only. Shared edges are handled in their upstream cache instead.
+/// Establish the reduced knot topology. A source-constrained caller may refine
+/// these final knots afterwards; only exact `serialize_lines` may follow it.
 pub fn document(doc: &mut VectorDoc) {
     let started = clock();
     if doc

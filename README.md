@@ -5,6 +5,46 @@ a tested ImageTracerJS fallback, three presets, original/vector comparison and l
 No account, tracing API, server upload, or paid runtime. Not affiliated with Vector Magic.
 Quality equivalence is not claimed; Photo is a baseline.
 
+## Stage 1.6E — source-verified sharp apex research
+
+The experimental already-G0 fallback fits incident handles jointly at a
+source-supported apex. Triangle 8° at 512px maximum error improves from
+2.255 to 0.985px; the protected Stage 1.6D exports remain identical. Triangle
+128 still requires an uncertified movement beyond the unchanged trust bounds
+and stays unresolved. Normal Auto is unchanged.
+[Diagnostics, measured results and actual exports](docs/STAGE_01_6E_SHARP_APEX_REPORT.md).
+
+## Stage 1.6D — source-verified continuity research
+
+The experimental recovery now rejects source-disproved short spline splices.
+Wave 128 false G0 corners drop from eight to zero, with p95 boundary error
+0.425 → 0.085px and preserved true-corner recall. The protected Stage 1.6C
+exports remain identical. Already-sharp triangle recovery improves at 1024px;
+128/512 and other uncertain cases remain unresolved. Normal Auto is unchanged.
+[Measured results, SVGs, visual evidence and limitations](docs/STAGE_01_6D_FALSE_CORNER_RECOVERY_REPORT.md).
+
+## Stage 1.6C — low-resolution acute geometry research
+
+The follow-up research feature recovers source-supported acute caps on final
+reduced knots. Cubic 128/512 maximum boundary error improves from about 3.47px
+to 0.82px; the verified Stage 1.6B exports remain unchanged. Wave 128 improves
+its corner and maximum error, while its p95 and existing crest artifacts remain
+limited. Ambiguous, nearly parallel and clipped shapes retain the baseline.
+Normal Auto is unchanged; this still requires the experimental `source_geometry`
+build. [Scope, evidence and remaining failures](docs/STAGE_01_6C_LOW_RESOLUTION_GEOMETRY_REPORT.md).
+The research runner saves a new artifact directory per run and retains the
+existing quality gates alongside cross-resolution browser comparisons.
+
+## Stage 1.6B — source geometry research
+
+The follow-up `source_geometry` Cargo feature refines final reduced contours:
+it excludes ambiguous wedge pixels, calibrates sharp intersections from the
+source, and rolls back individual spans when coverage or exported-paint error
+increases. It is excluded from normal builds and does not change Auto.
+[Recovery design, actual export metrics and limitations](docs/STAGE_01_6_SUBPIXEL_INVERSION_REPORT.md).
+`bash scripts/source-target-research.sh` rebuilds both historical baselines and
+the candidate, runs browser/export checks, and fails on the unchanged quality gate.
+
 ## Stage 1.5 — experimental source refinement
 
 Stage 1.5 adds `Refinement sumber · uji`, disabled by default,
@@ -140,3 +180,16 @@ remain; this is not a universal visual-gapless claim.
 
 See [the shared-edge report](docs/STAGE_01_2_SHARED_EDGE_REPORT.md) for geometry,
 renderer, feature and runtime comparisons at 100%, 400% and 1000%.
+
+Stage 1.6F research adds an opt-in `large_apex` Cargo feature (implies
+`source_geometry`) for separately source-certified large apex corrections.
+Ordinary 3px/3.5px validation is retained and reported independently. This is
+experimental, does not change Auto or shared-edge composition, and is not enabled
+in normal WASM builds. The isolated research runner retains all historical gates
+and compares the extended contract against Stage 1.6E exports.
+
+[Stage 1.6F measured report](docs/STAGE_01_6F_LARGE_APEX_RECOVERY_REPORT.md):
+Triangle 128 maximum boundary error 5.154 → 0.410px, corner precision/recall 1/1,
+14 anchors retained; all 44 other corpus exports unchanged. Both implementation
+CI runs pass. Local runtime gates still fail on recorded historical/protected
+cases, so local validation remains PARTIAL and the feature stays experimental.

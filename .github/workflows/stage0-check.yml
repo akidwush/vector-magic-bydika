@@ -1,7 +1,7 @@
 name: NEXORA Stage 1
 on:
   push:
-    branches: [main, feat/stage-1-2-subpixel-coverage, feat/stage-1-2b-locked-shared-edges, feat/stage-1-3-corner-bezier, feat/source-guided-quality, feat/stage-1-4-curve-optimization, feat/stage-1-5-source-refinement]
+    branches: [main, feat/stage-1-2-subpixel-coverage, feat/stage-1-2b-locked-shared-edges, feat/stage-1-3-corner-bezier, feat/source-guided-quality, feat/stage-1-4-curve-optimization, feat/stage-1-5-source-refinement, feat/stage-1-6-analytical-coverage, feat/stage-1-6b-source-geometry, feat/stage-1-6b-recovery, feat/stage-1-6c-low-resolution-geometry, feat/stage-1-6d-false-corner-recovery, feat/stage-1-6e-sharp-apex-recovery, feat/stage-1-6f-large-apex-recovery]
   pull_request:
 jobs:
   validate:
@@ -42,6 +42,13 @@ jobs:
       - run: node scripts/source-coverage-benchmark.mjs 2>&1 | tee -a "$RUNNER_TEMP/nexora-validation.log"
       - run: node scripts/source-refinement-editability.mjs 2>&1 | tee -a "$RUNNER_TEMP/nexora-validation.log"
       - run: node scripts/source-refinement-quality-gate.mjs 2>&1 | tee -a "$RUNNER_TEMP/nexora-validation.log"
+      - run: node scripts/subpixel-proof.mjs 2>&1 | tee -a "$RUNNER_TEMP/nexora-validation.log"
+      - name: Test source geometry research feature
+        if: github.ref == 'refs/heads/feat/stage-1-6b-source-geometry' || github.ref == 'refs/heads/feat/stage-1-6b-recovery' || github.head_ref == 'feat/stage-1-6b-recovery' || github.ref == 'refs/heads/feat/stage-1-6c-low-resolution-geometry' || github.head_ref == 'feat/stage-1-6c-low-resolution-geometry' || github.ref == 'refs/heads/feat/stage-1-6d-false-corner-recovery' || github.head_ref == 'feat/stage-1-6d-false-corner-recovery' || github.ref == 'refs/heads/feat/stage-1-6e-sharp-apex-recovery' || github.head_ref == 'feat/stage-1-6e-sharp-apex-recovery' || github.ref == 'refs/heads/feat/stage-1-6f-large-apex-recovery' || github.head_ref == 'feat/stage-1-6f-large-apex-recovery'
+        run: cargo test --manifest-path engine/Cargo.toml --locked --features source_geometry 2>&1 | tee -a "$RUNNER_TEMP/nexora-validation.log"
+      - name: Source geometry promotion gate (must block rejected candidates)
+        if: github.ref == 'refs/heads/feat/stage-1-6b-source-geometry' || github.ref == 'refs/heads/feat/stage-1-6b-recovery' || github.head_ref == 'feat/stage-1-6b-recovery' || github.ref == 'refs/heads/feat/stage-1-6c-low-resolution-geometry' || github.head_ref == 'feat/stage-1-6c-low-resolution-geometry' || github.ref == 'refs/heads/feat/stage-1-6d-false-corner-recovery' || github.head_ref == 'feat/stage-1-6d-false-corner-recovery' || github.ref == 'refs/heads/feat/stage-1-6e-sharp-apex-recovery' || github.head_ref == 'feat/stage-1-6e-sharp-apex-recovery' || github.ref == 'refs/heads/feat/stage-1-6f-large-apex-recovery' || github.head_ref == 'feat/stage-1-6f-large-apex-recovery'
+        run: bash scripts/source-target-research.sh 2>&1 | tee -a "$RUNNER_TEMP/nexora-validation.log"
       - name: Publish failed validation details
         if: failure()
         run: |

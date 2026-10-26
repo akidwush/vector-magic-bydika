@@ -1,4 +1,20 @@
-//! Vector-only opacity reconstruction using upstream binary contours at fixed levels.
+// Canvas getImageData supplies straight RGBA. Do not unpremultiply it again.
+// Alpha is coverage times intrinsic opacity; it alone cannot identify geometry.
+pub(crate) fn srgb_to_linear(c: f64) -> f64 {
+    if c <= 0.04045 {
+        c / 12.92
+    } else {
+        ((c + 0.055) / 1.055).powf(2.4)
+    }
+}
+pub(crate) fn linear_to_srgb(c: f64) -> f64 {
+    if c <= 0.0031308 {
+        12.92 * c
+    } else {
+        1.055 * c.powf(1.0 / 2.4) - 0.055
+    }
+}
+// Vector-only opacity reconstruction using upstream binary contours at fixed levels.
 use vtracer::{Clustering, ColorImage, Config, FitMode};
 fn body(svg: &str) -> &str {
     let start = svg.find("<svg").unwrap();
@@ -87,7 +103,16 @@ pub fn apply_with_mode(
         }
         previous = opacity;
     }
-    Ok(format!("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{}\" height=\"{}\" viewBox=\"0 0 {} {}\"><defs><mask id=\"nexora-alpha\" maskUnits=\"userSpaceOnUse\" x=\"0\" y=\"0\" width=\"{}\" height=\"{}\">{masks}</mask></defs><g mask=\"url(#nexora-alpha)\">{}</g></svg>",img.width,img.height,img.width,img.height,img.width,img.height,body(&svg)))
+    Ok(format!(
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{}\" height=\"{}\" viewBox=\"0 0 {} {}\"><defs><mask id=\"nexora-alpha\" maskUnits=\"userSpaceOnUse\" x=\"0\" y=\"0\" width=\"{}\" height=\"{}\">{masks}</mask></defs><g mask=\"url(#nexora-alpha)\">{}</g></svg>",
+        img.width,
+        img.height,
+        img.width,
+        img.height,
+        img.width,
+        img.height,
+        body(&svg)
+    ))
 }
 
 #[cfg(test)]
@@ -114,5 +139,15 @@ mod tests {
         };
         let err = apply("<svg/>".into(), &img).unwrap_err();
         assert!(err.to_string().contains("budget exceeded"));
+    }
+}
+
+#[cfg(test)]
+mod color_tests {
+    #[test]
+    fn transfer_roundtrip_including_toes() {
+        for c in [0., 0.0031308, 0.04045, 0.5, 1.] {
+            assert!((super::linear_to_srgb(super::srgb_to_linear(c)) - c).abs() < 3e-8);
+        }
     }
 }

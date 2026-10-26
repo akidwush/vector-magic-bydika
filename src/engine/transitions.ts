@@ -93,3 +93,53 @@ export function analyzeTransitions({
     }
   return result;
 }
+
+/** Diagnostic only: colour-line membership alone never authorizes relabeling. */
+export function boundaryMixModel(
+  colors: number[][],
+  a: number[],
+  b: number[],
+): "srgb" | "linear" | undefined {
+  const decode = (x: number) =>
+    x <= 0.04045 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4;
+  const encode = (x: number) =>
+    x <= 0.0031308 ? 12.92 * x : 1.055 * x ** (1 / 2.4) - 0.055;
+  if (
+    [a, b, ...colors].some(
+      (c) =>
+        c.length !== 3 || c.some((x) => !Number.isFinite(x) || x < 0 || x > 1),
+    )
+  )
+    return undefined;
+  const errors = [0, 0];
+  let count = 0;
+  for (const c of colors) {
+    const fits = [false, true].map((linear) => {
+      const u = linear ? a.map(decode) : a,
+        v = linear ? b.map(decode) : b;
+      const p = linear ? c.map(decode) : c,
+        d = u.map((x, k) => x - v[k]);
+      const norm = d.reduce((s, x) => s + x * x, 0);
+      if (norm < 1e-6) return undefined;
+      const t = p.reduce((s, x, k) => s + (x - v[k]) * d[k], 0) / norm;
+      if (t < -0.08 || t > 1.08) return undefined;
+      const coverage = Math.max(0, Math.min(1, t));
+      const error = v.reduce((s, x, k) => {
+        const mixed = x + coverage * d[k];
+        return s + ((linear ? encode(mixed) : mixed) - c[k]) ** 2;
+      }, 0);
+      return { coverage, error };
+    });
+    if (!fits[0] || !fits[1]) return undefined;
+    if (fits.every((f) => f!.coverage > 0.02 && f!.coverage < 0.98)) {
+      errors[0] += fits[0].error;
+      errors[1] += fits[1].error;
+      count++;
+    }
+  }
+  if (count < 8) return undefined;
+  const [s, l] = errors.map((e) => e / count),
+    floor = 3 / (255 * 255);
+  if (Math.min(s, l) > floor || Math.abs(s - l) < floor) return undefined;
+  return l < s * 0.5 ? "linear" : s < l * 0.5 ? "srgb" : undefined;
+}

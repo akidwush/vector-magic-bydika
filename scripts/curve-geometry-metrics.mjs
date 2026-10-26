@@ -11,6 +11,14 @@ function segmentDistance(p, a, b) {
       : 0;
   return Math.hypot(p[0] - a[0] - t * dx, p[1] - a[1] - t * dy);
 }
+// Exact reference endpoints are scored against independently flattened exports.
+export function pointBoundaryDistance(p, cs) {
+  let best = Infinity;
+  for (const chain of cs)
+    for (let i = 1; i < chain.length; i++)
+      best = Math.min(best, segmentDistance(p, chain[i - 1], chain[i]));
+  return best;
+}
 function cubic(c, depth = 0) {
   if (
     Math.max(

@@ -6,7 +6,8 @@ import assert from "node:assert/strict";
 import sharp from "sharp";
 import { geometry } from "./curve-geometry-metrics.mjs";
 import { metrics } from "./quality-metrics.mjs";
-const root = resolve("benchmark-results/stage15/inkscape");
+const evidenceRoot = process.env.NEXORA_STAGE15_ROOT || "benchmark-results/stage15";
+const root = resolve(evidenceRoot + "/inkscape");
 await mkdir(root, { recursive: true });
 const env = { ...process.env, INKSCAPE_PROFILE_DIR: root + "/profile" };
 const version = spawnSync("inkscape", ["--version"], { encoding: "utf8", env });
@@ -19,7 +20,7 @@ if (version.error?.code === "ENOENT") {
 } else {
   assert.equal(version.status, 0, version.stderr);
   const rows = JSON.parse(
-    await readFile("benchmark-results/stage15/production.json"),
+    await readFile(evidenceRoot + "/production.json"),
   );
   const results = [];
   for (const name of [
@@ -30,7 +31,7 @@ if (version.error?.code === "ENOENT") {
   ]) {
     const row = rows.find((r) => r.name === name && r.profile === "auto");
     const v = row.variants[1];
-    const input = resolve("benchmark-results/stage15/exports", v.filename),
+    const input = resolve(evidenceRoot + "/exports", v.filename),
       plain = root + "/" + name.replaceAll("/", "-") + ".svg",
       png = plain + ".png";
     for (const args of [

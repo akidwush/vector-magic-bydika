@@ -8,6 +8,11 @@ use vtracer::{
 };
 #[derive(Default)]
 struct Stats {
+    #[cfg(feature = "source_geometry")]
+    deferred: bool,
+    targets: u32,
+    target_steps: u32,
+    target_ms: f64,
     enabled: bool,
     attempts: u32,
     accepted: u32,
@@ -21,6 +26,8 @@ struct Stats {
 }
 thread_local! {static LAST:RefCell<Stats>=RefCell::new(Stats::default());}
 pub fn reset(enabled: bool) {
+    #[cfg(feature = "source_geometry")]
+    crate::recovery::reset();
     REPLACEMENTS.with(|r| r.borrow_mut().clear());
     LAST.with(|s| {
         *s.borrow_mut() = Stats {
@@ -45,6 +52,9 @@ pub fn values() -> Vec<f64> {
             s.phase as f64,
             s.initialized,
             s.inspections as f64,
+            s.targets as f64,
+            s.target_steps as f64,
+            s.target_ms,
         ]
     })
 }
@@ -64,21 +74,41 @@ fn clamped_integral(a: f64, b: f64, dy: f64) -> f64 {
     if (a - b).abs() < 1e-12 {
         return a.clamp(0., 1.) * dy;
     }
-    let primitive = |x: f64| {
-        if x <= 0. {
-            0.
-        } else if x >= 1. {
-            x - 0.5
-        } else {
-            0.5 * x * x
+    // Integrate piecewise at clamp breakpoints. Avoid subtracting large
+    // antiderivatives for edges far outside the pixel (catastrophic cancellation).
+    let mut knots = vec![0., 1.];
+    for boundary in [0., 1.] {
+        let t = (boundary - a) / (b - a);
+        if t > 0. && t < 1. {
+            knots.push(t);
         }
-    };
-    dy * (primitive(b) - primitive(a)) / (b - a)
+    }
+    knots.sort_by(f64::total_cmp);
+    knots
+        .windows(2)
+        .map(|w| {
+            let value = |t: f64| (a + (b - a) * t).clamp(0., 1.);
+            (w[1] - w[0]) * (value(w[0]) + value(w[1])) * 0.5 * dy
+        })
+        .sum()
 }
 /// Polygon/pixel intersection area via Green's theorem. Horizontal extent is
 /// integrated analytically; unlike 4x4/16x16 occupancy, no coverage staircase.
 pub fn coverages(poly: &[P], ss: &[Sample]) -> Option<Vec<f64>> {
-    if poly.len() < 4
+    if poly.len() < 4 {
+        return None;
+    }
+    Some(
+        signed_edge_areas(poly, ss)?
+            .into_iter()
+            .map(|v| v.abs().clamp(0., 1.))
+            .collect(),
+    )
+}
+/// Directed open-chain contributions, for caching unchanged edges. No abs/clamp
+/// until all chains are summed; uses the identical validated Green integral.
+pub(crate) fn signed_edge_areas(poly: &[P], ss: &[Sample]) -> Option<Vec<f64>> {
+    if poly.len() < 2
         || poly.len() > 32768
         || poly.iter().any(|p| !p.x.is_finite() || !p.y.is_finite())
     {
@@ -120,12 +150,12 @@ pub fn coverages(poly: &[P], ss: &[Sample]) -> Option<Vec<f64>> {
                     let x = |y| a.x + (y - a.y) * (b.x - a.x) / (b.y - a.y) - s.x as f64;
                     area += (b.y - a.y).signum() * clamped_integral(x(lo), x(hi), hi - lo);
                 }
-                area.abs().clamp(0., 1.)
+                area
             })
             .collect(),
     )
 }
-fn flatten(g: &G, tolerance: f64) -> Option<Vec<P>> {
+pub(crate) fn flatten(g: &G, tolerance: f64) -> Option<Vec<P>> {
     fn split(c: [P; 4], tol: f64, depth: u8, out: &mut Vec<P>) -> Option<()> {
         if out.len() > 8192 {
             return None;
@@ -205,7 +235,7 @@ fn round(g: &mut G) {
 }
 /// Preserve actual output tangent discontinuities with substantial support;
 /// tiny raster splice connectors do not become new protected feature claims.
-fn endpoint_tangents(c: &[P; 4]) -> (P, P) {
+pub(crate) fn endpoint_tangents(c: &[P; 4]) -> (P, P) {
     let end = if distance(c[3], c[2]) > 1e-8 {
         c[2]
     } else if distance(c[3], c[1]) > 1e-8 {
@@ -251,7 +281,7 @@ fn corners(g: &G) -> Vec<P> {
     }
     out
 }
-fn displacement_bound(a: &G, b: &G, limit: f64) -> bool {
+pub(crate) fn displacement_bound(a: &G, b: &G, limit: f64) -> bool {
     let a = crate::planar::flatten(a);
     let b = crate::planar::flatten(b);
     let mut checks = 0usize;
@@ -424,13 +454,23 @@ pub fn component(mask: &vtracer::ir::RegionMask, img: &ColorImage, baseline: Vec
             .unwrap_or_else(|| baseline[0].clone());
         if let Some(model) = refine(&seg, img, &reference, &ss) {
             if let Some(model) = crate::source_fit::protect_inverse(model, &baseline[0], img) {
+                #[cfg(feature = "source_geometry")]
+                crate::recovery::capture(&model, &seg, &ss);
                 return vec![model];
             }
+        }
+        // A low mean loss can hide a missing acute cap. Keep the existing
+        // global fit guard; defer only this source-supported case to final knots.
+        #[cfg(feature = "source_geometry")]
+        if LAST.with(|s| s.borrow().deferred) {
+            crate::recovery::capture_deferred(&baseline[0], &seg, &ss);
         }
     }
     baseline
 }
 pub fn refine(seg: &Segment, img: &ColorImage, old: &G, ss: &[Sample]) -> Option<G> {
+    #[cfg(feature = "source_geometry")]
+    LAST.with(|s| s.borrow_mut().deferred = false);
     if !enabled() || !seg.is_ring() || ss.len() < 32 || ss.len() > 8192 {
         return None;
     }
@@ -468,9 +508,17 @@ pub fn refine(seg: &Segment, img: &ColorImage, old: &G, ss: &[Sample]) -> Option
     let result = (|| {
         LAST.with(|s| s.borrow_mut().phase = 1);
         let before = loss(old, ss, 0.01);
+        #[cfg(feature = "source_geometry")]
+        crate::recovery::observe_initialization(before, seg, ss, cs.len());
         // A localized low-coverage cap alone is too weak to justify replacing
         // an otherwise well-reconstructed contour. Keep the stable baseline.
         if before < 0.008 {
+            #[cfg(feature = "source_geometry")]
+            LAST.with(|s| {
+                let mut s = s.borrow_mut();
+                s.phase = 8;
+                s.deferred = true;
+            });
             return None;
         }
         let movement = (img.width.max(img.height) as f64 * 0.012).clamp(4., 12.);
@@ -515,7 +563,7 @@ pub fn refine(seg: &Segment, img: &ColorImage, old: &G, ss: &[Sample]) -> Option
             return None;
         }
         let initial_candidate = candidate.clone();
-        let initial_loss = loss(&candidate, ss, 0.002);
+        let initial_loss = loss(&candidate, ss, 0.001);
         // Local handles only. Anchors/corner discontinuities and joins are locked.
         let G::Beziers(init) = candidate.clone() else {
             return None;
@@ -581,6 +629,61 @@ pub fn refine(seg: &Segment, img: &ColorImage, old: &G, ss: &[Sample]) -> Option
                         }
                         candidate = chosen;
                     }
+                }
+            }
+        }
+        // Bounded normal-direction experiment: rotate smooth handle pairs
+        // together at locked anchors, retaining the direction of a smooth join.
+        #[cfg(feature = "experiments")]
+        {
+            for i in (0..init.len()).step_by((init.len() / 4).max(1)).take(4) {
+                for angle in [0.004_f64, 0.002, 0.001, 0.0005] {
+                    let mut value = loss(&candidate, ss, 0.001);
+                    let mut chosen = candidate.clone();
+                    for sign in [-1., 1.] {
+                        let mut trial = candidate.clone();
+                        let G::Beziers(ref mut cs) = trial else {
+                            unreachable!()
+                        };
+                        let prev = (i + cs.len() - 1) % cs.len();
+                        let anchor = cs[i][0];
+                        let (v, _) = endpoint_tangents(&cs[i]);
+                        let (_, u) = endpoint_tangents(&cs[prev]);
+                        let norm = u.x.hypot(u.y) * v.x.hypot(v.y);
+                        if norm < 1e-8 || (u.x * v.x + u.y * v.y) / norm < 0.9999 {
+                            continue;
+                        }
+                        let (sn, co) = (sign * angle).sin_cos();
+                        for (idx, j) in [(i, 1), (prev, 2)] {
+                            let d = P {
+                                x: cs[idx][j].x - anchor.x,
+                                y: cs[idx][j].y - anchor.y,
+                            };
+                            cs[idx][j] = P {
+                                x: anchor.x + co * d.x - sn * d.y,
+                                y: anchor.y + sn * d.x + co * d.y,
+                            };
+                        }
+                        if distance(cs[i][1], init[i][1]) > 1.
+                            || distance(cs[prev][2], init[prev][2]) > 1.
+                        {
+                            continue;
+                        }
+                        if !crate::planar::valid_model(
+                            seg,
+                            &trial,
+                            img.width as u32,
+                            img.height as u32,
+                        ) {
+                            continue;
+                        }
+                        let trial_loss = loss(&trial, ss, 0.001);
+                        if trial_loss + 1e-9 < value {
+                            value = trial_loss;
+                            chosen = trial;
+                        }
+                    }
+                    candidate = chosen;
                 }
             }
         }
@@ -690,12 +793,12 @@ pub fn refine(seg: &Segment, img: &ColorImage, old: &G, ss: &[Sample]) -> Option
             }
         }
         round(&mut candidate);
-        best = loss(&candidate, ss, 0.002);
+        best = loss(&candidate, ss, 0.001);
         if best > initial_loss {
             candidate = initial_candidate;
             best = initial_loss;
         }
-        let baseline = loss(old, ss, 0.002);
+        let baseline = loss(old, ss, 0.001);
         let count = |g: &G| match g {
             G::Beziers(c) => c.len(),
             G::Polyline(p) => p.len(),
@@ -739,8 +842,27 @@ mod tests {
         P { x, y }
     }
     #[test]
+    fn integral_is_stable_outside_pixel_and_across_clamp_knots() {
+        let a: f64 = 0.7123456;
+        let b = a + 2e-12;
+        let exact = (a + b) * 0.5;
+        let old = (b * b * 0.5 - a * a * 0.5) / (b - a);
+        assert!((old - exact).abs() > 1e-8);
+        assert!((clamped_integral(a, b, 1.) - exact).abs() < 1e-15);
+        println!(
+            "NEAR_FLAT_AREA old_error={} stable_error={}",
+            (old - exact).abs(),
+            (clamped_integral(a, b, 1.) - exact).abs()
+        );
+        assert_eq!(clamped_integral(1e10, 1e10 + 0.001, 0.8), 0.8);
+        assert_eq!(clamped_integral(-1e10, -1e10 + 0.001, 0.8), 0.);
+        assert!((clamped_integral(-1., 2., 1.) - 0.5).abs() < 1e-12);
+        assert!((clamped_integral(2., -1., 1.) - 0.5).abs() < 1e-12);
+    }
+    #[test]
     fn analytic_area_moves_continuously_and_respects_winding() {
         let ss = [Sample {
+            trusted: false,
             x: 0,
             y: 0,
             coverage: 0.,
@@ -756,6 +878,7 @@ mod tests {
     #[test]
     fn area_handles_diagonal_concavity_and_degeneracy() {
         let ss = [Sample {
+            trusted: false,
             x: 0,
             y: 0,
             coverage: 0.,
@@ -782,6 +905,7 @@ mod tests {
             [p(0., 1.), p(0., 1.), p(0., 0.), p(0., 0.)],
         ]);
         let s = [Sample {
+            trusted: false,
             x: 0,
             y: 0,
             coverage: 0.,
@@ -938,5 +1062,102 @@ mod safety_tests {
         };
         assert!(refine(&seg, &img, &rect(0.), &[]).is_none());
         assert_eq!(values()[0], 0.);
+    }
+}
+#[cfg(test)]
+mod target_tests {
+    use super::*;
+    #[test]
+    fn source_targets_change_geometry_without_adding_anchors_and_reject_untrusted_data() {
+        let p = |x, y| P { x, y };
+        let k = 20. * 0.5522847498307936;
+        let truth = G::Beziers(vec![
+            [p(60., 40.), p(60., 40. + k), p(40. + k, 60.), p(40., 60.)],
+            [p(40., 60.), p(40. - k, 60.), p(20., 40. + k), p(20., 40.)],
+            [p(20., 40.), p(20., 40. - k), p(40. - k, 20.), p(40., 20.)],
+            [p(40., 20.), p(40. + k, 20.), p(60., 40. - k), p(60., 40.)],
+        ]);
+        let mut ss = vec![];
+        for y in 18..63 {
+            for x in 18..63 {
+                ss.push(Sample {
+                    x,
+                    y,
+                    coverage: 0.,
+                    trusted: true,
+                });
+            }
+        }
+        let coverage = coverages(&flatten(&truth, 0.001).unwrap(), &ss).unwrap();
+        for (s, c) in ss.iter_mut().zip(coverage) {
+            s.coverage = c;
+        }
+        let mut points = vec![];
+        for i in 0..=256 {
+            let t = i as f64 / 256. * 2. * std::f64::consts::PI;
+            let q = vtracer::PointI32 {
+                x: (40. + 20. * t.cos()).round() as i32,
+                y: (40. + 20. * t.sin()).round() as i32,
+            };
+            if points.last() != Some(&q) {
+                points.push(q);
+            }
+        }
+        let seg = Segment {
+            points,
+            start: None,
+            end: None,
+            left: 0,
+            right: 1,
+            first_dir: 0,
+            last_dir: 0,
+        };
+        let mut img = ColorImage {
+            width: 80,
+            height: 80,
+            pixels: vec![255; 80 * 80 * 4],
+        };
+        for s in &ss {
+            let i = (s.y as usize * 80 + s.x as usize) * 4;
+            for (k, c) in [36., 90., 183.].into_iter().enumerate() {
+                img.pixels[i + k] = (255. + s.coverage * (c - 255.)).round() as u8;
+            }
+        }
+        let mut old = truth.clone();
+        let G::Beziers(ref mut cs) = old else {
+            unreachable!()
+        };
+        for (i, j) in [(1, 0), (1, 1), (0, 2), (0, 3)] {
+            cs[i][j].y += 0.4;
+        }
+        let before = loss(&old, &ss, 0.001);
+        let candidate = crate::recovery::test_refine(&seg, &img, old.clone(), &ss);
+        let after = loss(&candidate, &ss, 0.001);
+        assert!(
+            after < before * 0.8,
+            "source target geometry must actually improve: {before} -> {after}"
+        );
+        let G::Beziers(cs) = &candidate else {
+            unreachable!()
+        };
+        assert_eq!(cs.len(), 4);
+        for i in 0..4 {
+            assert!(distance(cs[i][3], cs[(i + 1) % 4][0]) < 1e-12);
+        }
+        assert!(crate::planar::valid_model(&seg, &candidate, 80, 80));
+        let mut junction = seg.clone();
+        junction.start = Some(0);
+        junction.end = Some(1);
+        assert_eq!(
+            crate::recovery::test_refine(&junction, &img, old.clone(), &ss).into_closed_subpath(),
+            old.clone().into_closed_subpath()
+        );
+        for s in &mut ss {
+            s.trusted = false;
+        }
+        assert_eq!(
+            crate::recovery::test_refine(&seg, &img, old.clone(), &ss).into_closed_subpath(),
+            old.into_closed_subpath()
+        );
     }
 }
