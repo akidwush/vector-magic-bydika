@@ -37,6 +37,27 @@ export interface TraceResult {
     initialLoss: number;
     supportInspections: number;
   };
+  sourceGeometry?: {
+    components: number;
+    accepted: number;
+    coverageEvaluations: number;
+    axisUpdates: number;
+    spliceCollapsed: number;
+    apexUpdates: number;
+    apexLossBefore: number;
+    apexLossAfter: number;
+    coverageLossBefore: number;
+    coverageLossAfter: number;
+    rejected: number;
+    elapsedMs: number;
+    targetObservations: number;
+    wedgeRejected: number;
+    spansAttempted: number;
+    spansAccepted: number;
+    straightLocks: number;
+    spanMs: number;
+    cornerMs: number;
+  };
   optimization?: {
     attempts: number;
     accepted: number;

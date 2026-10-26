@@ -24,6 +24,8 @@ struct Stats {
 }
 thread_local! {static LAST:RefCell<Stats>=RefCell::new(Stats::default());}
 pub fn reset(enabled: bool) {
+    #[cfg(feature = "source_geometry")]
+    crate::recovery::reset();
     REPLACEMENTS.with(|r| r.borrow_mut().clear());
     LAST.with(|s| {
         *s.borrow_mut() = Stats {
@@ -91,7 +93,20 @@ fn clamped_integral(a: f64, b: f64, dy: f64) -> f64 {
 /// Polygon/pixel intersection area via Green's theorem. Horizontal extent is
 /// integrated analytically; unlike 4x4/16x16 occupancy, no coverage staircase.
 pub fn coverages(poly: &[P], ss: &[Sample]) -> Option<Vec<f64>> {
-    if poly.len() < 4
+    if poly.len() < 4 {
+        return None;
+    }
+    Some(
+        signed_edge_areas(poly, ss)?
+            .into_iter()
+            .map(|v| v.abs().clamp(0., 1.))
+            .collect(),
+    )
+}
+/// Directed open-chain contributions, for caching unchanged edges. No abs/clamp
+/// until all chains are summed; uses the identical validated Green integral.
+pub(crate) fn signed_edge_areas(poly: &[P], ss: &[Sample]) -> Option<Vec<f64>> {
+    if poly.len() < 2
         || poly.len() > 32768
         || poly.iter().any(|p| !p.x.is_finite() || !p.y.is_finite())
     {
@@ -133,12 +148,12 @@ pub fn coverages(poly: &[P], ss: &[Sample]) -> Option<Vec<f64>> {
                     let x = |y| a.x + (y - a.y) * (b.x - a.x) / (b.y - a.y) - s.x as f64;
                     area += (b.y - a.y).signum() * clamped_integral(x(lo), x(hi), hi - lo);
                 }
-                area.abs().clamp(0., 1.)
+                area
             })
             .collect(),
     )
 }
-fn flatten(g: &G, tolerance: f64) -> Option<Vec<P>> {
+pub(crate) fn flatten(g: &G, tolerance: f64) -> Option<Vec<P>> {
     fn split(c: [P; 4], tol: f64, depth: u8, out: &mut Vec<P>) -> Option<()> {
         if out.len() > 8192 {
             return None;
@@ -218,7 +233,7 @@ fn round(g: &mut G) {
 }
 /// Preserve actual output tangent discontinuities with substantial support;
 /// tiny raster splice connectors do not become new protected feature claims.
-fn endpoint_tangents(c: &[P; 4]) -> (P, P) {
+pub(crate) fn endpoint_tangents(c: &[P; 4]) -> (P, P) {
     let end = if distance(c[3], c[2]) > 1e-8 {
         c[2]
     } else if distance(c[3], c[1]) > 1e-8 {
@@ -264,7 +279,7 @@ fn corners(g: &G) -> Vec<P> {
     }
     out
 }
-fn displacement_bound(a: &G, b: &G, limit: f64) -> bool {
+pub(crate) fn displacement_bound(a: &G, b: &G, limit: f64) -> bool {
     let a = crate::planar::flatten(a);
     let b = crate::planar::flatten(b);
     let mut checks = 0usize;
@@ -437,6 +452,8 @@ pub fn component(mask: &vtracer::ir::RegionMask, img: &ColorImage, baseline: Vec
             .unwrap_or_else(|| baseline[0].clone());
         if let Some(model) = refine(&seg, img, &reference, &ss) {
             if let Some(model) = crate::source_fit::protect_inverse(model, &baseline[0], img) {
+                #[cfg(feature = "source_geometry")]
+                crate::recovery::capture(&model, &seg, &ss);
                 return vec![model];
             }
         }
@@ -757,10 +774,6 @@ pub fn refine(seg: &Segment, img: &ColorImage, old: &G, ss: &[Sample]) -> Option
                 }
             }
         }
-        #[cfg(feature = "source_geometry")]
-        {
-            candidate = target_refine(seg, img, candidate, ss);
-        }
         round(&mut candidate);
         best = loss(&candidate, ss, 0.001);
         if best > initial_loss {
@@ -803,301 +816,6 @@ pub fn refine(seg: &Segment, img: &ColorImage, old: &G, ss: &[Sample]) -> Option
     })();
     LAST.with(|s| s.borrow_mut().ms += now() - start);
     result
-}
-// Source targets constrain existing knots, never create one anchor per pixel.
-#[cfg(any(test, feature = "source_geometry"))]
-fn target_refine(seg: &Segment, img: &ColorImage, g: G, ss: &[Sample]) -> G {
-    if !seg.is_ring() || !ss.iter().any(|s| s.trusted) {
-        return g;
-    }
-    let start = now();
-    let result = target_propose(seg, img, g, ss);
-    LAST.with(|s| s.borrow_mut().target_ms += now() - start);
-    result
-}
-#[cfg(any(test, feature = "source_geometry"))]
-fn target_propose(seg: &Segment, img: &ColorImage, mut g: G, ss: &[Sample]) -> G {
-    let initial = g.clone();
-    for _ in 0..3 {
-        let G::Beziers(cs) = &g else { break };
-        let n = cs.len();
-        if n < 3 || n > 128 {
-            break;
-        }
-        let protected = corners(&g);
-        let flat = crate::planar::flatten(&g);
-        let sign = if flat
-            .windows(2)
-            .map(|w| w[0].x * w[1].y - w[1].x * w[0].y)
-            .sum::<f64>()
-            > 0.
-        {
-            1.
-        } else {
-            -1.
-        };
-        let evaluate = |c: &[P; 4], t: f64| {
-            let u = 1. - t;
-            let p = P {
-                x: u * u * u * c[0].x
-                    + 3. * u * u * t * c[1].x
-                    + 3. * u * t * t * c[2].x
-                    + t * t * t * c[3].x,
-                y: u * u * u * c[0].y
-                    + 3. * u * u * t * c[1].y
-                    + 3. * u * t * t * c[2].y
-                    + t * t * t * c[3].y,
-            };
-            let v = P {
-                x: 3.
-                    * (u * u * (c[1].x - c[0].x)
-                        + 2. * u * t * (c[2].x - c[1].x)
-                        + t * t * (c[3].x - c[2].x)),
-                y: 3.
-                    * (u * u * (c[1].y - c[0].y)
-                        + 2. * u * t * (c[2].y - c[1].y)
-                        + t * t * (c[3].y - c[2].y)),
-            };
-            (p, v)
-        };
-        let mut tess = Vec::new();
-        for (i, c) in cs.iter().enumerate() {
-            let count = (c.windows(2).map(|w| distance(w[0], w[1])).sum::<f64>() * 2.)
-                .ceil()
-                .clamp(4., 512.) as usize;
-            for j in 0..count {
-                let t = j as f64 / count as f64;
-                let u = (j + 1) as f64 / count as f64;
-                tess.push((i, t, u, evaluate(c, t).0, evaluate(c, u).0));
-            }
-        }
-        if tess.len() > 16384 {
-            break;
-        }
-        let mut grid: HashMap<(i32, i32), Vec<usize>> = HashMap::new();
-        let mut entries = 0;
-        for (id, &(_, _, _, p, q)) in tess.iter().enumerate() {
-            for y in ((p.y.min(q.y) - 1.) / 4.).floor() as i32
-                ..=((p.y.max(q.y) + 1.) / 4.).floor() as i32
-            {
-                for x in ((p.x.min(q.x) - 1.) / 4.).floor() as i32
-                    ..=((p.x.max(q.x) + 1.) / 4.).floor() as i32
-                {
-                    entries += 1;
-                    if entries > 65536 {
-                        return initial;
-                    }
-                    grid.entry((x, y)).or_default().push(id);
-                }
-            }
-        }
-        let m = n * 2;
-        let mut matrix = vec![vec![0.; m + 1]; m];
-        let mut used = 0;
-        let mut work = 0;
-        let mut targets = Vec::new();
-        for s in ss
-            .iter()
-            .filter(|s| s.trusted && s.coverage > 0.02 && s.coverage < 0.98)
-        {
-            let center = P {
-                x: s.x as f64 + 0.5,
-                y: s.y as f64 + 0.5,
-            };
-            if protected.iter().any(|p| distance(*p, center) < 2.) {
-                continue;
-            }
-            let mut nearest = (2., 0, 0.);
-            let Some(nearby) = grid.get(&(
-                (center.x / 4.).floor() as i32,
-                (center.y / 4.).floor() as i32,
-            )) else {
-                continue;
-            };
-            for &id in nearby {
-                let (i, a, b, p, q) = tess[id];
-                if center.x < p.x.min(q.x) - 1.
-                    || center.x > p.x.max(q.x) + 1.
-                    || center.y < p.y.min(q.y) - 1.
-                    || center.y > p.y.max(q.y) + 1.
-                {
-                    continue;
-                }
-                work += 1;
-                if work > 2_000_000 {
-                    return initial;
-                }
-                let dx = q.x - p.x;
-                let dy = q.y - p.y;
-                let den = dx * dx + dy * dy;
-                if den < 1e-16 {
-                    continue;
-                }
-                let t = (((center.x - p.x) * dx + (center.y - p.y) * dy) / den).clamp(0., 1.);
-                let d = distance(
-                    center,
-                    P {
-                        x: p.x + t * dx,
-                        y: p.y + t * dy,
-                    },
-                );
-                if d < nearest.0 {
-                    nearest = (d, i, a + (b - a) * t);
-                }
-            }
-            if nearest.0 > 0.8 {
-                continue;
-            }
-            let (_, i, t) = nearest;
-            let (p, v) = evaluate(&cs[i], t);
-            let len = v.x.hypot(v.y);
-            if len < 1e-6 {
-                continue;
-            }
-            let normal = P {
-                x: sign * v.y / len,
-                y: -sign * v.x / len,
-            };
-            let (_, left) = evaluate(&cs[i], (t - 0.02).max(0.));
-            let (_, right) = evaluate(&cs[i], (t + 0.02).min(1.));
-            if (left.x * right.x + left.y * right.y)
-                / (left.x.hypot(left.y) * right.x.hypot(right.y)).max(1e-12)
-                < 0.995
-            {
-                continue;
-            }
-            let Some(offset) = crate::unmix::offset(s.coverage, normal.x, normal.y) else {
-                continue;
-            };
-            let target = P {
-                x: center.x + offset * normal.x,
-                y: center.y + offset * normal.y,
-            };
-            let residual = (target.x - p.x) * normal.x + (target.y - p.y) * normal.y;
-            if residual.abs() > 0.8 {
-                continue;
-            }
-            let a = (1. - t).powi(2) * (1. + 2. * t);
-            let b = 1. - a;
-            let indices = [i * 2, i * 2 + 1, ((i + 1) % n) * 2, ((i + 1) % n) * 2 + 1];
-            let weights = [a * normal.x, a * normal.y, b * normal.x, b * normal.y];
-            for k in 0..4 {
-                matrix[indices[k]][m] += weights[k] * residual;
-                for l in 0..4 {
-                    matrix[indices[k]][indices[l]] += weights[k] * weights[l];
-                }
-            }
-            targets.push((i, t, target, normal));
-            used += 1;
-        }
-        LAST.with(|s| s.borrow_mut().targets += used);
-        if used < 32 {
-            break;
-        }
-        // Tikhonov trust prior, plus neighboring displacement regularization.
-        for j in 0..m {
-            matrix[j][j] += 0.01;
-        }
-        for i in 0..n {
-            if protected.iter().any(|p| distance(*p, cs[i][0]) < 0.01) {
-                continue;
-            }
-            for axis in 0..2 {
-                let a = i * 2 + axis;
-                let b = ((i + 1) % n) * 2 + axis;
-                matrix[a][a] += 0.02;
-                matrix[b][b] += 0.02;
-                matrix[a][b] -= 0.02;
-                matrix[b][a] -= 0.02;
-            }
-        }
-        for i in 0..m {
-            let pivot = (i..m)
-                .max_by(|a, b| matrix[*a][i].abs().total_cmp(&matrix[*b][i].abs()))
-                .unwrap();
-            matrix.swap(i, pivot);
-            let p = matrix[i][i];
-            if p.abs() < 1e-12 {
-                return initial;
-            }
-            for j in i..=m {
-                matrix[i][j] /= p;
-            }
-            for k in 0..m {
-                if k == i {
-                    continue;
-                }
-                let f = matrix[k][i];
-                for j in i..=m {
-                    matrix[k][j] -= f * matrix[i][j];
-                }
-            }
-        }
-        let delta: Vec<_> = (0..n)
-            .map(|i| {
-                let mut d = P {
-                    x: matrix[2 * i][m],
-                    y: matrix[2 * i + 1][m],
-                };
-                let length = d.x.hypot(d.y);
-                if length > 0.75 {
-                    d.x *= 0.75 / length;
-                    d.y *= 0.75 / length;
-                }
-                d
-            })
-            .collect();
-        if delta.iter().all(|d| d.x.hypot(d.y) < 0.005) {
-            break;
-        }
-        let geometry = |g: &G| {
-            let G::Beziers(c) = g else {
-                return f64::INFINITY;
-            };
-            targets
-                .iter()
-                .map(|(i, t, q, n)| {
-                    let p = evaluate(&c[*i], *t).0;
-                    ((p.x - q.x) * n.x + (p.y - q.y) * n.y).powi(2)
-                })
-                .sum::<f64>()
-                / targets.len() as f64
-        };
-        let base = loss(&g, ss, 0.001);
-        let objective = base + 0.1 * geometry(&g);
-        let mut accepted = false;
-        for scale in [1., 0.5, 0.25] {
-            let mut proposal = g.clone();
-            let G::Beziers(ref mut c) = proposal else {
-                unreachable!()
-            };
-            for i in 0..n {
-                for j in 0..4 {
-                    let d = delta[if j < 2 { i } else { (i + 1) % n }];
-                    c[i][j].x += d.x * scale;
-                    c[i][j].y += d.y * scale;
-                }
-            }
-            round(&mut proposal);
-            if !crate::planar::valid_model(seg, &proposal, img.width as u32, img.height as u32) {
-                continue;
-            }
-            if !displacement_bound(&initial, &proposal, 2.) {
-                continue;
-            }
-            let source = loss(&proposal, ss, 0.001);
-            if source <= base && source + 0.1 * geometry(&proposal) + 1e-7 < objective {
-                g = proposal;
-                LAST.with(|s| s.borrow_mut().target_steps += 1);
-                accepted = true;
-                break;
-            }
-        }
-        if !accepted {
-            break;
-        }
-    }
-    g
 }
 #[cfg(test)]
 mod tests {
@@ -1376,20 +1094,26 @@ mod target_tests {
             first_dir: 0,
             last_dir: 0,
         };
-        let img = ColorImage {
+        let mut img = ColorImage {
             width: 80,
             height: 80,
             pixels: vec![255; 80 * 80 * 4],
         };
+        for s in &ss {
+            let i = (s.y as usize * 80 + s.x as usize) * 4;
+            for (k, c) in [36., 90., 183.].into_iter().enumerate() {
+                img.pixels[i + k] = (255. + s.coverage * (c - 255.)).round() as u8;
+            }
+        }
         let mut old = truth.clone();
         let G::Beziers(ref mut cs) = old else {
             unreachable!()
         };
-        for (i, j) in [(0, 0), (0, 1), (3, 2), (3, 3)] {
-            cs[i][j].x += 0.4;
+        for (i, j) in [(1, 0), (1, 1), (0, 2), (0, 3)] {
+            cs[i][j].y += 0.4;
         }
         let before = loss(&old, &ss, 0.001);
-        let candidate = target_refine(&seg, &img, old.clone(), &ss);
+        let candidate = crate::recovery::test_refine(&seg, &img, old.clone(), &ss);
         let after = loss(&candidate, &ss, 0.001);
         assert!(
             after < before * 0.8,
@@ -1407,14 +1131,14 @@ mod target_tests {
         junction.start = Some(0);
         junction.end = Some(1);
         assert_eq!(
-            target_refine(&junction, &img, old.clone(), &ss).into_closed_subpath(),
+            crate::recovery::test_refine(&junction, &img, old.clone(), &ss).into_closed_subpath(),
             old.clone().into_closed_subpath()
         );
         for s in &mut ss {
             s.trusted = false;
         }
         assert_eq!(
-            target_refine(&seg, &img, old.clone(), &ss).into_closed_subpath(),
+            crate::recovery::test_refine(&seg, &img, old.clone(), &ss).into_closed_subpath(),
             old.into_closed_subpath()
         );
     }

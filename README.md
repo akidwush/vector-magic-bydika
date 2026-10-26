@@ -5,6 +5,16 @@ a tested ImageTracerJS fallback, three presets, original/vector comparison and l
 No account, tracing API, server upload, or paid runtime. Not affiliated with Vector Magic.
 Quality equivalence is not claimed; Photo is a baseline.
 
+## Stage 1.6B — source geometry research
+
+The follow-up `source_geometry` Cargo feature refines final reduced contours:
+it excludes ambiguous wedge pixels, calibrates sharp intersections from the
+source, and rolls back individual spans when coverage or exported-paint error
+increases. It is excluded from normal builds and does not change Auto.
+[Recovery design, actual export metrics and limitations](docs/STAGE_01_6_SUBPIXEL_INVERSION_REPORT.md).
+`bash scripts/source-target-research.sh` rebuilds both historical baselines and
+the candidate, runs browser/export checks, and fails on the unchanged quality gate.
+
 ## Stage 1.5 — experimental source refinement
 
 Stage 1.5 adds `Refinement sumber · uji`, disabled by default,

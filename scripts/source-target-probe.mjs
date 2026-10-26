@@ -1,8 +1,9 @@
 // Offline original-raster probe, with actual exported SVG and independent geometry.
 import * as old from "../benchmark-results/stage16b/baseline-wasm/nexora_wasm.js";
-import * as now from "../src/engine/wasm/nexora_wasm.js";
 import sharp from "sharp";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import {
   geometry,
   chains,
@@ -10,12 +11,16 @@ import {
   corners,
   worstBoundary,
 } from "./curve-geometry-metrics.mjs";
+const candidateRoot = resolve(
+  process.env.NEXORA_CANDIDATE_WASM || "src/engine/wasm",
+);
+const now = await import(pathToFileURL(candidateRoot + "/nexora_wasm.js").href);
 old.initSync({
   module: await readFile(
     "benchmark-results/stage16b/baseline-wasm/nexora_wasm_bg.wasm",
   ),
 });
-now.initSync({ module: await readFile("src/engine/wasm/nexora_wasm_bg.wasm") });
+now.initSync({ module: await readFile(candidateRoot + "/nexora_wasm_bg.wasm") });
 await mkdir("benchmark-results/stage16b/probe", { recursive: true });
 const result = [];
 for (const name of (process.env.TARGET_NAMES || "cubic,wave").split(",")) {
@@ -56,6 +61,7 @@ for (const name of (process.env.TARGET_NAMES || "cubic,wave").split(",")) {
       label,
       ms,
       inverse: [...m.last_inverse()],
+      recovery: m.last_recovery ? [...m.last_recovery()] : [],
       geometry: d,
       corners: corners(g),
       worst: worstBoundary(reference, chains(g)),

@@ -8,7 +8,15 @@ pub fn last_inverse() -> Vec<f64> {
 mod corners;
 mod coverage;
 mod planar;
+#[cfg(any(test, feature = "source_geometry"))]
+mod recovery;
 mod reduce;
+#[cfg(feature = "source_geometry")]
+#[wasm_bindgen]
+pub fn last_recovery() -> Vec<f64> {
+    recovery::values()
+}
+
 mod source_fit;
 #[wasm_bindgen]
 pub fn last_optimization() -> Vec<f64> {
@@ -214,6 +222,8 @@ fn run_pipeline(
             .map_err(|e| JsValue::from_str(&e.to_string()))?
     };
     inverse::repair(&mut doc).map_err(|e| JsValue::from_str(&e))?;
+    #[cfg(feature = "source_geometry")]
+    recovery::locate(&doc);
     let fitted_at = now();
     let mut evidence = coverage::Evidence::default();
     if profile == "source" {
@@ -248,6 +258,10 @@ fn run_pipeline(
             use vtracer::optimize::OptimizerPass;
             vtracer::optimize::QuantizePass::new(2).run(&mut doc);
             reduce::document(&mut doc);
+            #[cfg(feature = "source_geometry")]
+            if inverse::enabled() && profile == "source" {
+                recovery::document(&mut doc, &img);
+            }
             pipeline.writer.precision = Some(6);
         }
         // Upstream Mosaic gets only exact line canonicalization. Retain its

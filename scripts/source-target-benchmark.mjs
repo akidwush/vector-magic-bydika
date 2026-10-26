@@ -193,6 +193,7 @@ try {
             initMs,
             ms: performance.now() - start,
             inverse: [...m.last_inverse()],
+            recovery: m.last_recovery ? [...m.last_recovery()] : [],
           };
         },
         { key, b64: source.toString("base64"), w },
@@ -244,6 +245,7 @@ try {
         initMs: result.initMs,
         ms: result.ms,
         inverse: result.inverse,
+        recovery: result.recovery,
         boundary: boundary(reference, chains(g)),
         worst: worstBoundary(reference, chains(g)),
         anchors: g.anchors,

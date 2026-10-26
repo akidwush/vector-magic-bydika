@@ -88,6 +88,12 @@ export async function createEngine(
             const optimizationData = wasm.last_optimization();
             const inverseData = wasm.last_inverse();
             const topologyData = wasm.last_topology();
+            const recoveryGetter = Reflect.get(wasm, "last_recovery") as
+              undefined | (() => Float64Array);
+            const recovery =
+              typeof recoveryGetter === "function"
+                ? recoveryGetter()
+                : undefined;
             return {
               svg,
               engine: "vtracer-wasm",
@@ -115,6 +121,29 @@ export async function createEngine(
                 initialLoss: inverseData[7],
                 supportInspections: inverseData[8],
               },
+              sourceGeometry: recovery
+                ? {
+                    components: recovery[0],
+                    accepted: recovery[1],
+                    coverageEvaluations: recovery[2],
+                    axisUpdates: recovery[3],
+                    spliceCollapsed: recovery[4],
+                    apexUpdates: recovery[5],
+                    apexLossBefore: recovery[6],
+                    apexLossAfter: recovery[7],
+                    coverageLossBefore: recovery[8],
+                    coverageLossAfter: recovery[9],
+                    rejected: recovery[10],
+                    elapsedMs: recovery[11],
+                    targetObservations: recovery[12],
+                    wedgeRejected: recovery[13],
+                    spansAttempted: recovery[14],
+                    spansAccepted: recovery[15],
+                    straightLocks: recovery[16],
+                    spanMs: recovery[17],
+                    cornerMs: recovery[18],
+                  }
+                : undefined,
               optimization: {
                 attempts: optimizationData[0],
                 accepted: optimizationData[1],
