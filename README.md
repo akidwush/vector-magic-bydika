@@ -5,6 +5,15 @@ a tested ImageTracerJS fallback, three presets, original/vector comparison and l
 No account, tracing API, server upload, or paid runtime. Not affiliated with Vector Magic.
 Quality equivalence is not claimed; Photo is a baseline.
 
+## Stage 1.6D — source-verified continuity research
+
+The experimental recovery now rejects source-disproved short spline splices.
+Wave 128 false G0 corners drop from eight to zero, with p95 boundary error
+0.425 → 0.085px and preserved true-corner recall. The protected Stage 1.6C
+exports remain identical. Already-sharp triangle recovery improves at 1024px;
+128/512 and other uncertain cases remain unresolved. Normal Auto is unchanged.
+[Measured results, SVGs, visual evidence and limitations](docs/STAGE_01_6D_FALSE_CORNER_RECOVERY_REPORT.md).
+
 ## Stage 1.6C — low-resolution acute geometry research
 
 The follow-up research feature recovers source-supported acute caps on final
