@@ -27,16 +27,14 @@ test("runtime telemetry separates actual worker reuse and reset without changing
       const raw = document
         .querySelector(".result")
         ?.getAttribute("data-metrics");
-      return raw && JSON.parse(raw).timings?.warm === warm;
+      return raw && JSON.parse(raw).warm === warm;
     }, run === 1);
     const metrics = JSON.parse(
       (await page.locator(".result").getAttribute("data-metrics"))!,
     );
     const fullBrowserMs = performance.now() - start;
-    expect(metrics.timings.warm).toBe(run === 1);
-    expect(metrics.timings.workerTotalMs).toBeGreaterThanOrEqual(
-      metrics.elapsedMs,
-    );
+    expect(metrics.warm).toBe(run === 1);
+    expect(metrics.workerTotalMs).toBeGreaterThanOrEqual(metrics.traceMs);
     const pending = page.waitForEvent("download");
     await page.getByRole("link", { name: "Download SVG" }).click();
     exports.push(await readFile((await (await pending).path())!, "utf8"));
