@@ -231,6 +231,7 @@ fn arm(
 }
 
 fn hypothesis(a: &Arm, b: &Arm, origin: P, depth: P, side: P) -> Option<Hypothesis> {
+    runtime_count!(24, 1);
     let values: [f64; 3] = std::array::from_fn(|i| {
         a.coeff[i] / a.scale.powi(i as i32) - b.coeff[i] / b.scale.powi(i as i32)
     });
@@ -466,6 +467,7 @@ fn local_clear(cs: &[C], i: usize) -> bool {
 }
 
 pub(super) fn initialize(cs: &mut Vec<C>, img: &ColorImage, matte: &Matte) -> bool {
+    runtime_scope!(7);
     let started = now();
     let baseline = cs.clone();
     let n = cs.len();
@@ -696,6 +698,7 @@ pub(super) fn initialize(cs: &mut Vec<C>, img: &ColorImage, matte: &Matte) -> bo
 pub(super) mod large;
 
 fn joint_handles(old: &[C], i: usize, h: &Hypothesis, cache: &Patch<'_>) -> Option<Vec<C>> {
+    runtime_scope!(10);
     let prev = (i + old.len() - 1) % old.len();
     let handles = [
         dist(old[prev][0], old[prev][1]),
@@ -723,6 +726,7 @@ fn joint_handles(old: &[C], i: usize, h: &Hypothesis, cache: &Patch<'_>) -> Opti
             let mut best = chosen.clone();
             let mut next = score;
             for sign in [-1., 1.] {
+                runtime_count!(25, 1);
                 let mut trial = chosen.clone();
                 let delta = sub(trial[edge][handle], anchor);
                 let len = norm(delta);
@@ -810,6 +814,7 @@ fn joint_sharp(
 /// Only deferred components without accepted rounded-cap initialization enter.
 /// Agreement/conditioning and the original trust region are not relaxed.
 pub(super) fn refine_sharp(cs: &mut Vec<C>, img: &ColorImage, matte: &Matte) -> bool {
+    runtime_scope!(8);
     let started = now();
     let old = cs.clone();
     let n = cs.len();

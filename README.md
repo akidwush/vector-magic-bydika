@@ -193,3 +193,10 @@ Triangle 128 maximum boundary error 5.154 → 0.410px, corner precision/recall 1
 14 anchors retained; all 44 other corpus exports unchanged. Both implementation
 CI runs pass. Local runtime gates still fail on recorded historical/protected
 cases, so local validation remains PARTIAL and the feature stays experimental.
+
+Stage 1.6G runtime research adds fixed-size `runtime_profile` diagnostics and
+A/A, A/B, cold/warm and Worker-reset distributions without replacing old gates.
+The bounded exact-area `runtime_cache` prototype is opt-in: measured work savings
+and Cubic improvements do not establish a universal speedup. Ordinary
+`source_geometry`/`large_apex` retain their previous scoring path. Physical
+Android performance remains unverified; runtime stabilization is research-only.

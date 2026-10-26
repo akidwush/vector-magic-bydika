@@ -589,6 +589,7 @@ fn geom(path: &SubPath) -> Option<G> {
 /// Establish the reduced knot topology. A source-constrained caller may refine
 /// these final knots afterwards; only exact `serialize_lines` may follow it.
 pub fn document(doc: &mut VectorDoc) {
+    runtime_scope!(2);
     let started = clock();
     if doc
         .shapes

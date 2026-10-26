@@ -175,6 +175,7 @@ fn measured_distance(old: &[C], new: &[C]) -> f64 {
     max
 }
 pub(crate) fn refine(old: &[C], img: &ColorImage, matte: &Matte) -> Option<Certified> {
+    runtime_scope!(9);
     let started = now();
     let i = (0..old.len())
         .filter(|&i| {
@@ -293,6 +294,7 @@ pub(crate) fn refine(old: &[C], img: &ColorImage, matte: &Matte) -> Option<Certi
     let cache = Patch::new(old, &[prev, i], &patch, img, matte)?;
     let before = cache.score(old);
     let solving = now();
+    runtime_count!(30, 1);
     let candidate = joint_handles(old, i, h, &cache)?;
     row[25] = now() - solving;
     row[0] = 20.;

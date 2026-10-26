@@ -440,6 +440,8 @@ impl Matte {
                 .all(|(a, b)| (a - b).abs() < 0.1)
     }
     fn score(&self, cs: &[C], ss: &[Sample], img: &ColorImage) -> (f64, f64) {
+        runtime_scope!(18);
+        runtime_count!(28, 1);
         if ss.is_empty() {
             return (f64::INFINITY, f64::INFINITY);
         }
@@ -488,6 +490,7 @@ fn geometry_safe(cs: &[C], old: &[C], img: &ColorImage) -> bool {
     true
 }
 fn source_safe(cs: &[C], old: &[C], img: &ColorImage) -> bool {
+    runtime_scope!(11);
     geometry_safe(cs, old, img)
         && crate::inverse::displacement_bound(
             &G::Beziers(old.to_vec()),
@@ -497,6 +500,7 @@ fn source_safe(cs: &[C], old: &[C], img: &ColorImage) -> bool {
 }
 
 pub fn document(doc: &mut VectorDoc, img: &ColorImage) {
+    runtime_scope!(3);
     if doc.shapes.len() > 64
         || doc
             .shapes
@@ -532,6 +536,8 @@ pub fn document(doc: &mut VectorDoc, img: &ColorImage) {
         if !matte.exported_colors(doc, i, &ctx.ss) {
             continue;
         }
+        runtime_count!(21, 1);
+        runtime_count!(23, ctx.ss.len());
         count(0, 1.);
         let mut candidate = old.clone();
         #[cfg(feature = "large_apex")]
@@ -543,6 +549,7 @@ pub fn document(doc: &mut VectorDoc, img: &ColorImage) {
             if !acute && !sharp && !continuous {
                 #[cfg(not(feature = "large_apex"))]
                 {
+                    runtime_count!(22, 1);
                     continue;
                 }
                 #[cfg(feature = "large_apex")]
@@ -563,6 +570,8 @@ pub fn document(doc: &mut VectorDoc, img: &ColorImage) {
             continuity::refine(&mut candidate, img, &matte);
         }
         round(&mut candidate);
+        #[cfg(feature = "runtime_profile")]
+        let _validation_scope = crate::runtime_profile::Scope::new(19);
         let validation_started = now();
         let legacy_safe = source_safe(&candidate, &old, img);
         #[cfg(feature = "large_apex")]
@@ -580,6 +589,7 @@ pub fn document(doc: &mut VectorDoc, img: &ColorImage) {
                 now() - validation_started,
                 None,
             );
+            runtime_count!(22, 1);
             count(10, 1.);
             continue;
         }
@@ -592,6 +602,7 @@ pub fn document(doc: &mut VectorDoc, img: &ColorImage) {
                 now() - validation_started,
                 None,
             );
+            runtime_count!(22, 1);
             count(10, 1.);
             continue;
         }
@@ -617,6 +628,7 @@ pub fn document(doc: &mut VectorDoc, img: &ColorImage) {
                 now() - validation_started,
                 None,
             );
+            runtime_count!(22, 1);
             count(10, 1.);
             continue;
         }
@@ -635,6 +647,7 @@ pub fn document(doc: &mut VectorDoc, img: &ColorImage) {
                 now() - validation_started,
                 None,
             );
+            runtime_count!(22, 1);
             count(10, 1.);
             continue;
         }
@@ -665,6 +678,7 @@ pub fn document(doc: &mut VectorDoc, img: &ColorImage) {
             doc.shapes[i].path.subpaths[j] = G::Beziers(candidate).into_closed_subpath();
             count(1, 1.);
         } else {
+            runtime_count!(22, 1);
             apex_trace::component(
                 103.,
                 legacy_safe,
@@ -1499,6 +1513,10 @@ struct Patch<'a> {
     matte: &'a Matte,
     fixed: Vec<f64>,
     indices: Vec<usize>,
+    // One exact-key entry per changed slot, at most 65536 cached f64 areas.
+    // Cache lifetime is this immutable source patch, never another image/trace.
+    #[cfg(feature = "runtime_cache")]
+    contributions: RefCell<Vec<Option<(C, Vec<f64>)>>>,
 }
 impl<'a> Patch<'a> {
     fn new(
@@ -1508,6 +1526,7 @@ impl<'a> Patch<'a> {
         img: &'a ColorImage,
         matte: &'a Matte,
     ) -> Option<Self> {
+        runtime_scope!(13);
         let mut fixed = vec![0.; ss.len()];
         for (i, c) in cs.iter().enumerate() {
             if indices.contains(&i) {
@@ -1525,6 +1544,19 @@ impl<'a> Patch<'a> {
             matte,
             fixed,
             indices: indices.to_vec(),
+            #[cfg(feature = "runtime_cache")]
+            contributions: RefCell::new(
+                if !cfg!(feature = "runtime_uncached")
+                    && indices
+                        .len()
+                        .checked_mul(ss.len())
+                        .is_some_and(|n| n <= 65536)
+                {
+                    vec![None; indices.len()]
+                } else {
+                    Vec::new()
+                },
+            ),
         })
     }
     fn score(&self, cs: &[C]) -> (f64, f64) {
@@ -1532,17 +1564,51 @@ impl<'a> Patch<'a> {
         self.score_changed(&changed)
     }
     fn score_changed(&self, changed: &[C]) -> (f64, f64) {
+        runtime_scope!(14);
+        runtime_count!(28, 1);
         count(2, 1.);
         let mut areas = self.fixed.clone();
-        for c in changed {
-            let Some(flat) = crate::inverse::flatten(&G::Beziers(vec![*c]), 0.001) else {
-                return (f64::INFINITY, f64::INFINITY);
-            };
-            let Some(v) = crate::inverse::signed_edge_areas(&flat, self.ss) else {
-                return (f64::INFINITY, f64::INFINITY);
-            };
-            for (a, b) in areas.iter_mut().zip(v) {
-                *a += b;
+        #[cfg(feature = "runtime_cache")]
+        {
+            let mut cache = self.contributions.borrow_mut();
+            for (slot, c) in changed.iter().enumerate() {
+                if let Some(Some((key, values))) = cache.get(slot) {
+                    if key == c {
+                        runtime_count!(26, 1);
+                        for (a, b) in areas.iter_mut().zip(values) {
+                            *a += b;
+                        }
+                        continue;
+                    }
+                }
+                runtime_count!(27, 1);
+                let Some(flat) = crate::inverse::flatten(&G::Beziers(vec![*c]), 0.001) else {
+                    return (f64::INFINITY, f64::INFINITY);
+                };
+                let Some(v) = crate::inverse::signed_edge_areas(&flat, self.ss) else {
+                    return (f64::INFINITY, f64::INFINITY);
+                };
+                for (a, b) in areas.iter_mut().zip(&v) {
+                    *a += b;
+                }
+                if let Some(entry) = cache.get_mut(slot) {
+                    *entry = Some((*c, v));
+                }
+            }
+            drop(cache);
+        }
+        #[cfg(not(feature = "runtime_cache"))]
+        {
+            for c in changed {
+                let Some(flat) = crate::inverse::flatten(&G::Beziers(vec![*c]), 0.001) else {
+                    return (f64::INFINITY, f64::INFINITY);
+                };
+                let Some(v) = crate::inverse::signed_edge_areas(&flat, self.ss) else {
+                    return (f64::INFINITY, f64::INFINITY);
+                };
+                for (a, b) in areas.iter_mut().zip(v) {
+                    *a += b;
+                }
             }
         }
         let mut mse = 0.;
@@ -1576,6 +1642,7 @@ fn control_safe(cs: &[C], old: &[C], img: &ColorImage, limit: f64) -> bool {
         && self_clear(cs)
 }
 fn self_clear(cs: &[C]) -> bool {
+    runtime_scope!(12);
     let Some(flat) = crate::inverse::flatten(&G::Beziers(cs.to_vec()), 0.001) else {
         return false;
     };
@@ -1696,6 +1763,31 @@ mod tests {
             }
         }
         (img, ss)
+    }
+    #[cfg(feature = "runtime_cache")]
+    #[test]
+    fn patch_cache_is_bit_exact_across_trials_rollback_and_cardinality_changes() {
+        let cs = box_path();
+        let matte = matte(false);
+        let (img, ss) = raster(&cs, &matte);
+        let repeated = vec![cs[0]; 9];
+        let indices: Vec<_> = (0..9).collect();
+        let many = vec![ss[0].clone(); 8192];
+        let capped = Patch::new(&repeated, &indices, &many, &img, &matte).unwrap();
+        assert!(capped.contributions.borrow().is_empty());
+        let cache = Patch::new(&cs, &[0, 1], &ss, &img, &matte).unwrap();
+        let uncached = Patch::new(&cs, &[0, 1], &ss, &img, &matte).unwrap();
+        uncached.contributions.borrow_mut().clear();
+        for dx in [0., 0.1, -0.2, 0., 0.1] {
+            let mut trial = cs.clone();
+            trial[0][1].x += dx;
+            for changed in [&trial[..2], &trial[..3], &trial[..2]] {
+                let a = cache.score_changed(changed);
+                let b = uncached.score_changed(changed);
+                assert_eq!(a.0.to_bits(), b.0.to_bits());
+                assert_eq!(a.1.to_bits(), b.1.to_bits());
+            }
+        }
     }
     #[test]
     fn cached_open_edge_contributions_equal_full_closed_coverage() {

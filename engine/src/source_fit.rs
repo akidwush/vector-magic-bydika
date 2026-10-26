@@ -1108,6 +1108,7 @@ pub fn optimize(
     img: &ColorImage,
     baseline: Vec<FittedGeom>,
 ) -> Vec<FittedGeom> {
+    runtime_scope!(5);
     use vtracer::fitter::CurveFitter;
     // The missing side of a canvas-clipped boundary supplies no source evidence.
     if baseline.len() != 1 || touches_frame(mask, img) {

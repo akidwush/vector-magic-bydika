@@ -108,6 +108,7 @@ pub fn coverages(poly: &[P], ss: &[Sample]) -> Option<Vec<f64>> {
 /// Directed open-chain contributions, for caching unchanged edges. No abs/clamp
 /// until all chains are summed; uses the identical validated Green integral.
 pub(crate) fn signed_edge_areas(poly: &[P], ss: &[Sample]) -> Option<Vec<f64>> {
+    runtime_scope!(16);
     if poly.len() < 2
         || poly.len() > 32768
         || poly.iter().any(|p| !p.x.is_finite() || !p.y.is_finite())
@@ -156,6 +157,7 @@ pub(crate) fn signed_edge_areas(poly: &[P], ss: &[Sample]) -> Option<Vec<f64>> {
     )
 }
 pub(crate) fn flatten(g: &G, tolerance: f64) -> Option<Vec<P>> {
+    runtime_scope!(15);
     fn split(c: [P; 4], tol: f64, depth: u8, out: &mut Vec<P>) -> Option<()> {
         if out.len() > 8192 {
             return None;
@@ -208,6 +210,7 @@ pub(crate) fn flatten(g: &G, tolerance: f64) -> Option<Vec<P>> {
     }
 }
 fn loss(g: &G, ss: &[Sample], tol: f64) -> f64 {
+    runtime_count!(29, 1);
     LAST.with(|s| s.borrow_mut().evaluations += 1);
     let Some(p) = flatten(g, tol) else {
         return f64::INFINITY;
@@ -282,6 +285,7 @@ fn corners(g: &G) -> Vec<P> {
     out
 }
 pub(crate) fn displacement_bound(a: &G, b: &G, limit: f64) -> bool {
+    runtime_scope!(17);
     let a = crate::planar::flatten(a);
     let b = crate::planar::flatten(b);
     let mut checks = 0usize;
@@ -469,6 +473,7 @@ pub fn component(mask: &vtracer::ir::RegionMask, img: &ColorImage, baseline: Vec
     baseline
 }
 pub fn refine(seg: &Segment, img: &ColorImage, old: &G, ss: &[Sample]) -> Option<G> {
+    runtime_scope!(4);
     #[cfg(feature = "source_geometry")]
     LAST.with(|s| s.borrow_mut().deferred = false);
     if !enabled() || !seg.is_ring() || ss.len() < 32 || ss.len() > 8192 {

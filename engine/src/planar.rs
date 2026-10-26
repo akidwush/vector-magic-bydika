@@ -101,6 +101,7 @@ fn line(a: PointF64, b: PointF64, out: &mut Vec<PointF64>) {
     }
 }
 pub(crate) fn flatten(g: &FittedGeom) -> Vec<PointF64> {
+    runtime_scope!(20);
     let mut out = Vec::new();
     match g {
         FittedGeom::Polyline(ps) => {

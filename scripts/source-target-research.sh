@@ -5,7 +5,7 @@ cd "$(dirname "$0")/.."
 repo_dir="$PWD"
 # One immutable artifact namespace per execution. Historical Stage 1.6B output
 # is never used as a writable destination.
-proof_dir="${NEXORA_PROOF_DIR:-$repo_dir/benchmark-results/stage16f/$(git rev-parse --short HEAD)-$(date -u +%Y%m%dT%H%M%S)-$$}"
+proof_dir="${NEXORA_PROOF_DIR:-$repo_dir/benchmark-results/stage16g/$(git rev-parse --short HEAD)-$(date -u +%Y%m%dT%H%M%S)-$$}"
 if [[ "$proof_dir" != /* ]]; then proof_dir="$repo_dir/$proof_dir"; fi
 mkdir -p "$(dirname "$proof_dir")"
 mkdir "$proof_dir"
@@ -45,13 +45,14 @@ cleanup() {
   exit "$research_status"
 }
 trap cleanup EXIT
-for entry in '6084faffbd18313c80b7d4bc8bec349dd88b63c8 stage15-wasm' 'db06a032f7180f349b275ef3801854c048bb674d baseline-wasm' '564b643d53ecc5897f6c3b8a0174ccd807c47dcd stage16b-wasm' '5f69567c357eb0bb5930925fa7d35d132de2f3a5 stage16c-wasm' 'b1fa0c572c94b8a432735cd981c88570ba890c2a stage16d-wasm' '0b67da0cce87476adc59acc7396eb8cfd542452a stage16e-wasm'; do
+for entry in '6084faffbd18313c80b7d4bc8bec349dd88b63c8 stage15-wasm' 'db06a032f7180f349b275ef3801854c048bb674d baseline-wasm' '564b643d53ecc5897f6c3b8a0174ccd807c47dcd stage16b-wasm' '5f69567c357eb0bb5930925fa7d35d132de2f3a5 stage16c-wasm' 'b1fa0c572c94b8a432735cd981c88570ba890c2a stage16d-wasm' '0b67da0cce87476adc59acc7396eb8cfd542452a stage16e-wasm' 'c7f47512598cec01ad0adc9516af94e3ff58c963 stage16f-wasm'; do
   read -r baseline_commit output_name <<< "$entry"
   if ! git cat-file -e "$baseline_commit^{commit}" 2>/dev/null; then git fetch --depth=1 origin "$baseline_commit"; fi
   work_dir=$(mktemp -d /tmp/nexora-target-baseline-XXXXXX)
   git worktree add --detach "$work_dir" "$baseline_commit"
   baseline_features=()
   if [[ "$output_name" == stage16b-wasm || "$output_name" == stage16c-wasm || "$output_name" == stage16d-wasm || "$output_name" == stage16e-wasm ]]; then baseline_features=(--features source_geometry); fi
+  if [[ "$output_name" == stage16f-wasm ]]; then baseline_features=(--features large_apex); fi
   CARGO_TARGET_DIR="$repo_dir/engine/target" cargo build --manifest-path "$work_dir/engine/Cargo.toml" --locked --release --target wasm32-unknown-unknown "${baseline_features[@]}" -j2
   wasm-bindgen engine/target/wasm32-unknown-unknown/release/nexora_wasm.wasm --target web --out-dir "$proof_dir/$output_name"
   git worktree remove "$work_dir"
@@ -101,3 +102,10 @@ npm run build
 NEXORA_LARGE_APEX=1 NEXORA_STAGE15_ROOT="$proof_dir/large-regression" NEXORA_LOW_RES_ROOT="$proof_dir/large-browser" NEXORA_TEST_PORT="${NEXORA_TEST_PORT:-4187}" npm run test:e2e -- --output="$proof_dir/large-feature-e2e"
 NEXORA_COMPARE_STAGE=16f NEXORA_STAGE16B_WASM="$proof_dir/stage16e-wasm" NEXORA_PROOF_DIR="$proof_dir/large-apex" node scripts/low-resolution-benchmark.mjs
 node scripts/large-apex-quality-gate.mjs
+
+# Cache prototype is tested separately; the ordinary feature above stays unchanged.
+cargo test --manifest-path engine/Cargo.toml --locked --features large_apex,runtime_cache
+cargo build --manifest-path engine/Cargo.toml --locked --release --target wasm32-unknown-unknown --features large_apex,runtime_cache -j2
+wasm-bindgen engine/target/wasm32-unknown-unknown/release/nexora_wasm.wasm --target web --out-dir "$proof_dir/runtime-cache-wasm"
+NEXORA_CANDIDATE_WASM="$proof_dir/runtime-cache-wasm" NEXORA_COMPARE_STAGE=16g NEXORA_STAGE16B_WASM="$proof_dir/stage16f-wasm" NEXORA_PROOF_DIR="$proof_dir/runtime-identity" node scripts/low-resolution-benchmark.mjs
+node scripts/runtime-identity-gate.mjs

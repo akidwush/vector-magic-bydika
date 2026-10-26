@@ -259,6 +259,7 @@ fn graph_safe(curves: &[C; 2], axis: usize) -> bool {
     }) && turn(curves, 1) < 1e-3
 }
 pub(super) fn refine(cs: &mut Vec<C>, img: &ColorImage, matte: &Matte) -> bool {
+    runtime_scope!(6);
     let started = now();
     if cs.len() < 3
         || cs.len() > 128

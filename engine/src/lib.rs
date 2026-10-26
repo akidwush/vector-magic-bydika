@@ -1,3 +1,28 @@
+// Compiles to no statements or argument evaluation outside diagnostic builds.
+macro_rules! runtime_scope {
+    ($i:expr) => {
+        #[cfg(feature = "runtime_profile")]
+        let _runtime_scope = crate::runtime_profile::Scope::new($i);
+    };
+}
+macro_rules! runtime_count {
+    ($i:expr,$n:expr) => {
+        #[cfg(feature = "runtime_profile")]
+        crate::runtime_profile::count($i, $n as f64);
+    };
+}
+#[cfg(feature = "runtime_profile")]
+mod runtime_profile;
+#[cfg(feature = "runtime_profile")]
+#[wasm_bindgen]
+pub fn last_runtime_profile() -> Vec<f64> {
+    runtime_profile::values()
+}
+#[cfg(feature = "runtime_profile")]
+#[wasm_bindgen]
+pub fn runtime_profile_names() -> String {
+    runtime_profile::names()
+}
 mod alpha;
 mod inverse;
 mod unmix;
@@ -62,6 +87,9 @@ pub fn last_source_models() -> u32 {
 /// Thin integration only; segmentation and curve fitting are upstream VTracer.
 #[wasm_bindgen]
 pub fn trace(rgba: Vec<u8>, width: usize, height: usize, preset: &str) -> Result<String, JsValue> {
+    #[cfg(feature = "runtime_profile")]
+    runtime_profile::reset();
+    runtime_scope!(0);
     if width == 0
         || height == 0
         || width
@@ -140,6 +168,8 @@ fn run_pipeline(
     source_fit::reset();
     source_fit::sparse(optimize);
     let prepare_started = now();
+    #[cfg(feature = "runtime_profile")]
+    let prepare_scope = runtime_profile::Scope::new(1);
     let source_prepared = if profile.starts_with("reconstruct") {
         source_fit::prepare(&img).0
     } else {
@@ -163,6 +193,8 @@ fn run_pipeline(
     } else {
         profile
     };
+    #[cfg(feature = "runtime_profile")]
+    drop(prepare_scope);
     let preparation_ms = now() - prepare_started;
     let mut pipeline = config
         .build()
@@ -327,6 +359,9 @@ pub fn trace_quality(
     preset: &str,
     profile: &str,
 ) -> Result<String, JsValue> {
+    #[cfg(feature = "runtime_profile")]
+    runtime_profile::reset();
+    runtime_scope!(0);
     if width == 0
         || height == 0
         || width
@@ -492,6 +527,7 @@ struct RegionFitter {
 }
 impl vtracer::fitter::CurveFitter for RegionFitter {
     fn fit_region(&self, mask: &vtracer::ir::RegionMask) -> Vec<vtracer::fitter::FittedGeom> {
+        runtime_scope!(31);
         let mut output = Vec::new();
         for cluster in mask.image.to_clusters(false).iter() {
             let component = vtracer::ir::RegionMask::new(
