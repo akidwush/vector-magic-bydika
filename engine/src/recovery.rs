@@ -10,17 +10,42 @@ use vtracer::{
     mosaic::{FittedGeom as G, Segment},
 };
 type C = [P; 4];
+mod acute;
 #[derive(Clone)]
 struct Context {
     path: SubPath,
     seg: Segment,
     ss: Vec<Sample>,
     location: Option<(usize, usize)>,
+    deferred: bool,
 }
-thread_local! {static CONTEXTS:RefCell<Vec<Context>>=const{RefCell::new(Vec::new())};static STATS:RefCell<[f64;20]>=const{RefCell::new([0.;20])};}
+thread_local! {static CONTEXTS:RefCell<Vec<Context>>=const{RefCell::new(Vec::new())};static STATS:RefCell<[f64;30]>=const{RefCell::new([0.;30])};static INITIALIZATION:RefCell<Vec<f64>>=const{RefCell::new(Vec::new())};}
 pub fn reset() {
+    acute::reset();
     CONTEXTS.with(|c| c.borrow_mut().clear());
-    STATS.with(|s| *s.borrow_mut() = [0.; 20]);
+    STATS.with(|s| *s.borrow_mut() = [0.; 30]);
+    INITIALIZATION.with(|s| s.borrow_mut().clear());
+}
+pub fn acute_evidence() -> Vec<f64> {
+    acute::evidence()
+}
+pub fn initialization() -> Vec<f64> {
+    INITIALIZATION.with(|s| s.borrow().clone())
+}
+pub fn observe_initialization(mean: f64, seg: &Segment, ss: &[Sample], knots: usize) {
+    INITIALIZATION.with(|s| {
+        let mut s = s.borrow_mut();
+        if s.len() < 1536 {
+            s.extend([
+                mean,
+                ss.len() as f64,
+                ss.iter().filter(|s| s.trusted).count() as f64,
+                seg.points.len() as f64,
+                knots as f64,
+                (mean < 0.008) as u8 as f64,
+            ]);
+        }
+    });
 }
 pub fn values() -> Vec<f64> {
     STATS.with(|s| s.borrow().to_vec())
@@ -37,6 +62,12 @@ fn now() -> f64 {
     0.
 }
 pub fn capture(g: &G, seg: &Segment, ss: &[Sample]) {
+    capture_mode(g, seg, ss, false)
+}
+pub fn capture_deferred(g: &G, seg: &Segment, ss: &[Sample]) {
+    capture_mode(g, seg, ss, true)
+}
+fn capture_mode(g: &G, seg: &Segment, ss: &[Sample], deferred: bool) {
     if !seg.is_ring()
         || seg.points.len() < 4
         || seg.points.len() > 8192
@@ -47,17 +78,28 @@ pub fn capture(g: &G, seg: &Segment, ss: &[Sample]) {
     }
     CONTEXTS.with(|c| {
         let mut c = c.borrow_mut();
+        // A new deferred low-loss cap must never evict an established Stage
+        // 1.6B initialization or consume its four-component research budget.
+        if c.len() == 4 && !deferred {
+            if let Some(i) = c.iter().rposition(|c| c.deferred) {
+                c.remove(i);
+            }
+        }
         if c.len() < 4 {
             c.push(Context {
                 path: g.clone().into_closed_subpath(),
                 seg: seg.clone(),
                 ss: ss.to_vec(),
                 location: None,
+                deferred,
             });
         }
     });
 }
-pub fn locate(doc: &VectorDoc) {
+pub fn locate(doc: &VectorDoc, img: &ColorImage) {
+    if CONTEXTS.with(|c| c.borrow().is_empty()) {
+        return;
+    }
     CONTEXTS.with(|c| {
         for ctx in c.borrow_mut().iter_mut() {
             let mut found = None;
@@ -67,6 +109,40 @@ pub fn locate(doc: &VectorDoc) {
                     if *p == ctx.path {
                         found = Some((i, j));
                         matches += 1;
+                    }
+                }
+            }
+            // A deferred upstream spline may not yet have undergone the
+            // compositor's quantization/cleanup. Compare that exact canonical
+            // policy only when the raw identity failed; never use proximity or
+            // choose one of multiple canonically identical owners.
+            if matches == 0
+                && ctx.deferred
+                && doc.shapes.len() <= 64
+                && doc
+                    .shapes
+                    .iter()
+                    .flat_map(|s| &s.path.subpaths)
+                    .map(|p| p.commands.len())
+                    .sum::<usize>()
+                    <= 65536
+            {
+                let canonical = |path: &SubPath| {
+                    crate::source_fit::from_path(path)
+                        .and_then(|g| crate::source_fit::quantized(g, img))
+                        .map(|(_, p)| p)
+                };
+                if let Some(key) = canonical(&ctx.path) {
+                    for (i, s) in doc.shapes.iter().enumerate() {
+                        for (j, path) in s.path.subpaths.iter().enumerate() {
+                            if canonical(path).is_some_and(|p| p == key) {
+                                found = Some((i, j));
+                                matches += 1;
+                            }
+                        }
+                    }
+                    if matches == 1 {
+                        count(29, 1.);
                     }
                 }
             }
@@ -416,6 +492,9 @@ pub fn document(doc: &mut VectorDoc, img: &ColorImage) {
             continue;
         }
         let Some((i, j)) = ctx.location else { continue };
+        if ctx.deferred {
+            count(19, 1.);
+        }
         let Some(G::Beziers(old)) = crate::source_fit::from_path(&doc.shapes[i].path.subpaths[j])
         else {
             continue;
@@ -431,7 +510,16 @@ pub fn document(doc: &mut VectorDoc, img: &ColorImage) {
         }
         count(0, 1.);
         let mut candidate = old.clone();
-        recover(&mut candidate, &ctx.ss, img, &matte);
+        if ctx.deferred {
+            if !acute::initialize(&mut candidate, img, &matte) {
+                continue;
+            }
+            let span_started = now();
+            span_recover(&mut candidate, &ctx.ss, img, &matte);
+            count(17, now() - span_started);
+        } else {
+            recover(&mut candidate, &ctx.ss, img, &matte);
+        }
         round(&mut candidate);
         if !source_safe(&candidate, &old, img) || !self_clear(&candidate) {
             count(10, 1.);
@@ -1652,15 +1740,92 @@ mod tests {
             paint: vtracer::ir::Paint::Solid(vtracer::Color::new(30, 90, 180)),
             path,
         });
-        locate(&doc);
+        let img = ColorImage {
+            width: 32,
+            height: 32,
+            pixels: vec![255; 32 * 32 * 4],
+        };
+        locate(&doc, &img);
         assert_eq!(CONTEXTS.with(|c| c.borrow()[0].location), Some((0, 0)));
         doc.shapes.push(doc.shapes[0].clone());
-        locate(&doc);
+        locate(&doc, &img);
         assert_eq!(CONTEXTS.with(|c| c.borrow()[0].location), None);
+        for _ in 0..300 {
+            observe_initialization(0.003, &seg, &ss, 4);
+        }
+        assert_eq!(initialization().len(), 1536);
+        for _ in 0..4 {
+            capture_deferred(&G::Beziers(box_path()), &seg, &ss);
+        }
+        for _ in 0..4 {
+            capture(&G::Beziers(box_path()), &seg, &ss);
+        }
+        CONTEXTS.with(|c| {
+            let c = c.borrow();
+            assert_eq!(c.len(), 4);
+            assert!(c.iter().all(|c| !c.deferred));
+        });
         count(1, 1.);
         reset();
         assert!(values().iter().all(|n| *n == 0.));
         assert!(CONTEXTS.with(|c| c.borrow().is_empty()));
+        assert!(initialization().is_empty());
+    }
+    #[test]
+    fn deferred_ownership_uses_upstream_quantization_without_guessing_between_owners() {
+        reset();
+        let img = ColorImage {
+            width: 32,
+            height: 32,
+            pixels: vec![255; 32 * 32 * 4],
+        };
+        let mut curves = box_path();
+        for q in curves.iter_mut().flatten() {
+            q.x += 0.0037;
+            q.y += 0.0063;
+        }
+        let g = G::Beziers(curves);
+        let path = crate::source_fit::quantized(g.clone(), &img).unwrap().1;
+        assert_ne!(path, g.clone().into_closed_subpath());
+        let seg = Segment {
+            points: vec![
+                vtracer::PointI32 { x: 8, y: 8 },
+                vtracer::PointI32 { x: 24, y: 8 },
+                vtracer::PointI32 { x: 24, y: 24 },
+                vtracer::PointI32 { x: 8, y: 24 },
+                vtracer::PointI32 { x: 8, y: 8 },
+            ],
+            start: None,
+            end: None,
+            left: 0,
+            right: 1,
+            first_dir: 0,
+            last_dir: 0,
+        };
+        capture_deferred(
+            &g,
+            &seg,
+            &[Sample {
+                x: 12,
+                y: 12,
+                coverage: 1.,
+                trusted: true,
+            }],
+        );
+        let mut doc = VectorDoc::new(32, 32);
+        let mut paths = vtracer::ir::MultiPath::new();
+        paths.push(path);
+        doc.shapes.push(vtracer::ir::Shape {
+            paint: vtracer::ir::Paint::Solid(vtracer::Color::new(30, 90, 180)),
+            path: paths,
+        });
+        locate(&doc, &img);
+        assert_eq!(CONTEXTS.with(|c| c.borrow()[0].location), Some((0, 0)));
+        assert_eq!(values()[29], 1.);
+        doc.shapes.push(doc.shapes[0].clone());
+        locate(&doc, &img);
+        assert_eq!(CONTEXTS.with(|c| c.borrow()[0].location), None);
+        reset();
     }
     #[test]
     fn alpha_and_third_colours_are_not_reinterpreted_as_coverage() {

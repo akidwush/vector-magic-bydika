@@ -57,6 +57,15 @@ export interface TraceResult {
     straightLocks: number;
     spanMs: number;
     cornerMs: number;
+    deferredContexts: number;
+    acuteCandidates: number;
+    intersectionModels: number;
+    acuteRecovered: number;
+    uncertainCaps: number;
+    initializationMs: number;
+    capLossBefore: number;
+    capLossAfter: number;
+    canonicalOwners: number;
   };
   optimization?: {
     attempts: number;

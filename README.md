@@ -5,6 +5,18 @@ a tested ImageTracerJS fallback, three presets, original/vector comparison and l
 No account, tracing API, server upload, or paid runtime. Not affiliated with Vector Magic.
 Quality equivalence is not claimed; Photo is a baseline.
 
+## Stage 1.6C — low-resolution acute geometry research
+
+The follow-up research feature recovers source-supported acute caps on final
+reduced knots. Cubic 128/512 maximum boundary error improves from about 3.47px
+to 0.82px; the verified Stage 1.6B exports remain unchanged. Wave 128 improves
+its corner and maximum error, while its p95 and existing crest artifacts remain
+limited. Ambiguous, nearly parallel and clipped shapes retain the baseline.
+Normal Auto is unchanged; this still requires the experimental `source_geometry`
+build. [Scope, evidence and remaining failures](docs/STAGE_01_6C_LOW_RESOLUTION_GEOMETRY_REPORT.md).
+The research runner saves a new artifact directory per run and retains the
+existing quality gates alongside cross-resolution browser comparisons.
+
 ## Stage 1.6B — source geometry research
 
 The follow-up `source_geometry` Cargo feature refines final reduced contours:

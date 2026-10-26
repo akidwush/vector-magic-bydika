@@ -3,7 +3,12 @@ import {
   geometry,
   chains,
   boundary,
+  pointBoundaryDistance,
 } from "../../scripts/curve-geometry-metrics.mjs";
+import {
+  cornerMetrics,
+  structure,
+} from "../../scripts/source-structure-metrics.mjs";
 const svg = (d: string) =>
   `<svg width="100" height="100"><path d="${d}"/></svg>`;
 test("geometry metric ignores the speed and syntax of identical line loci", () => {
@@ -28,4 +33,19 @@ test("semantic nodes count shorthand cubics and exclude duplicate closing anchor
   expect(g.curves).toBe(2);
   expect(g.controls).toBe(4);
   expect(g.closed).toBe(1);
+});
+test("endpoint boundary distance does not conceal an overshot corner anchor", () => {
+  const g = geometry(svg("M4 3L4 12L12 12Z"));
+  expect(pointBoundaryDistance([4, 4], chains(g))).toBe(0);
+  expect(cornerMetrics(g, [[4, 4]]).endpointAnchorErrors).toEqual([1]);
+  expect(pointBoundaryDistance([4, 4], [])).toBe(Infinity);
+});
+test("export topology metric distinguishes a crossing from a numerical shared join", () => {
+  expect(
+    structure(geometry(svg("M10 10L90 90L10 90L90 10Z"))).properCrossings,
+  ).toBe(1);
+  expect(
+    structure(geometry(svg("M10 10L90 90L90.0000000000001 90L90 10Z")))
+      .properCrossings,
+  ).toBe(0);
 });

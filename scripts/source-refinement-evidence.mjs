@@ -10,7 +10,7 @@ import {
   corners,
 } from "./curve-geometry-metrics.mjs";
 import { metrics } from "./quality-metrics.mjs";
-const root = "benchmark-results/stage15";
+const root = process.env.NEXORA_STAGE15_ROOT || "benchmark-results/stage15";
 await mkdir(root, { recursive: true });
 const stretchFailures = [];
 const rows = JSON.parse(await readFile(root + "/production.json"));

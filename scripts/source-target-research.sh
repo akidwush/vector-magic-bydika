@@ -3,8 +3,27 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 repo_dir="$PWD"
-proof_dir="$repo_dir/benchmark-results/stage16b"
-mkdir -p "$proof_dir"
+# One immutable artifact namespace per execution. Historical Stage 1.6B output
+# is never used as a writable destination.
+proof_dir="${NEXORA_PROOF_DIR:-$repo_dir/benchmark-results/stage16c/$(git rev-parse --short HEAD)-$(date -u +%Y%m%dT%H%M%S)-$$}"
+if [[ "$proof_dir" != /* ]]; then proof_dir="$repo_dir/$proof_dir"; fi
+mkdir -p "$(dirname "$proof_dir")"
+mkdir "$proof_dir"
+export NEXORA_PROOF_DIR="$proof_dir"
+export NEXORA_STAGE15_ROOT="$proof_dir/regression"
+export NEXORA_LOW_RES_ROOT="$proof_dir/browser"
+export NEXORA_STAGE16B_WASM="$proof_dir/stage16b-wasm"
+node --input-type=module - "$proof_dir" <<'JSMETA'
+import {writeFile} from 'node:fs/promises';
+import {execFileSync} from 'node:child_process';
+await writeFile(process.argv[2]+'/run.json',JSON.stringify({
+ commit:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),
+ dirty:!!execFileSync('git',['status','--porcelain'],{encoding:'utf8'}).trim(),
+ started:new Date().toISOString(),
+ comparator:'564b643d53ecc5897f6c3b8a0174ccd807c47dcd',
+ source:'original input resolution only; references are offline metrics'
+},null,2));
+JSMETA
 backup_dir=$(mktemp -d /tmp/nexora-target-wasm-XXXXXX)
 mkdir -p "$backup_dir/wasm"
 cp -a src/engine/wasm/. "$backup_dir/wasm/"
@@ -25,12 +44,14 @@ cleanup() {
   exit "$research_status"
 }
 trap cleanup EXIT
-for entry in '6084faffbd18313c80b7d4bc8bec349dd88b63c8 stage15-wasm' 'db06a032f7180f349b275ef3801854c048bb674d baseline-wasm'; do
+for entry in '6084faffbd18313c80b7d4bc8bec349dd88b63c8 stage15-wasm' 'db06a032f7180f349b275ef3801854c048bb674d baseline-wasm' '564b643d53ecc5897f6c3b8a0174ccd807c47dcd stage16b-wasm'; do
   read -r baseline_commit output_name <<< "$entry"
   if ! git cat-file -e "$baseline_commit^{commit}" 2>/dev/null; then git fetch --depth=1 origin "$baseline_commit"; fi
   work_dir=$(mktemp -d /tmp/nexora-target-baseline-XXXXXX)
   git worktree add --detach "$work_dir" "$baseline_commit"
-  CARGO_TARGET_DIR="$repo_dir/engine/target" cargo build --manifest-path "$work_dir/engine/Cargo.toml" --locked --release --target wasm32-unknown-unknown -j2
+  baseline_features=()
+  if [[ "$output_name" == stage16b-wasm ]]; then baseline_features=(--features source_geometry); fi
+  CARGO_TARGET_DIR="$repo_dir/engine/target" cargo build --manifest-path "$work_dir/engine/Cargo.toml" --locked --release --target wasm32-unknown-unknown "${baseline_features[@]}" -j2
   wasm-bindgen engine/target/wasm32-unknown-unknown/release/nexora_wasm.wasm --target web --out-dir "$proof_dir/$output_name"
   git worktree remove "$work_dir"
   work_dir=""
@@ -38,10 +59,27 @@ done
 cargo build --manifest-path engine/Cargo.toml --locked --release --target wasm32-unknown-unknown --features source_geometry -j2
 wasm-bindgen engine/target/wasm32-unknown-unknown/release/nexora_wasm.wasm --target web --out-dir src/engine/wasm
 npm run build
-NEXORA_TEST_PORT="${NEXORA_TEST_PORT:-4187}" npm run test:e2e -- tests/e2e/source-refinement.spec.ts tests/e2e/recovery.spec.ts --output=benchmark-results/stage16b/feature-e2e
+NEXORA_TEST_PORT="${NEXORA_TEST_PORT:-4187}" npm run test:e2e -- tests/e2e/source-refinement.spec.ts tests/e2e/recovery.spec.ts tests/e2e/low-resolution.spec.ts --output="$proof_dir/feature-e2e"
 node scripts/source-refinement-evidence.mjs
 node scripts/source-refinement-editability.mjs
-node scripts/source-refinement-quality-gate.mjs
-node scripts/subpixel-proof.mjs
+# Retain the old gate files and their thresholds byte-for-byte. Their relative
+# evidence paths resolve inside a private namespace, not the historical outputs.
+namespace="$backup_dir/gate-workspace"
+mkdir -p "$namespace/benchmark-results" "$proof_dir/subpixel"
+ln -s "$repo_dir/tests" "$namespace/tests"
+ln -s "$proof_dir/regression" "$namespace/benchmark-results/stage15"
+ln -s "$proof_dir/subpixel" "$namespace/benchmark-results/stage16"
+ln -s "$proof_dir" "$namespace/benchmark-results/stage16b"
+(
+  cd "$namespace"
+  node "$repo_dir/scripts/source-refinement-quality-gate.mjs"
+  node "$repo_dir/scripts/subpixel-proof.mjs"
+)
 node scripts/source-target-benchmark.mjs
-node scripts/source-geometry-quality-gate.mjs
+(
+  cd "$namespace"
+  node "$repo_dir/scripts/source-geometry-quality-gate.mjs"
+)
+node scripts/low-resolution-benchmark.mjs
+node scripts/low-resolution-quality-gate.mjs
+node scripts/low-resolution-editability.mjs

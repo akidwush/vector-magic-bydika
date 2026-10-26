@@ -8,6 +8,8 @@ use vtracer::{
 };
 #[derive(Default)]
 struct Stats {
+    #[cfg(feature = "source_geometry")]
+    deferred: bool,
     targets: u32,
     target_steps: u32,
     target_ms: f64,
@@ -457,10 +459,18 @@ pub fn component(mask: &vtracer::ir::RegionMask, img: &ColorImage, baseline: Vec
                 return vec![model];
             }
         }
+        // A low mean loss can hide a missing acute cap. Keep the existing
+        // global fit guard; defer only this source-supported case to final knots.
+        #[cfg(feature = "source_geometry")]
+        if LAST.with(|s| s.borrow().deferred) {
+            crate::recovery::capture_deferred(&baseline[0], &seg, &ss);
+        }
     }
     baseline
 }
 pub fn refine(seg: &Segment, img: &ColorImage, old: &G, ss: &[Sample]) -> Option<G> {
+    #[cfg(feature = "source_geometry")]
+    LAST.with(|s| s.borrow_mut().deferred = false);
     if !enabled() || !seg.is_ring() || ss.len() < 32 || ss.len() > 8192 {
         return None;
     }
@@ -498,9 +508,17 @@ pub fn refine(seg: &Segment, img: &ColorImage, old: &G, ss: &[Sample]) -> Option
     let result = (|| {
         LAST.with(|s| s.borrow_mut().phase = 1);
         let before = loss(old, ss, 0.01);
+        #[cfg(feature = "source_geometry")]
+        crate::recovery::observe_initialization(before, seg, ss, cs.len());
         // A localized low-coverage cap alone is too weak to justify replacing
         // an otherwise well-reconstructed contour. Keep the stable baseline.
         if before < 0.008 {
+            #[cfg(feature = "source_geometry")]
+            LAST.with(|s| {
+                let mut s = s.borrow_mut();
+                s.phase = 8;
+                s.deferred = true;
+            });
             return None;
         }
         let movement = (img.width.max(img.height) as f64 * 0.012).clamp(4., 12.);

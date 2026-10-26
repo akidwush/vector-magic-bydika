@@ -16,6 +16,16 @@ mod reduce;
 pub fn last_recovery() -> Vec<f64> {
     recovery::values()
 }
+#[cfg(feature = "source_geometry")]
+#[wasm_bindgen]
+pub fn last_initialization() -> Vec<f64> {
+    recovery::initialization()
+}
+#[cfg(feature = "source_geometry")]
+#[wasm_bindgen]
+pub fn last_acute_evidence() -> Vec<f64> {
+    recovery::acute_evidence()
+}
 
 mod source_fit;
 #[wasm_bindgen]
@@ -223,7 +233,7 @@ fn run_pipeline(
     };
     inverse::repair(&mut doc).map_err(|e| JsValue::from_str(&e))?;
     #[cfg(feature = "source_geometry")]
-    recovery::locate(&doc);
+    recovery::locate(&doc, &img);
     let fitted_at = now();
     let mut evidence = coverage::Evidence::default();
     if profile == "source" {

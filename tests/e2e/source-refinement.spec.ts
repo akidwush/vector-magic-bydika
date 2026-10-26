@@ -14,6 +14,9 @@ import {
 } from "../../scripts/shared-edge-metrics.mjs";
 import { metrics } from "../../scripts/quality-metrics.mjs";
 
+const evidenceRoot =
+  process.env.NEXORA_STAGE15_ROOT || "benchmark-results/stage15";
+
 test("source refinement: exported geometry, source loss, features and shared ownership", async ({
   page,
 }) => {
@@ -112,8 +115,8 @@ test("source refinement: exported geometry, source loss, features and shared own
           expect(perf.topology.crossingsAfter).toBe(0);
         }
         const filename = `${name.replaceAll("/", "-")}-${profile}-${refined ? "candidate" : "baseline"}.svg`;
-        await mkdir("benchmark-results/stage15/exports", { recursive: true });
-        await writeFile("benchmark-results/stage15/exports/" + filename, svg);
+        await mkdir(evidenceRoot + "/exports", { recursive: true });
+        await writeFile(evidenceRoot + "/exports/" + filename, svg);
         variants.push({
           refined,
           perf,
@@ -165,9 +168,9 @@ test("source refinement: exported geometry, source loss, features and shared own
     }
   }
   expect(reducedDense).toBe(true);
-  await mkdir("benchmark-results/stage15", { recursive: true });
+  await mkdir(evidenceRoot, { recursive: true });
   await writeFile(
-    "benchmark-results/stage15/production.json",
+    evidenceRoot + "/production.json",
     JSON.stringify(rows, null, 2),
   );
 });
@@ -208,9 +211,9 @@ test("source refinement keeps worker reuse, cancellation and unsupported routes 
     observations.push({ refined, runs });
   }
   expect(requests).toBe(2);
-  await mkdir("benchmark-results/stage15", { recursive: true });
+  await mkdir(evidenceRoot, { recursive: true });
   await writeFile(
-    "benchmark-results/stage15/cold-warm.json",
+    evidenceRoot + "/cold-warm.json",
     JSON.stringify(observations, null, 2),
   );
   await page

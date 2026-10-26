@@ -142,6 +142,15 @@ export async function createEngine(
                     straightLocks: recovery[16],
                     spanMs: recovery[17],
                     cornerMs: recovery[18],
+                    deferredContexts: recovery[19] || 0,
+                    acuteCandidates: recovery[20] || 0,
+                    intersectionModels: recovery[21] || 0,
+                    acuteRecovered: recovery[22] || 0,
+                    uncertainCaps: recovery[23] || 0,
+                    initializationMs: recovery[24] || 0,
+                    capLossBefore: recovery[27] || 0,
+                    capLossAfter: recovery[28] || 0,
+                    canonicalOwners: recovery[29] || 0,
                   }
                 : undefined,
               optimization: {

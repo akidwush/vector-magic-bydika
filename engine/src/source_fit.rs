@@ -1013,7 +1013,10 @@ pub(crate) fn from_path(path: &vtracer::ir::SubPath) -> Option<FittedGeom> {
         Some(FittedGeom::Polyline(points))
     }
 }
-fn quantized(g: FittedGeom, img: &ColorImage) -> Option<(FittedGeom, vtracer::ir::SubPath)> {
+pub(crate) fn quantized(
+    g: FittedGeom,
+    img: &ColorImage,
+) -> Option<(FittedGeom, vtracer::ir::SubPath)> {
     use vtracer::optimize::OptimizerPass;
     let mut doc = model_doc(g, img);
     vtracer::optimize::QuantizePass::new(2).run(&mut doc);

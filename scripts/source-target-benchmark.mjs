@@ -1,3 +1,4 @@
+import { structure } from "./source-structure-metrics.mjs";
 // Three actual browser WASM builds; original raster and retained vector ground truth.
 import { createServer } from "node:http";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
@@ -11,7 +12,7 @@ import {
   worstBoundary,
 } from "./curve-geometry-metrics.mjs";
 import { metrics } from "./quality-metrics.mjs";
-const root = "benchmark-results/stage16b";
+const root = process.env.NEXORA_PROOF_DIR || "benchmark-results/stage16b";
 await mkdir(root + "/exports", { recursive: true });
 const builds = {
   stage15: root + "/stage15-wasm",
@@ -46,65 +47,6 @@ const browser = await chromium.launch({
 });
 const uri = (s) =>
   "data:image/svg+xml;base64," + Buffer.from(s).toString("base64");
-function structure(g) {
-  const angles = [];
-  let cusps = 0;
-  for (const path of g.paths) {
-    const edges = path.edges;
-    for (let i = 0; i < edges.length; i++) {
-      const a = edges[(i + edges.length - 1) % edges.length],
-        b = edges[i];
-      const q = a.at(-1);
-      if (Math.hypot(q[0] - b[0][0], q[1] - b[0][1]) > 1e-6) continue;
-      const p = a.length === 4 ? a[2] : a[0],
-        r = b[1];
-      const u = [q[0] - p[0], q[1] - p[1]],
-        v = [r[0] - q[0], r[1] - q[1]];
-      const den = Math.hypot(...u) * Math.hypot(...v);
-      if (!den) continue;
-      const angle = Math.acos(
-        Math.max(-1, Math.min(1, (u[0] * v[0] + u[1] * v[1]) / den)),
-      );
-      if (angle > 2.6) cusps++;
-      if (angle <= 0.65) angles.push(angle);
-    }
-  }
-  const ls = chains(g).flatMap((ps) => ps.slice(1).map((b, i) => [ps[i], b]));
-  let crossings = 0;
-  const cross = (a, b, c) =>
-    (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
-  for (let i = 0; i < ls.length; i++)
-    for (let j = i + 1; j < ls.length; j++) {
-      const [a, b] = ls[i],
-        [c, d] = ls[j];
-      if (
-        Math.max(a[0], b[0]) <= Math.min(c[0], d[0]) ||
-        Math.max(c[0], d[0]) <= Math.min(a[0], b[0]) ||
-        Math.max(a[1], b[1]) <= Math.min(c[1], d[1]) ||
-        Math.max(c[1], d[1]) <= Math.min(a[1], b[1])
-      )
-        continue;
-      // Relative SVG parsing can differ at the same endpoint by ~1e-13px.
-      // A shared endpoint is not a proper interior crossing.
-      if (
-        [a, b].some((p) =>
-          [c, d].some((q) => Math.hypot(p[0] - q[0], p[1] - q[1]) < 1e-6),
-        )
-      )
-        continue;
-      if (
-        cross(a, b, c) * cross(a, b, d) < -1e-12 &&
-        cross(c, d, a) * cross(c, d, b) < -1e-12
-      )
-        crossings++;
-    }
-  return {
-    closed: g.closed,
-    properCrossings: crossings,
-    acuteTurnCount: cusps,
-    maxSmoothJoinRadians: Math.max(0, ...angles),
-  };
-}
 // Metric sanity checks: a bow tie crosses, a numerically identical join does not.
 if (
   structure(
