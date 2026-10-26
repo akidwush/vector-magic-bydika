@@ -1,0 +1,202 @@
+// Attribute marks to OS threads. GC/compile intervals overlap: report their union,
+// never sum nested V8 timers. CPU snapshots envelope the call, not just its marks.
+import { createReadStream } from "node:fs";
+import { readFile as read, writeFile as write } from "node:fs/promises";
+import { createInterface } from "node:readline";
+import { resolve } from "node:path";
+import { distribution } from "./runtime-statistics.mjs";
+const root = resolve(process.env.NEXORA_CROSS_ROOT);
+const rows = JSON.parse(await read(root + "/observations.json"));
+const env = JSON.parse(await read(root + "/environment.json"));
+const threadEvents = new Map(),
+  marks = new Map(),
+  eventNames = new Map();
+for (let rep = 0; rep < env.repetitions; rep++) {
+  const lines = createInterface({
+    input: createReadStream(root + `/traces/session-${rep}.jsonl`),
+    crlfDelay: Infinity,
+  });
+  for await (const line of lines) {
+    const e = JSON.parse(line);
+    const name = e.name || "";
+    if (name.startsWith("nexora-core-"))
+      marks.set(name, { rep, pid: e.pid, tid: e.tid, ts: e.ts });
+    if (
+      e.ph === "X" &&
+      e.dur > 0 &&
+      /wasm|compile|MinorGC|MajorGC/i.test(name)
+    ) {
+      const key = rep + ":" + e.pid + ":" + e.tid;
+      if (!threadEvents.has(key)) threadEvents.set(key, []);
+      threadEvents
+        .get(key)
+        .push({ name, start: e.ts, end: e.ts + e.dur, args: e.args });
+      eventNames.set(name, (eventNames.get(name) || 0) + 1);
+    }
+  }
+}
+function union(events, start, end) {
+  const intervals = events
+    .map((e) => [Math.max(start, e.start), Math.min(end, e.end)])
+    .filter(([a, b]) => b > a)
+    .sort((a, b) => a[0] - b[0]);
+  let total = 0,
+    lo = 0,
+    hi = 0;
+  for (const [a, b] of intervals) {
+    if (a > hi) {
+      total += hi - lo;
+      lo = a;
+      hi = b;
+    } else hi = Math.max(hi, b);
+  }
+  return (total + hi - lo) / 1000;
+}
+function cgroup(text) {
+  return Object.fromEntries(
+    (text || "")
+      .trim()
+      .split("\n")
+      .map((s) => s.split(/\s+/))
+      .map(([k, v]) => [k, Number(v)]),
+  );
+}
+const missing = [];
+for (const r of rows) {
+  const a = marks.get("nexora-core-start-" + r.markId),
+    b = marks.get("nexora-core-end-" + r.markId);
+  if (!a || !b) {
+    missing.push(r.traceId);
+    continue;
+  }
+  const id = a.pid + ":" + a.tid,
+    events = (threadEvents.get(r.rep + ":" + id) || []).filter(
+      (e) => e.end > a.ts && e.start < b.ts,
+    );
+  const execution = r.cpu.find((t) => t.id === id) ?? null;
+  const cpu = r.cpu.filter((t) => t.id !== id);
+  const bgEvents = [...threadEvents]
+    .filter(([key]) => key.startsWith(r.rep + ":") && key !== r.rep + ":" + id)
+    .flatMap(([, es]) => es)
+    .filter((e) => e.end > a.ts && e.start < b.ts);
+  const before = cgroup(r.systemBefore.cgroup),
+    after = cgroup(r.systemAfter.cgroup);
+  r.attribution = {
+    executionThread: id,
+    execution,
+    traceMarkMs: (b.ts - a.ts) / 1000,
+    gcUnionMs: union(
+      events.filter((e) => ["MinorGC", "MajorGC"].includes(e.name)),
+      a.ts,
+      b.ts,
+    ),
+    compileUnionMs: union(
+      events.filter((e) => /compile/i.test(e.name)),
+      a.ts,
+      b.ts,
+    ),
+    wasmEventUnionMs: union(
+      events.filter((e) => /wasm/i.test(e.name)),
+      a.ts,
+      b.ts,
+    ),
+    eventNames: [...new Set(events.map((e) => e.name))],
+    backgroundCompileEvents: bgEvents.filter((e) => /compile/i.test(e.name))
+      .length,
+    backgroundInternalCompileEvents: bgEvents.filter(
+      (e) =>
+        /compile/i.test(e.name) && JSON.stringify(e.args).includes("chrome://"),
+    ).length,
+    otherRendererMainCPU: cpu
+      .filter(
+        (t) => t.processType === "renderer" && t.comm === "CrRendererMain",
+      )
+      .reduce((s, t) => s + t.cpuMs, 0),
+    otherThreadCPU: cpu.reduce((s, t) => s + t.cpuMs, 0),
+    cgroupThrottledMs:
+      after.throttled_usec == null
+        ? null
+        : (after.throttled_usec - before.throttled_usec) / 1000,
+    caveat:
+      "OS CPU/runqueue snapshots include harness/getters/message overhead and are not exclusive Rust CPU. Cgroup counters cover shared quota. V8 compileModule is not evidence of WASM tiering.",
+  };
+  delete r.systemBefore;
+  delete r.systemAfter;
+}
+const groups = [];
+for (const fixture of new Set(rows.map((r) => r.fixture)))
+  for (const build of new Set(rows.map((r) => r.buildId)))
+    for (const mode of env.modes)
+      for (const state of ["first", "warm", "reset"]) {
+        const rs = rows.filter(
+          (r) =>
+            r.fixture === fixture &&
+            r.buildId === build &&
+            r.mode === mode &&
+            r.state === state,
+        );
+        const dist = (fn) => distribution(rs.map(fn).filter(Number.isFinite));
+        const sessions = Array.from({ length: env.repetitions }, (_, rep) => {
+          const slots = [0, 1].map((slot) =>
+            distribution(
+              rs
+                .filter((r) => r.rep === rep && r.slot === slot)
+                .map((r) => r.coreMs),
+            ),
+          );
+          return {
+            rep,
+            slots,
+            aaMedianDifferenceMs: slots.every(Boolean)
+              ? slots[1].median - slots[0].median
+              : null,
+          };
+        });
+        groups.push({
+          fixture,
+          build,
+          mode,
+          state,
+          core: dist((r) => r.coreMs),
+          rust: dist((r) => r.runtime?.[32]),
+          cpu: dist((r) => r.attribution?.execution?.cpuMs),
+          runqueue: dist((r) => r.attribution?.execution?.runqueueMs),
+          gc: dist((r) => r.attribution?.gcUnionMs),
+          compile: dist((r) => r.attribution?.compileUnionMs),
+          otherCPU: dist((r) => r.attribution?.otherThreadCPU),
+          wall: dist((r) => r.resultWallMs),
+          page: dist((r) => r.pageResultMs ?? r.appResultReadyMs),
+          memory: dist((r) => r.memory),
+          sessions,
+        });
+      }
+await write(root + "/attribution.json", JSON.stringify(rows));
+await write(
+  root + "/attribution-summary.json",
+  JSON.stringify(
+    {
+      missing,
+      eventNames: [...eventNames],
+      groups,
+      slowest: rows
+        .toSorted((a, b) => b.coreMs - a.coreMs)
+        .slice(0, 20)
+        .map(({ traceId, coreMs, stages, attribution }) => ({
+          traceId,
+          coreMs,
+          stages,
+          attribution,
+        })),
+    },
+    null,
+    2,
+  ),
+);
+console.log(
+  JSON.stringify({
+    rows: rows.length,
+    missing: missing.length,
+    eventNames: [...eventNames],
+  }),
+);
+if (missing.length) process.exitCode = 1;

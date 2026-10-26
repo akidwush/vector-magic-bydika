@@ -1,0 +1,38 @@
+// Diagnostics only. The trace call and output remain the original binding.
+import * as core from __CORE__;
+export * from __CORE__;
+const buildId=__BUILD_ID__;
+const realm=crypto.randomUUID();
+let memory, pending, serial=0;
+export default async function init(){
+ const t=performance.now();
+ const result=await core.default({module_or_path:new URL('/binary/'+buildId+'/nexora_wasm_bg.wasm',globalThis.location.origin)});
+ memory=result.memory;
+ globalThis.__nxInitMs=performance.now()-t;
+ return result;
+}
+const hex=b=>Array.from(new Uint8Array(b),x=>x.toString(16).padStart(2,'0')).join('');
+export function trace_quality(...args){
+ const invocation=++serial;
+ const markId=buildId+'-'+realm+'-'+invocation;
+ performance.mark('nexora-core-start-'+markId);
+ const t=performance.now();
+ const svg=core.trace_quality(...args);
+ const coreMs=performance.now()-t;
+ performance.mark('nexora-core-end-'+markId);
+ const g=performance.now();
+ const get=name=>typeof core[name]==='function'?Array.from(core[name]()):null;
+ const record={invocation,realm,markId,buildId,coreMs,args:args.slice(1),initMs:globalThis.__nxInitMs,
+ stages:get('last_stage_timings'),inverse:get('last_inverse'),recovery:get('last_recovery'),large:get('last_large_apex'),
+ runtime:get('last_runtime_profile'),inverseWork:get('last_inverse_work'),optimization:get('last_optimization'),
+ profileNames:core.runtime_profile_names?.().split('|')??null,inverseWorkNames:core.inverse_work_names?.().split('|')??null,
+ memory:memory.buffer.byteLength,svg,gettersMs:performance.now()-g,timeOrigin:performance.timeOrigin,coreStart:t,coreEnd:t+coreMs};
+ const hashing=performance.now();
+ pending=Promise.all([crypto.subtle.digest('SHA-256',args[0]),crypto.subtle.digest('SHA-256',new TextEncoder().encode(svg))]).then(([rgba,svg])=>{
+  const packet={...record,rgbaSHA256:hex(rgba),svgSHA256:hex(svg),hashMs:performance.now()-hashing};
+  if(typeof document==='undefined')self.postMessage({__nexoraForensics:packet});
+  return packet;
+ });
+ return svg;
+}
+export async function telemetry(){return pending;}
