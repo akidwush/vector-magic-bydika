@@ -206,3 +206,7 @@ PARTIAL. A/A/A/B data and profiling are retained, 45 F/G SVGs are byte-identical
 and cache work savings do not establish a universal speedup. The local historical
 thin-ellipse runtime gate remains FAIL; the complete c6cda33 CI passed. See the
 report for later workflow status and the unverified physical Android procedure.
+
+### Stage 1.6H research — inverse hot path
+
+The opt-in `inverse_hotpath` feature preserves all 45 Stage F SVG exports byte for byte. Ordered row constants, stack clamp knots and exact local flatten reuse reduce redundant CPU work. Wave 512/1024 improve in all three paired Worker sessions; Cubic and small-input latency remain mixed. **PARTIAL:** the local historical runner fails its unchanged sharp-apex +500ms gate on a clipped 1024px blade, and the separate H/E runtime gate fails six cases. No global activation or merge. See [measured results and retained failures](docs/STAGE_01_6H_INVERSE_HOTPATH_REPORT.md).
