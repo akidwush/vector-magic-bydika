@@ -19,10 +19,17 @@ import { metrics } from "./quality-metrics.mjs";
 const root = resolve(
   process.env.NEXORA_PROOF_DIR || "benchmark-results/stage16c/browser-proof",
 );
+const stageF = process.env.NEXORA_COMPARE_STAGE === "16f";
 const stageE = process.env.NEXORA_COMPARE_STAGE === "16e";
 const stageD = process.env.NEXORA_COMPARE_STAGE === "16d";
 const buildRoots = {
-  [stageE ? "stage16d" : stageD ? "stage16c" : "stage16b"]: resolve(
+  [stageF
+    ? "stage16e"
+    : stageE
+      ? "stage16d"
+      : stageD
+        ? "stage16c"
+        : "stage16b"]: resolve(
     process.env.NEXORA_STAGE16B_WASM ||
       "benchmark-results/stage16c/baseline-wasm",
   ),
@@ -143,6 +150,7 @@ try {
                 apexEvidence: m.last_apex_evidence
                   ? [...m.last_apex_evidence()]
                   : [],
+                largeApex: m.last_large_apex ? [...m.last_large_apex()] : [],
                 initialization: m.last_initialization
                   ? [...m.last_initialization()]
                   : [],
@@ -219,6 +227,7 @@ try {
         recovery: result.recovery,
         continuity: result.continuity,
         apexEvidence: result.apexEvidence,
+        largeApex: result.largeApex,
         initialization: result.initialization,
         acuteEvidence: result.acuteEvidence,
         memory: {
@@ -292,7 +301,7 @@ try {
           height: side + 150,
         });
         await page.setContent(
-          `<body style="margin:12px;background:#ddd;font:14px sans-serif"><b>${entry.key} | ${w}×${h} PNG | Illustration / VTracer WASM | ${zoom * 100}% | same ROI ${x},${y},${size}</b><div style="display:flex;gap:12px">${images.map((src, i) => `<figure style="margin:0"><figcaption style="height:64px">${(stageE ? ["Original Raster", "Stage 1.6D", "Stage 1.6E"] : stageD ? ["Original Raster", "Stage 1.6C", "Stage 1.6D"] : ["Original Raster", "Stage 1.6B", "Stage 1.6C"])[i]}${i ? `<br>${variants[i - 1].anchors} anchors | ${variants[i - 1].curves} cubics | ${variants[i - 1].bytes} bytes<br>max ${variants[i - 1].geometry.max.toFixed(4)} px | ${variants[i - 1].ms.toFixed(1)} ms` : ""}</figcaption><img src="${src}" width="${side}" height="${side}"/></figure>`).join("")}</div></body>`,
+          `<body style="margin:12px;background:#ddd;font:14px sans-serif"><b>${entry.key} | ${w}×${h} PNG | Illustration / VTracer WASM | ${zoom * 100}% | same ROI ${x},${y},${size}</b><div style="display:flex;gap:12px">${images.map((src, i) => `<figure style="margin:0"><figcaption style="height:64px">${(stageF ? ["Original Raster", "Stage 1.6E", "Stage 1.6F"] : stageE ? ["Original Raster", "Stage 1.6D", "Stage 1.6E"] : stageD ? ["Original Raster", "Stage 1.6C", "Stage 1.6D"] : ["Original Raster", "Stage 1.6B", "Stage 1.6C"])[i]}${i ? `<br>${variants[i - 1].anchors} anchors | ${variants[i - 1].curves} cubics | ${variants[i - 1].bytes} bytes<br>max ${variants[i - 1].geometry.max.toFixed(4)} px | ${variants[i - 1].ms.toFixed(1)} ms` : ""}</figcaption><img src="${src}" width="${side}" height="${side}"/></figure>`).join("")}</div></body>`,
         );
         await page
           .locator("img")

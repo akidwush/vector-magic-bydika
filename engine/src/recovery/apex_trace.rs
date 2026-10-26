@@ -17,6 +17,7 @@ pub(super) fn record(row: [f64; 32]) {
 }
 pub(super) fn component(
     stage: f64,
+    legacy: bool,
     old: &[C],
     new: &[C],
     elapsed: f64,
@@ -63,6 +64,7 @@ pub(super) fn component(
         r[20] = 1.;
         r[21] = (stage == 110.) as u8 as f64;
     }
+    r[16] = legacy as u8 as f64;
     record(r);
 }
 

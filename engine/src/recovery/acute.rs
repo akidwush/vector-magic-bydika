@@ -692,18 +692,10 @@ pub(super) fn initialize(cs: &mut Vec<C>, img: &ColorImage, matte: &Matte) -> bo
     accepted
 }
 
-// Fallback only after the established Stage 1.6D proposal is rejected.
-// Keep the evidence apex fixed: improve the incident handles jointly, without
-// moving an uncertain corner to chase a lower image loss.
-fn joint_sharp(
-    old: &[C],
-    i: usize,
-    h: &Hypothesis,
-    cache: &Patch<'_>,
-    before: (f64, f64),
-    img: &ColorImage,
-) -> Option<Vec<C>> {
-    let evaluation_started = now();
+#[cfg(feature = "large_apex")]
+pub(super) mod large;
+
+fn joint_handles(old: &[C], i: usize, h: &Hypothesis, cache: &Patch<'_>) -> Option<Vec<C>> {
     let prev = (i + old.len() - 1) % old.len();
     let handles = [
         dist(old[prev][0], old[prev][1]),
@@ -767,6 +759,23 @@ fn joint_sharp(
             break;
         }
     }
+    Some(chosen)
+}
+
+// Fallback only after the established Stage 1.6D proposal is rejected.
+// Keep the evidence apex fixed: improve the incident handles jointly, without
+// moving an uncertain corner to chase a lower image loss.
+fn joint_sharp(
+    old: &[C],
+    i: usize,
+    h: &Hypothesis,
+    cache: &Patch<'_>,
+    before: (f64, f64),
+    img: &ColorImage,
+) -> Option<Vec<C>> {
+    let evaluation_started = now();
+    let chosen = joint_handles(old, i, h, cache)?;
+    let score = cache.score(&chosen);
     let mut audit = [-1.; 32];
     audit[0] = 5.;
     audit[1] = i as f64;

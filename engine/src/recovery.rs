@@ -23,12 +23,18 @@ struct Context {
 }
 thread_local! {static CONTEXTS:RefCell<Vec<Context>>=const{RefCell::new(Vec::new())};static STATS:RefCell<[f64;35]>=const{RefCell::new([0.;35])};static INITIALIZATION:RefCell<Vec<f64>>=const{RefCell::new(Vec::new())};}
 pub fn reset() {
+    #[cfg(feature = "large_apex")]
+    acute::large::reset();
     acute::reset();
     apex_trace::reset();
     continuity::reset();
     CONTEXTS.with(|c| c.borrow_mut().clear());
     STATS.with(|s| *s.borrow_mut() = [0.; 35]);
     INITIALIZATION.with(|s| s.borrow_mut().clear());
+}
+#[cfg(feature = "large_apex")]
+pub fn large_evidence() -> Vec<f64> {
+    acute::large::evidence()
 }
 pub fn acute_evidence() -> Vec<f64> {
     acute::evidence()
@@ -457,7 +463,7 @@ impl Matte {
         (mse / ss.len() as f64, mae / ss.len() as f64)
     }
 }
-fn source_safe(cs: &[C], old: &[C], img: &ColorImage) -> bool {
+fn geometry_safe(cs: &[C], old: &[C], img: &ColorImage) -> bool {
     if cs.len() < 3
         || cs.len() > old.len()
         || cs.iter().flatten().any(|p| {
@@ -479,7 +485,15 @@ fn source_safe(cs: &[C], old: &[C], img: &ColorImage) -> bool {
     {
         return false;
     }
-    crate::inverse::displacement_bound(&G::Beziers(old.to_vec()), &G::Beziers(cs.to_vec()), 3.5)
+    true
+}
+fn source_safe(cs: &[C], old: &[C], img: &ColorImage) -> bool {
+    geometry_safe(cs, old, img)
+        && crate::inverse::displacement_bound(
+            &G::Beziers(old.to_vec()),
+            &G::Beziers(cs.to_vec()),
+            3.5,
+        )
 }
 
 pub fn document(doc: &mut VectorDoc, img: &ColorImage) {
@@ -520,29 +534,64 @@ pub fn document(doc: &mut VectorDoc, img: &ColorImage) {
         }
         count(0, 1.);
         let mut candidate = old.clone();
+        #[cfg(feature = "large_apex")]
+        let mut extended = None;
         if ctx.deferred {
             let acute = acute::initialize(&mut candidate, img, &matte);
             let sharp = !acute && acute::refine_sharp(&mut candidate, img, &matte);
             let continuous = continuity::refine(&mut candidate, img, &matte);
             if !acute && !sharp && !continuous {
-                continue;
+                #[cfg(not(feature = "large_apex"))]
+                {
+                    continue;
+                }
+                #[cfg(feature = "large_apex")]
+                {
+                    extended = acute::large::refine(&old, img, &matte);
+                    let Some(ref proof) = extended else {
+                        continue;
+                    };
+                    candidate = proof.geometry().to_vec();
+                }
+            } else {
+                let span_started = now();
+                span_recover(&mut candidate, &ctx.ss, img, &matte);
+                count(17, now() - span_started);
             }
-            let span_started = now();
-            span_recover(&mut candidate, &ctx.ss, img, &matte);
-            count(17, now() - span_started);
         } else {
             recover(&mut candidate, &ctx.ss, img, &matte);
             continuity::refine(&mut candidate, img, &matte);
         }
         round(&mut candidate);
         let validation_started = now();
-        if !source_safe(&candidate, &old, img) {
-            apex_trace::component(100., &old, &candidate, now() - validation_started, None);
+        let legacy_safe = source_safe(&candidate, &old, img);
+        #[cfg(feature = "large_apex")]
+        let certified_safe = extended
+            .as_ref()
+            .is_some_and(|proof| proof.validate(&candidate, &old, img));
+        #[cfg(not(feature = "large_apex"))]
+        let certified_safe = false;
+        if !legacy_safe && !certified_safe {
+            apex_trace::component(
+                100.,
+                legacy_safe,
+                &old,
+                &candidate,
+                now() - validation_started,
+                None,
+            );
             count(10, 1.);
             continue;
         }
         if !self_clear(&candidate) {
-            apex_trace::component(104., &old, &candidate, now() - validation_started, None);
+            apex_trace::component(
+                104.,
+                legacy_safe,
+                &old,
+                &candidate,
+                now() - validation_started,
+                None,
+            );
             count(10, 1.);
             continue;
         }
@@ -560,7 +609,14 @@ pub fn document(doc: &mut VectorDoc, img: &ColorImage) {
             })
             .collect();
         if !crate::planar::replacement_clear(&G::Beziers(candidate.clone()), &others) {
-            apex_trace::component(101., &old, &candidate, now() - validation_started, None);
+            apex_trace::component(
+                101.,
+                legacy_safe,
+                &old,
+                &candidate,
+                now() - validation_started,
+                None,
+            );
             count(10, 1.);
             continue;
         }
@@ -571,7 +627,14 @@ pub fn document(doc: &mut VectorDoc, img: &ColorImage) {
                 .first()
                 .is_some_and(|p| crate::reduce::inside(&a, *p) != crate::reduce::inside(&b, *p))
         }) {
-            apex_trace::component(102., &old, &candidate, now() - validation_started, None);
+            apex_trace::component(
+                102.,
+                legacy_safe,
+                &old,
+                &candidate,
+                now() - validation_started,
+                None,
+            );
             count(10, 1.);
             continue;
         }
@@ -582,16 +645,29 @@ pub fn document(doc: &mut VectorDoc, img: &ColorImage) {
         if after.0 < before.0 && after.1 <= before.1 {
             apex_trace::component(
                 110.,
+                legacy_safe,
                 &old,
                 &candidate,
                 now() - validation_started,
                 Some((before, after)),
             );
+            #[cfg(feature = "large_apex")]
+            if extended.is_some() {
+                acute::large::committed(
+                    legacy_safe,
+                    &candidate,
+                    &old,
+                    now() - validation_started,
+                    before,
+                    after,
+                );
+            }
             doc.shapes[i].path.subpaths[j] = G::Beziers(candidate).into_closed_subpath();
             count(1, 1.);
         } else {
             apex_trace::component(
                 103.,
+                legacy_safe,
                 &old,
                 &candidate,
                 now() - validation_started,

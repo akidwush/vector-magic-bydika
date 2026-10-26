@@ -180,3 +180,10 @@ remain; this is not a universal visual-gapless claim.
 
 See [the shared-edge report](docs/STAGE_01_2_SHARED_EDGE_REPORT.md) for geometry,
 renderer, feature and runtime comparisons at 100%, 400% and 1000%.
+
+Stage 1.6F research adds an opt-in `large_apex` Cargo feature (implies
+`source_geometry`) for separately source-certified large apex corrections.
+Ordinary 3px/3.5px validation is retained and reported independently. This is
+experimental, does not change Auto or shared-edge composition, and is not enabled
+in normal WASM builds. The isolated research runner retains all historical gates
+and compares the extended contract against Stage 1.6E exports.

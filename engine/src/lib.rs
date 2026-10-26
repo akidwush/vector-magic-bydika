@@ -11,6 +11,11 @@ mod planar;
 #[cfg(any(test, feature = "source_geometry"))]
 mod recovery;
 mod reduce;
+#[cfg(feature = "large_apex")]
+#[wasm_bindgen]
+pub fn last_large_apex() -> Vec<f64> {
+    recovery::large_evidence()
+}
 #[cfg(feature = "source_geometry")]
 #[wasm_bindgen]
 pub fn last_recovery() -> Vec<f64> {

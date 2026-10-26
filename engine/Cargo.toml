@@ -15,3 +15,6 @@ lto = true
 experiments = []
 # Research-only source target solver; activation blocked by exported geometry gate.
 source_geometry = []
+
+# Independently certified large-motion experiment; ordinary source_geometry is unchanged.
+large_apex = ["source_geometry"]
