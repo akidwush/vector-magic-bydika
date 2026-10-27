@@ -1,17 +1,262 @@
 // Generated raw summaries stay in the isolated artifact directory, never git scores.
-import{readFile,writeFile}from'node:fs/promises';import{resolve}from'node:path';
-import{editability}from'./real-artwork-editability.mjs';
-const root=resolve(process.env.NEXORA_ART_ROOT),rows=(await readFile(root+'/analysis/measurements.jsonl','utf8')).trim().split('\n').map(JSON.parse),corpus=JSON.parse(await readFile('tests/fixtures/real-artwork/manifest.json')),conv=(await readFile(root+'/conversions.jsonl','utf8')).trim().split('\n').map(JSON.parse);
-for(const row of rows)row.evidenceRoot=root;
-if(process.env.NEXORA_ART_SUPPLEMENT){const supplemental=resolve(process.env.NEXORA_ART_SUPPLEMENT);const extra=(await readFile(supplemental+'/analysis/measurements.jsonl','utf8')).trim().split('\n').map(JSON.parse);for(const row of extra){row.evidenceRoot=supplemental;rows.push(row);}}
-for(const row of rows)if(row.status==='MEASURED'){Object.assign(row.complexity,editability(await readFile(row.evidenceRoot+'/'+row.export,'utf8')));const source=conv.find(c=>c.image===row.image&&c.config.id==='A-auto');row.sourceDiagnostics=source?.runs[0]?.perf.diagnostics??null;}
-await writeFile(root+'/enriched-measurements.jsonl',rows.map(r=>JSON.stringify(r)).join('\n')+'\n');
-const median=a=>a.length?[...a].sort((x,y)=>x-y)[Math.floor(a.length/2)]:null;
-const table=[];for(const category of new Set(rows.map(r=>r.category)))for(const config of new Set(rows.map(r=>r.config.id))){const rs=rows.filter(r=>r.category===category&&r.config.id===config&&r.status==='MEASURED');table.push({category,config,images:rs.length,medianMae:median(rs.map(r=>r.libvips.mae)),worstLocal:rs.length?Math.max(...rs.map(r=>r.libvips.worst[0].mae)):null,medianAnchors:median(rs.map(r=>r.complexity.anchors)),medianPaths:median(rs.map(r=>r.complexity.paths)),medianBytes:median(rs.map(r=>r.complexity.bytes)),firstMedianMs:median(rs.map(r=>r.runs[0].traceMs)),warmMedianMs:median(rs.map(r=>r.runs[1].traceMs)),flags:rs.flatMap(r=>r.flags).reduce((o,f)=>(o[f.code]=(o[f.code]??0)+1,o),{})});}
-const frequencies=[];for(const code of new Set(rows.flatMap(r=>(r.flags??[]).map(f=>f.code)))){const flagged=rows.filter(r=>r.flags?.some(f=>f.code===code));frequencies.push({code,images:new Set(flagged.map(r=>r.image)).size,families:new Set(flagged.map(r=>r.family)).size,productionFamilies:new Set(flagged.filter(r=>r.config.id==='A-auto').map(r=>r.family)).size,cases:flagged.length,evidence:flagged.sort((a,b)=>b.libvips.worst[0].mae-a.libvips.worst[0].mae).slice(0,8).map(r=>({id:r.id,split:r.split,crop:r.crops[0],localMae:r.libvips.worst[0].mae}))});}
-const improvements=corpus.images.map(item=>{const by=id=>rows.find(r=>r.image===item.id&&r.config.id===id);const a=by('A-auto'),c=by('C-geometry-f'),d=by('D-hotpath-h'),e=by('E-source-only');return{image:item.id,family:item.family,split:item.split,sourceEligible:c?.runs?.[0]?.refinement?.enabled??false,fEqualsH:c?.svgSHA256===d?.svgSHA256,autoEqualsF:a?.svgSHA256===c?.svgSHA256,sourceOnlyEqualsF:e?e.svgSHA256===c?.svgSHA256:null,maeE:e?.libvips?.mae,recoveryAccepted:c?.runs?.[0]?.recovery?.accepted??0,maeA:a?.libvips?.mae,maeC:c?.libvips?.mae,localA:a?.libvips?.worst[0]?.mae,localC:c?.libvips?.worst[0]?.mae,boundaryMaxA:a?.boundary?.max,boundaryMaxC:c?.boundary?.max};});
-const summary={status:rows.every(r=>r.status==='MEASURED')?'MEASURED':'PARTIAL',baseline:corpus.baseline,images:corpus.images.length,families:new Set(corpus.images.map(r=>r.family)).size,holdout:corpus.images.filter(r=>r.split==='holdout').length,table,frequencies,improvements,worst:rows.filter(r=>r.status==='MEASURED').sort((a,b)=>b.libvips.worst[0].mae-a.libvips.worst[0].mae).slice(0,20).map(r=>({id:r.id,global:r.libvips.mae,local:r.libvips.worst[0].mae,crop:r.crops[0]})),unsupported:rows.filter(r=>r.status!=='MEASURED'||r.boundary?.status==='UNSUPPORTED').map(r=>({id:r.id,status:r.status,boundary:r.boundary,error:r.error})),identityFailures:improvements.filter(r=>!r.fEqualsH),inkscape:rows.filter(r=>r.inkscape).map(r=>({id:r.id,...r.inkscape})),policy:'Family frequency and per-category distributions, not one quality score. Flags remain suspected. No threshold fitting on holdout. Android UNVERIFIED.'};
-await writeFile(root+'/report-summary.json',JSON.stringify(summary,null,2));
-let md='# Stage 1.7A raw per-image observations\n\nNumeric facts, not universal quality PASS labels. Separate renderer and ground-truth limits apply.\n\n| Image/config | split | RGBA MAE | worst tile | alpha MAE | anchors | paths | bytes | sampled silhouette max | first/warm ms |\n| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |\n';
-for(const r of rows){if(r.status!=='MEASURED'){md+=`| ${r.id} | ${r.split} | ${r.status}: ${r.error??''} | | | | | | | |\n`;continue;}const f=x=>Number.isFinite(x)?x.toFixed(3):'N/A';md+=`| ${r.id} | ${r.split} | ${f(r.libvips.mae)} | ${f(r.libvips.worst[0].mae)} | ${f(r.libvips.alphaMae)} | ${r.complexity.anchors} | ${r.complexity.paths} | ${r.complexity.bytes} | ${f(r.boundary.max)} | ${f(r.runs[0].traceMs)} / ${f(r.runs[1].traceMs)} |\n`;}
-await writeFile(root+'/per-image-report.md',md);console.log({status:summary.status,rows:rows.length,identityFailures:summary.identityFailures.length,unsupported:summary.unsupported.length});if(summary.status==='PARTIAL'||summary.identityFailures.length)process.exitCode=1;
+import { readFile, writeFile } from "node:fs/promises";
+import { resolve } from "node:path";
+import { editability } from "./real-artwork-editability.mjs";
+const root = resolve(process.env.NEXORA_ART_ROOT),
+  rows = (await readFile(root + "/analysis/measurements.jsonl", "utf8"))
+    .trim()
+    .split("\n")
+    .map(JSON.parse),
+  corpus = JSON.parse(
+    await readFile("tests/fixtures/real-artwork/manifest.json"),
+  ),
+  conv = (await readFile(root + "/conversions.jsonl", "utf8"))
+    .trim()
+    .split("\n")
+    .map(JSON.parse);
+for (const row of rows) row.evidenceRoot = root;
+if (process.env.NEXORA_ART_SUPPLEMENT) {
+  const supplemental = resolve(process.env.NEXORA_ART_SUPPLEMENT);
+  const extra = (
+    await readFile(supplemental + "/analysis/measurements.jsonl", "utf8")
+  )
+    .trim()
+    .split("\n")
+    .map(JSON.parse);
+  for (const row of extra) {
+    row.evidenceRoot = supplemental;
+    rows.push(row);
+  }
+}
+for (const row of rows)
+  if (row.status === "MEASURED") {
+    Object.assign(
+      row.complexity,
+      editability(await readFile(row.evidenceRoot + "/" + row.export, "utf8")),
+    );
+    const source = conv.find(
+      (c) => c.image === row.image && c.config.id === "A-auto",
+    );
+    row.sourceDiagnostics = source?.runs[0]?.perf.diagnostics ?? null;
+  }
+if (process.env.NEXORA_ART_GEOMETRY_REVIEW) {
+  const reviewed = (
+    await readFile(
+      process.env.NEXORA_ART_GEOMETRY_REVIEW + "/geometry.jsonl",
+      "utf8",
+    )
+  )
+    .trim()
+    .split("\n")
+    .map(JSON.parse);
+  for (const update of reviewed) {
+    const r = rows.find((r) => r.id === update.id);
+    if (!r || r.svgSHA256 !== update.svgSHA256)
+      throw Error("Geometry review export identity mismatch");
+    r.boundary = update.boundary;
+  }
+}
+const sourceDesigns = new Map();
+for (const item of corpus.images)
+  if (item.reference) {
+    const svg = await readFile(
+      "tests/fixtures/real-artwork/" + item.reference,
+      "utf8",
+    );
+    sourceDesigns.set(item.id, {
+      geometryElements: (
+        svg.match(/<(?:path|circle|ellipse|rect|polygon|polyline|line)\b/g) ||
+        []
+      ).length,
+      pathElements: (svg.match(/<path\b/g) || []).length,
+      bytes: Buffer.byteLength(svg),
+      definition:
+        "Original design elements, not equivalent to flattened painted regions or an optimal-node claim.",
+    });
+  }
+const same = new Map(),
+  metricConsistency = [];
+for (const row of rows)
+  if (row.status === "MEASURED") {
+    row.sourceDesign = sourceDesigns.get(row.image) ?? null;
+    const k = row.image + "/" + row.svgSHA256;
+    const values = [
+      row.libvips.mae,
+      row.libvips.alphaMae,
+      row.chromium.mae,
+      row.complexity.anchors,
+    ];
+    if (same.has(k) && JSON.stringify(same.get(k)) !== JSON.stringify(values))
+      metricConsistency.push(row.id);
+    else same.set(k, values);
+  }
+const reportRoot = resolve(process.env.NEXORA_ART_REPORT_ROOT ?? root);
+if (reportRoot !== root)
+  await (await import("node:fs/promises")).mkdir(reportRoot);
+await writeFile(
+  reportRoot + "/enriched-measurements.jsonl",
+  rows.map((r) => JSON.stringify(r)).join("\n") + "\n",
+);
+const median = (a) =>
+  a.length ? [...a].sort((x, y) => x - y)[Math.floor(a.length / 2)] : null;
+const table = [];
+for (const category of new Set(rows.map((r) => r.category)))
+  for (const config of new Set(rows.map((r) => r.config.id))) {
+    const rs = rows.filter(
+      (r) =>
+        r.category === category &&
+        r.config.id === config &&
+        r.status === "MEASURED",
+    );
+    table.push({
+      category,
+      config,
+      images: rs.length,
+      medianMae: median(rs.map((r) => r.libvips.mae)),
+      worstLocal: rs.length
+        ? Math.max(...rs.map((r) => r.libvips.worst[0].mae))
+        : null,
+      medianAnchors: median(rs.map((r) => r.complexity.anchors)),
+      medianPaths: median(rs.map((r) => r.complexity.paths)),
+      medianBytes: median(rs.map((r) => r.complexity.bytes)),
+      firstMedianMs: median(rs.map((r) => r.runs[0].traceMs)),
+      warmMedianMs: median(rs.map((r) => r.runs[1].traceMs)),
+      flags: rs
+        .flatMap((r) => r.flags)
+        .reduce((o, f) => ((o[f.code] = (o[f.code] ?? 0) + 1), o), {}),
+    });
+  }
+const frequencies = [];
+for (const code of new Set(
+  rows.flatMap((r) => (r.flags ?? []).map((f) => f.code)),
+)) {
+  const flagged = rows.filter((r) => r.flags?.some((f) => f.code === code));
+  frequencies.push({
+    code,
+    images: new Set(flagged.map((r) => r.image)).size,
+    families: new Set(flagged.map((r) => r.family)).size,
+    productionFamilies: new Set(
+      flagged.filter((r) => r.config.id === "A-auto").map((r) => r.family),
+    ).size,
+    cases: flagged.length,
+    evidence: flagged
+      .sort((a, b) => b.libvips.worst[0].mae - a.libvips.worst[0].mae)
+      .slice(0, 8)
+      .map((r) => ({
+        id: r.id,
+        split: r.split,
+        crop: r.crops[0],
+        localMae: r.libvips.worst[0].mae,
+      })),
+  });
+}
+const improvements = corpus.images.map((item) => {
+  const by = (id) =>
+    rows.find((r) => r.image === item.id && r.config.id === id);
+  const a = by("A-auto"),
+    c = by("C-geometry-f"),
+    d = by("D-hotpath-h"),
+    e = by("E-source-only");
+  return {
+    image: item.id,
+    family: item.family,
+    split: item.split,
+    sourceEligible: c?.runs?.[0]?.refinement?.enabled ?? false,
+    fEqualsH: c && d ? c.svgSHA256 === d.svgSHA256 : null,
+    autoEqualsF: a && c ? a.svgSHA256 === c.svgSHA256 : null,
+    sourceOnlyEqualsF: e ? e.svgSHA256 === c?.svgSHA256 : null,
+    maeE: e?.libvips?.mae,
+    recoveryAccepted: c?.runs?.[0]?.recovery?.accepted ?? 0,
+    maeA: a?.libvips?.mae,
+    maeC: c?.libvips?.mae,
+    localA: a?.libvips?.worst[0]?.mae,
+    localC: c?.libvips?.worst[0]?.mae,
+    boundaryMaxA: a?.boundary?.max,
+    boundaryMaxC: c?.boundary?.max,
+  };
+});
+const coreConfigs = [
+  "A-auto",
+  "B-vtracer-legacy",
+  "C-geometry-f",
+  "D-hotpath-h",
+];
+const missingComparisons = corpus.images.flatMap((item) =>
+  coreConfigs
+    .filter(
+      (id) =>
+        !rows.some(
+          (r) =>
+            r.image === item.id &&
+            r.config.id === id &&
+            r.status === "MEASURED",
+        ),
+    )
+    .map((config) => ({ image: item.id, config })),
+);
+const summary = {
+  missingComparisons,
+  metricConsistencyFailures: metricConsistency,
+  status:
+    rows.every((r) => r.status === "MEASURED") &&
+    !metricConsistency.length &&
+    !missingComparisons.length
+      ? "MEASURED"
+      : "PARTIAL",
+  baseline: corpus.baseline,
+  images: corpus.images.length,
+  families: new Set(corpus.images.map((r) => r.family)).size,
+  holdout: corpus.images.filter((r) => r.split === "holdout").length,
+  table,
+  frequencies,
+  improvements,
+  worst: rows
+    .filter((r) => r.status === "MEASURED")
+    .sort((a, b) => b.libvips.worst[0].mae - a.libvips.worst[0].mae)
+    .slice(0, 20)
+    .map((r) => ({
+      id: r.id,
+      global: r.libvips.mae,
+      local: r.libvips.worst[0].mae,
+      crop: r.crops[0],
+    })),
+  unsupported: rows
+    .filter(
+      (r) => r.status !== "MEASURED" || r.boundary?.status === "UNSUPPORTED",
+    )
+    .map((r) => ({
+      id: r.id,
+      status: r.status,
+      boundary: r.boundary,
+      error: r.error,
+    })),
+  identityFailures: improvements.filter((r) => r.fEqualsH === false),
+  inkscape: rows
+    .filter((r) => r.inkscape)
+    .map((r) => ({ id: r.id, ...r.inkscape })),
+  policy:
+    "Family frequency and per-category distributions, not one quality score. Flags remain suspected. No threshold fitting on holdout. Android UNVERIFIED.",
+};
+await writeFile(
+  reportRoot + "/report-summary.json",
+  JSON.stringify(summary, null, 2),
+);
+let md =
+  "# Stage 1.7A raw per-image observations\n\nNumeric facts, not universal quality PASS labels. Separate renderer and ground-truth limits apply.\n\n| Image/config | split | RGBA MAE | worst tile | alpha MAE | anchors | paths | bytes | sampled silhouette max | first/warm ms |\n| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |\n";
+for (const r of rows) {
+  if (r.status !== "MEASURED") {
+    md += `| ${r.id} | ${r.split} | ${r.status}: ${r.error ?? ""} | | | | | | | |\n`;
+    continue;
+  }
+  const f = (x) => (Number.isFinite(x) ? x.toFixed(3) : "N/A");
+  md += `| ${r.id} | ${r.split} | ${f(r.libvips.mae)} | ${f(r.libvips.worst[0].mae)} | ${f(r.libvips.alphaMae)} | ${r.complexity.anchors} | ${r.complexity.paths} | ${r.complexity.bytes} | ${f(r.boundary.max)} | ${f(r.runs[0].traceMs)} / ${f(r.runs[1].traceMs)} |\n`;
+}
+await writeFile(reportRoot + "/per-image-report.md", md);
+console.log({
+  status: summary.status,
+  rows: rows.length,
+  identityFailures: summary.identityFailures.length,
+  unsupported: summary.unsupported.length,
+});
+if (summary.status === "PARTIAL" || summary.identityFailures.length)
+  process.exitCode = 1;
