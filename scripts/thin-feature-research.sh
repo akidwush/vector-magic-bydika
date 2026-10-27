@@ -42,6 +42,7 @@ record candidate-worker env NEXORA_THIN_CANDIDATE_ID=thin-negative NEXORA_THIN_M
 record historical env NEXORA_RESEARCH_STAGE=stage17b NEXORA_INVERSE_HOTPATH=1 NEXORA_PROOF_DIR="$root/historical" bash scripts/source-target-research.sh
 record protected env NEXORA_PROOF_DIR="$root/protected" bash scripts/inverse-hotpath-proof.sh
 record enabled env NEXORA_THIN_MODE=4 NEXORA_THIN_ENABLED="$root/enabled" NEXORA_THIN_F_BASELINE="$root/protected/F" bash scripts/thin-feature-enabled.sh
+record experimental-browser env NEXORA_THIN_BROWSER="$root/experimental-browser" NEXORA_THIN_BROWSER_MODULE="$root/enabled/candidate" bash scripts/thin-feature-browser.sh
 record visuals env NEXORA_THIN_CANDIDATE_ID=thin-negative NEXORA_THIN_EVALUATION="$root/evaluation" NEXORA_ART_FIXTURES="$root/corpus" node scripts/thin-feature-visuals.mjs
 record review env NEXORA_THIN_STRICT_SOURCE=1 NEXORA_THIN_CANDIDATE_ID=thin-negative NEXORA_THIN_EXPECT_IMAGES=39 NEXORA_THIN_EXPECT_CONFIGS=4 NEXORA_THIN_EVALUATION="$root/evaluation" node scripts/thin-feature-review.mjs
 record final-wasm bash scripts/build-wasm.sh
