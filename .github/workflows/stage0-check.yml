@@ -174,10 +174,19 @@ jobs:
           NEXORA_CROSS_BUILDS: benchmark-results/stage16j/modules
           NEXORA_LEGACY_ROOT: benchmark-results/stage16j/legacy-primary
         run: node scripts/runtime-legacy-cpu-forensics.mjs
+      - name: Bounded one-factor compiler-tier investigation
+        env:
+          NEXORA_CROSS_BUILDS: benchmark-results/stage16j/modules
+          NEXORA_TIER_ROOT: benchmark-results/stage16j/tier-isolation
+        run: bash scripts/runtime-legacy-tier-isolation.sh
       - name: Extended counters (distinct diagnostic binaries)
         run: |
           NEXORA_LEGACY_BUILDS=benchmark-results/stage16j/diagnostic-modules bash scripts/runtime-legacy-diagnostic-builds.sh
           NEXORA_CROSS_BUILDS=benchmark-results/stage16j/diagnostic-modules NEXORA_LEGACY_MODULES=diagnostic-reference,diagnostic-hotpath NEXORA_LEGACY_ROOT=benchmark-results/stage16j/legacy-diagnostic NEXORA_LEGACY_SESSIONS=2 NEXORA_LEGACY_DETAIL=1 node scripts/runtime-legacy-cpu-forensics.mjs
+      - name: Derive per-call stack and work summaries
+        run: |
+          NEXORA_LEGACY_ROOT=benchmark-results/stage16j/legacy-primary node scripts/runtime-legacy-analysis.mjs
+          NEXORA_LEGACY_ROOT=benchmark-results/stage16j/legacy-diagnostic node scripts/runtime-legacy-analysis.mjs
       - name: Download control on normal production build
         run: |
           bash scripts/build-wasm.sh

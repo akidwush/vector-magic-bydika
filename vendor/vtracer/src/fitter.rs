@@ -116,8 +116,15 @@ impl CurveFitter for SplineFitter {
 /// holes already punched) is split into connected sub-clusters, each traced
 /// independently, then offset into document space.
 fn trace_region(mask: &RegionMask, mode: PathSimplifyMode, params: FitParams) -> Vec<FittedGeom> {
+    #[cfg(feature = "runtime_work")]
+    {
+        crate::runtime_work::count(4, 1);
+        crate::runtime_work::count(5, (mask.width() * mask.height()) as u64);
+    }
     let mut geoms = Vec::new();
     for sub in mask.image.to_clusters(false).iter() {
+        #[cfg(feature = "runtime_work")]
+        crate::runtime_work::count(6, 1);
         let offset = PointI32 {
             x: mask.offset.x + sub.rect.left,
             y: mask.offset.y + sub.rect.top,

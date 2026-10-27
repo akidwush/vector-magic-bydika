@@ -78,6 +78,7 @@ export function cpuBounds(samples, start, end) {
     cpuUpperMs: delta(pre, post, "cpuNs"),
     waitLowerMs: first && last ? delta(first, last, "waitNs") : 0,
     waitUpperMs: delta(pre, post, "waitNs"),
+    runPeriodsUpperDelta: pre && post ? post.runs - pre.runs : null,
     insideSamples: inside.length,
     beforeUs: pre?.hiUs ?? null,
     afterUs: post?.loUs ?? null,
