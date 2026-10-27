@@ -94,3 +94,18 @@ A negative-space raster component is not automatically an SVG compound hole.
 If held-out results disappoint, report the limitation or reject the candidate;
 do not tune its thresholds against held-out SVG coordinates. A later independent
 algorithm change requires a new untouched validation family.
+
+## Post-validation rejection and negative-only subset
+
+Mode 3 remains reproducible as the rejected full-model experiment. Four of seven
+clean-garden ridge patches worsen local RGB after ordinary fitting/palette even
+though total image MAE improves. Source ridge support alone is insufficient to
+certify final painted geometry. No old gate is changed or that result relabelled.
+
+Mode 4 uses exactly the existing enclosed-background certificate and bounds,
+with ridge overrides disabled. It changes no thresholds, palette budget, legacy
+successful decision or downstream geometry contract. Selection occurred after
+mode-3 validation, so the prior validation corpus is not claimed as untouched
+for mode 4. The new orbital-badge family is held aside until this implementation
+is committed. Candidate comparisons and final local RGB/geometry checks must be
+repeated; mode 3 results cannot stand in for mode 4 evidence.

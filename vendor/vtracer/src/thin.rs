@@ -51,7 +51,8 @@ pub fn configure(mode: u32, capture: bool) {
 pub fn active() -> bool {
     STATE.with(|s| {
         let s = s.borrow();
-        s.capture || ((s.mode == 2 || s.mode == 3) && s.eligible && s.source.is_some())
+        s.capture
+            || ((s.mode == 2 || s.mode == 3 || s.mode == 4) && s.eligible && s.source.is_some())
     })
 }
 pub fn mode() -> u32 {
@@ -324,7 +325,7 @@ pub fn deepen(
     STATE.with(|s| s.borrow_mut().evaluated += 1);
     let inspect = STATE.with(|s| {
         let s = s.borrow();
-        s.mode == 3
+        (s.mode == 3 || s.mode == 4)
             && s.eligible
             && s.protected < 64
             && s.charged_pixels.saturating_add(p.area()) <= 1_000_000
@@ -340,9 +341,17 @@ pub fn deepen(
     {
         STATE.with(|s| {
             let s = s.borrow();
-            s.source
-                .as_ref()
-                .and_then(|img| evidence(img, p, view, ns, negative_budget, &mut negative_work))
+            s.source.as_ref().and_then(|img| {
+                evidence(
+                    img,
+                    p,
+                    view,
+                    ns,
+                    negative_budget,
+                    s.mode == 4,
+                    &mut negative_work,
+                )
+            })
         })
     } else {
         None
@@ -430,6 +439,7 @@ fn evidence(
     view: &ClustersView<'_>,
     ns: &[NeighbourInfo],
     negative_budget: bool,
+    negative_only: bool,
     negative_work: &mut [usize; 3],
 ) -> Option<Evidence> {
     if p.rect.left < 3
@@ -505,7 +515,7 @@ fn evidence(
         }
     }
     let long = p.rect.width().max(p.rect.height()) >= 8;
-    if long && ridge >= 0.55 && ridges >= 6 {
+    if !negative_only && long && ridge >= 0.55 && ridges >= 6 {
         return Some(Evidence {
             reason: "multiscale-ridge",
             stable,
@@ -700,6 +710,41 @@ mod tests {
         let result = STATE.with(|s| s.borrow().frames.last().unwrap().rgba.clone());
         drop(guard);
         result
+    }
+    #[test]
+    fn negative_only_ablation_does_not_promote_colored_ridges() {
+        let line = raster(40, 24, |x, y| {
+            if y == 12 && (6..34).contains(&x) {
+                48
+            } else {
+                255
+            }
+        });
+        assert_eq!(visible(&line, 0), visible(&line, 4));
+        let gap = raster(40, 32, |x, y| {
+            if (5..35).contains(&x)
+                && (5..27).contains(&y)
+                && !((12..28).contains(&x) && (15..17).contains(&y))
+            {
+                30
+            } else {
+                255
+            }
+        });
+        let old = visible(&gap, 0);
+        let new = visible(&gap, 4);
+        let i = (15 * 40 + 20) * 4;
+        assert!(old[i] < 100, "legacy absorption should fill the source gap");
+        assert!(
+            new[i] > 245,
+            "certified negative gap survives without ridge protection"
+        );
+        STATE.with(|s| {
+            let s = s.borrow();
+            assert!(s.protected <= 64);
+            assert!(s.source.is_none());
+            assert!(s.negative_paints.is_empty());
+        });
     }
     #[test]
     fn coherent_ridge_survives_without_retaining_one_sided_aa_band() {

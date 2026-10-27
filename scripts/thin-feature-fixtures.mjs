@@ -29,6 +29,16 @@ const designs = {
     ),
   },
 };
+// Added only after rejecting the full ridge model. No candidate outcomes were
+// inspected on this independent design before the negative-only rules were frozen.
+designs["orbital-badge"] = {
+  split: "holdout",
+  background: [246, 244, 238],
+  validationEpoch: "negative-only-post-selection",
+  svg: svg(
+    '<rect width="128" height="128" fill="#f6f4ee"/><circle cx="64" cy="64" r="49" fill="#294957"/><circle cx="64" cy="64" r="34" fill="#658991"/><path d="M64 19l6 10-6 5-6-5zM104 62l7 6-9 5zM21 73l10 2-5 8z" fill="#c87950"/><path d="M30 47h27v2H30z" fill="#f6f4ee"/><rect x="71" y="79" width="26" height="2" transform="rotate(-28 84 80)" fill="#f6f4ee"/><path d="M46 91q18 15 36-1" fill="none" stroke="#294957" stroke-width="4"/>',
+  ),
+};
 const images = [];
 for (const [family, d] of Object.entries(designs)) {
   const reference = "references/" + family + ".svg";
@@ -52,6 +62,7 @@ for (const [family, d] of Object.entries(designs)) {
       splitGroup: family,
       split: d.split,
       category: "thin-feature-generalization",
+      validationEpoch: d.validationEpoch ?? "full-model-frozen",
       width,
       height: width,
       image,
@@ -66,7 +77,8 @@ for (const [family, d] of Object.entries(designs)) {
       sourceURL: "scripts/thin-feature-fixtures.mjs",
       preset: "illustration",
       background:
-        family === "ribbon-garden" ? [247, 245, 237] : [255, 255, 255],
+        d.background ??
+        (family === "ribbon-garden" ? [247, 245, 237] : [255, 255, 255]),
       maskApplicable: true,
       rois: [],
       cornerReference: null,
@@ -79,10 +91,10 @@ await writeFile(
   root + "/manifest.json",
   JSON.stringify(
     {
-      schema: 1,
+      schema: 2,
       base: "ca3871e14ca633aad09503e78681631348d71b75",
       policy:
-        "Only circuit-ribbon is development. Stencil-kite and ribbon-garden are frozen unseen families; do not inspect candidate outcomes until implementation thresholds are frozen. Existing 1.7A holdout assignments retained.",
+        "Original split labels retained. Full mode 3 was frozen before stencil/ribbon validation. Negative-only mode 4 was selected after source-RGB rejection of full-mode ridges; only orbital-badge is untouched post-selection validation for mode 4. No reference reaches either solver.",
       images,
     },
     null,

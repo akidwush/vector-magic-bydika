@@ -16,3 +16,10 @@ The Stage 1.7A manifest remains unchanged. Its small-symbols and garden families
 remain validation-only even though the Stage 1.7B task names them as primary
 repair targets. They can diagnose a failure class and test frozen rules, but must
 not become hidden threshold-tuning cases.
+
+The later `orbital-badge` CC0 family is a separate post-selection validation epoch.
+The full ridge+negative model was rejected after its original holdout/local RGB
+review. Mode 4 selects only the unchanged enclosed-background certificate. Old
+split labels remain provenance, but are not described as untouched evaluation of
+that selected subset. Orbital-badge outcomes must not be read before committing
+mode 4; any subsequent tuning would need another untouched family.

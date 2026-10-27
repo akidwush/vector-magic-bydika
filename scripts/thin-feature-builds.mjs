@@ -16,6 +16,7 @@ const variants = [
   ["thin-precision", 1],
   ["thin-thread", 2],
   ["thin-structural", 3],
+  ["thin-negative", 4],
 ];
 for (const [name, mode] of variants) {
   const dir = root + "/" + name;

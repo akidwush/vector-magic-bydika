@@ -13,8 +13,11 @@ const rows = (await readFile(root + "/analysis/measurements.jsonl", "utf8"))
 const ids = [...new Set(rows.map((r) => r.image))],
   failures = [],
   pairs = [];
-if (ids.length !== 37 || rows.length !== 111)
-  failures.push("37 images / 111 measured outputs required");
+const expectedImages = Number(process.env.NEXORA_THIN_EXPECT_IMAGES ?? 37);
+if (ids.length !== expectedImages || rows.length !== 3 * expectedImages)
+  failures.push(
+    `${expectedImages} images / ${3 * expectedImages} measured outputs required`,
+  );
 const negatives = new Set([
   "original-anime-512-webp",
   "original-anime-128-jpeg",
@@ -24,7 +27,12 @@ const negatives = new Set([
 for (const id of ids) {
   const b = rows.find((r) => r.image === id && r.config.id === "A-auto"),
     o = rows.find((r) => r.image === id && r.config.id === "thin-observe"),
-    c = rows.find((r) => r.image === id && r.config.id === "thin-structural");
+    c = rows.find(
+      (r) =>
+        r.image === id &&
+        r.config.id ===
+          (process.env.NEXORA_THIN_CANDIDATE_ID ?? "thin-structural"),
+    );
   if (!b || !o || !c) {
     failures.push(id + " missing comparison");
     continue;

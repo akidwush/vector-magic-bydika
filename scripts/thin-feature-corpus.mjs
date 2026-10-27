@@ -25,7 +25,7 @@ const m = {
   ),
   images: [...one.images, ...two.images],
   policy:
-    "Existing Stage 1.7A split unchanged; new circuit-ribbon is development. Existing symbols/garden and new stencil/ribbon families remain validation-only. Reference SVGs are evaluator inputs only.",
+    "Original split labels retained as provenance. Mode 3 full-model validation predates negative-only model selection. Orbital-badge is the untouched post-selection mode-4 family; old holdout results are not claimed as unseen for the selected subset. References are offline only.",
 };
 await writeFile(root + "/manifest.json", JSON.stringify(m, null, 2));
 console.log({ images: m.images.length });
