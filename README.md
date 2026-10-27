@@ -210,3 +210,20 @@ report for later workflow status and the unverified physical Android procedure.
 ### Stage 1.6H research — inverse hot path
 
 The opt-in `inverse_hotpath` feature preserves all 45 Stage F SVG exports byte for byte. Ordered row constants, stack clamp knots and exact local flatten reuse reduce redundant CPU work. Wave 512/1024 improve in all three paired Worker sessions; Cubic and small-input latency remain mixed. **PARTIAL:** the local historical runner fails its unchanged sharp-apex +500ms gate on a clipped 1024px blade, and the separate H/E runtime gate fails six cases. No global activation or merge. See [measured results and retained failures](docs/STAGE_01_6H_INVERSE_HOTPATH_REPORT.md).
+
+### Stage 1.7A research — real artwork quality
+
+The [licensed corpus](tests/fixtures/real-artwork/README.md) contains 31 images in
+17 independent design groups. Five configurations produce 335 actual browser SVG
+downloads, independently measured in Chromium and libvips. The
+[quality report](docs/STAGE_01_7A_REAL_ARTWORK_QUALITY_REPORT.md) includes editable
+SVG exports, 100/400/1000% comparisons, local error and node/path measurements.
+Thin details, typography counters, low-contrast regions and lossy-image
+fragmentation remain substantial failures. The proposed next target is
+source-supported detail and negative-space preservation during region construction.
+
+**PARTIAL:** protected geometry remains unchanged and the independent CI passed,
+but an unchanged historical runtime gate still fails locally. Neither experimental
+recovery nor hot-path features are enabled globally. Physical Android and manual
+GUI editing remain unverified. Run the isolated evaluation with
+`bash scripts/real-artwork-research.sh`; raw observations stay in CI artifacts.

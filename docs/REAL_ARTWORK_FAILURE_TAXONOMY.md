@@ -39,7 +39,9 @@ components. The white-background mask uses maximum RGB distance >8 from the
 specified background and alpha >=128. IoU is unavailable for the natural raster
 city screenshot. No true-vector metrics are assigned to raster-only rows.
 
-Ranks in the Stage 1.7A report use affected **families**, not multiple sizes of one
-artwork as independent votes. Severity and proposed engineering cause require
+Ranks in the Stage 1.7A report use affected **independent design groups**, not
+multiple sizes or sibling portraits from one template as independent votes.
+The original family split and its metadata-only correction remain auditable.
+Severity and proposed engineering cause require
 visual review. Holdout is descriptive evaluation only; do not adjust thresholds
 or engine eligibility based on its outcomes.
