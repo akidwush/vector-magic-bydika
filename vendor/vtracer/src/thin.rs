@@ -442,6 +442,12 @@ fn evidence(
     negative_only: bool,
     negative_work: &mut [usize; 3],
 ) -> Option<Evidence> {
+    // A compact 2x2 source core alone cannot distinguish a true counter from a
+    // compression speckle. The selected subset requires extended support; the
+    // rejected full model remains unchanged for reproducible ablation.
+    if negative_only && p.rect.width().max(p.rect.height()) < 8 {
+        return None;
+    }
     if p.rect.left < 3
         || p.rect.top < 3
         || p.rect.right + 3 >= img.width as i32
@@ -745,6 +751,22 @@ mod tests {
             assert!(s.source.is_none());
             assert!(s.negative_paints.is_empty());
         });
+    }
+    #[test]
+    fn selected_subset_keeps_compact_ambiguous_counters_at_baseline() {
+        let ambiguous = raster(32, 28, |x, y| {
+            if (6..26).contains(&x)
+                && (6..22).contains(&y)
+                && !((15..17).contains(&x) && (13..15).contains(&y))
+            {
+                30
+            } else {
+                255
+            }
+        });
+        // These same four source pixels could be an intentional counter or a
+        // speckle. Source-only compact support cannot resolve that distinction.
+        assert_eq!(visible(&ambiguous, 0), visible(&ambiguous, 4));
     }
     #[test]
     fn coherent_ridge_survives_without_retaining_one_sided_aa_band() {

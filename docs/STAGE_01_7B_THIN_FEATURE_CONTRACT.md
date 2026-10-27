@@ -109,3 +109,11 @@ mode-3 validation, so the prior validation corpus is not claimed as untouched
 for mode 4. The new orbital-badge family is held aside until this implementation
 is committed. Candidate comparisons and final local RGB/geometry checks must be
 repeated; mode 3 results cannot stand in for mode 4 evidence.
+
+Before any mode-4 export or orbital-badge outcome is inspected, the selected
+subset additionally requires patch extent ≥8px (the existing coherent-support
+length, not a global minimum-area change). A compact pure-background 2×2 patch
+could equally be a true counter or a compression speckle; the raster alone cannot
+certify intent. Mode 4 retains the baseline on that ambiguity. Mode 3's compact
+counter ablation remains unchanged. Tests cover both this rejection and retention
+of a genuinely extended 2px gap. The new family remains untouched at this freeze.
