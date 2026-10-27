@@ -170,6 +170,18 @@ try {
     const same = hash(Buffer.from(result.svg)) === baseline.runs[0].svgSHA256;
     if (Number(process.env.NEXORA_THIN_MODE ?? 0) === 0 && !same)
       throw Error("Diagnostics changed exported baseline " + id);
+    const wanted = process.env.NEXORA_THIN_CANDIDATE_ID;
+    if (wanted) {
+      const exported = old.find(
+        (r) => r.image === id && r.config.id === wanted,
+      );
+      if (
+        !exported ||
+        hash(Buffer.from(result.svg)) !== exported.runs[0].svgSHA256
+      )
+        throw Error("Diagnostic candidate differs from actual download " + id);
+    }
+
     await writeFile(root + "/exports/" + id + ".svg", result.svg);
     const input = await sharp(source).ensureAlpha().raw().toBuffer();
     const observations = [];

@@ -31,9 +31,9 @@ record ablation env NEXORA_ART_ROOT="$root/ablation" NEXORA_ART_FIXTURES="$root/
 record ablation-analysis env NEXORA_ART_ROOT="$root/ablation" NEXORA_ART_FIXTURES="$root/corpus" node scripts/real-artwork-analyze.mjs
 record diagnosis env NEXORA_THIN_DIAG_ROOT="$root/diagnosis" NEXORA_THIN_MODULE="$root/modules/research" NEXORA_THIN_BASELINE_RUN="$root/evaluation" node scripts/thin-feature-diagnose.mjs
 record lifecycle env NEXORA_THIN_DIAG_ROOT="$root/diagnosis" node scripts/thin-feature-lifecycle.mjs
-record full-diagnosis env NEXORA_THIN_MODE=3 NEXORA_THIN_DIAG_ROOT="$root/full-diagnosis" NEXORA_THIN_MODULE="$root/modules/research" NEXORA_THIN_BASELINE_RUN="$root/evaluation" node scripts/thin-feature-diagnose.mjs
+record full-diagnosis env NEXORA_THIN_CANDIDATE_ID=thin-structural NEXORA_THIN_MODE=3 NEXORA_THIN_DIAG_ROOT="$root/full-diagnosis" NEXORA_THIN_MODULE="$root/modules/research" NEXORA_THIN_BASELINE_RUN="$root/evaluation" node scripts/thin-feature-diagnose.mjs
 record full-lifecycle env NEXORA_THIN_DIAG_ROOT="$root/full-diagnosis" node scripts/thin-feature-lifecycle.mjs
-record candidate-diagnosis env NEXORA_THIN_MODE=4 NEXORA_THIN_DIAG_ROOT="$root/candidate-diagnosis" NEXORA_THIN_MODULE="$root/modules/research" NEXORA_THIN_BASELINE_RUN="$root/evaluation" node scripts/thin-feature-diagnose.mjs
+record candidate-diagnosis env NEXORA_THIN_CANDIDATE_ID=thin-negative NEXORA_THIN_MODE=4 NEXORA_THIN_DIAG_ROOT="$root/candidate-diagnosis" NEXORA_THIN_MODULE="$root/modules/research" NEXORA_THIN_BASELINE_RUN="$root/evaluation" node scripts/thin-feature-diagnose.mjs
 record candidate-lifecycle env NEXORA_THIN_DIAG_ROOT="$root/candidate-diagnosis" node scripts/thin-feature-lifecycle.mjs
 record full-local env NEXORA_THIN_EVALUATION="$root/evaluation" NEXORA_ART_FIXTURES="$root/corpus" NEXORA_THIN_LOCAL_DIAG_ROOT="$root/full-diagnosis" node scripts/thin-feature-local-proof.mjs
 record candidate-local env NEXORA_THIN_LOCAL_STRICT=1 NEXORA_THIN_CANDIDATE_ID=thin-negative NEXORA_THIN_EVALUATION="$root/evaluation" NEXORA_ART_FIXTURES="$root/corpus" NEXORA_THIN_LOCAL_DIAG_ROOT="$root/candidate-diagnosis" node scripts/thin-feature-local-proof.mjs
