@@ -2,7 +2,8 @@
 import { mkdir, writeFile, readFile } from "node:fs/promises";
 import sharp from "sharp";
 import { createHash } from "node:crypto";
-const root = "tests/fixtures/thin-feature";
+const root =
+  process.env.NEXORA_THIN_REGEN_ROOT ?? "tests/fixtures/thin-feature";
 await mkdir(root + "/references", { recursive: true });
 await mkdir(root + "/images", { recursive: true });
 const sha = (b) => createHash("sha256").update(b).digest("hex");
