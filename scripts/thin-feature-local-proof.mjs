@@ -143,6 +143,40 @@ try {
   await browser.close();
 }
 await writeFile(out + "/regions.json", JSON.stringify(results, null, 2));
+const failures = [];
+for (const image of results) {
+  for (let i = 0; i < image.variants[0].regions.length; i++) {
+    const b = image.variants[0].regions[i],
+      c = image.variants[1].regions[i];
+    for (const scope of ["patch", "context"])
+      for (const renderer of ["libvipsMae", "chromiumMae"])
+        if (c[scope][renderer] > b[scope][renderer] + 1e-9)
+          failures.push({
+            image: image.image,
+            box: c.box,
+            scope,
+            renderer,
+            before: b[scope][renderer],
+            after: c[scope][renderer],
+          });
+  }
+}
+await writeFile(
+  out + "/local-verdict.json",
+  JSON.stringify(
+    {
+      status: failures.length ? "REJECT_CANDIDATE" : "LOCAL_NONREGRESSION",
+      failures,
+      policy:
+        "Strict local source reconstruction; no historical gate changed. Measurement-only mode preserves the rejected full-model evidence.",
+    },
+    null,
+    2,
+  ),
+);
+if (failures.length && process.env.NEXORA_THIN_LOCAL_STRICT === "1")
+  process.exitCode = 1;
+
 console.log(
   results.map((r) => ({
     image: r.image,

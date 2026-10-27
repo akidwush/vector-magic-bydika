@@ -34,7 +34,7 @@ const old = (
   .map(JSON.parse);
 const ids = (
   process.env.NEXORA_THIN_IMAGES ??
-  "original-signage-128,original-anime-128,original-small-symbols-128,original-small-symbols-512,original-garden-512-low-contrast"
+  "original-signage-128,original-anime-128,original-small-symbols-128,original-small-symbols-512,original-garden-512-low-contrast,original-garden-512"
 ).split(",");
 const hash = (b) => createHash("sha256").update(b).digest("hex");
 const decode = ts.transpileModule(await readFile("src/lib/input.ts", "utf8"), {

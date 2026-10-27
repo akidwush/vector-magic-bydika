@@ -14,9 +14,13 @@ const ids = [...new Set(rows.map((r) => r.image))],
   failures = [],
   pairs = [];
 const expectedImages = Number(process.env.NEXORA_THIN_EXPECT_IMAGES ?? 37);
-if (ids.length !== expectedImages || rows.length !== 3 * expectedImages)
+const expectedConfigs = Number(process.env.NEXORA_THIN_EXPECT_CONFIGS ?? 3);
+if (
+  ids.length !== expectedImages ||
+  rows.length !== expectedConfigs * expectedImages
+)
   failures.push(
-    `${expectedImages} images / ${3 * expectedImages} measured outputs required`,
+    `${expectedImages} images / ${expectedConfigs * expectedImages} measured outputs required`,
   );
 const negatives = new Set([
   "original-anime-512-webp",
@@ -47,6 +51,12 @@ for (const id of ids) {
     failures.push(id + " new crossing suspect needs rejection/review");
   if (c.libvips.alphaMae > b.libvips.alphaMae + 1e-9)
     failures.push(id + " alpha regression");
+  if (
+    process.env.NEXORA_THIN_STRICT_SOURCE === "1" &&
+    (c.libvips.mae > b.libvips.mae + 1e-9 ||
+      c.chromium.mae > b.chromium.mae + 1e-9)
+  )
+    failures.push(id + " source RGB reconstruction regression");
   const records =
     conversions.find((r) => r.id === c.id)?.worker.regionResearch ?? [];
   for (const v of records) {
