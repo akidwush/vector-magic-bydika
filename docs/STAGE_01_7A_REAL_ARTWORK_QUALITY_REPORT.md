@@ -196,6 +196,15 @@ and primitive objects are normalized **offline** through Inkscape; actual source
 versus normalized native-pixel MAE is zero on all available references. These
 normalized files never become tracing inputs.
 
+A separate 31-image decoder audit replayed the actual `src/lib/input.ts` decoder
+and matched every prior Worker-input SHA256. Sharp and browser RGBA are identical
+for 30 images, including both JPEGs and WebP. The intrinsic-opacity PNG differs
+by premultiplied MAE **0.1932** (worst local tile 0.5118, alpha difference zero)
+consistent with canvas premultiplied-alpha rounding. These scores use the
+declared Sharp-decoded source; that small decoder discrepancy is not subtracted
+from output error or credited as an engine defect. The audit is retained separately
+in `decoder-review-v1/results.json`; it does not alter the primary comparison.
+
 ### Evaluator defects found and rejected
 
 Initial geometry analysis reported approximately 94px errors for unicorn and
@@ -589,8 +598,12 @@ H/F byte identity does not imply every unchanged held-out shape is correct.
 - [Calibrated implementation af552b1 — SUCCESS](https://github.com/akidwush/vector-magic-bydika/actions/runs/40470794414).
   This independent full runner completed all recorded commands. Its success does
   not replace the local historical FAIL.
-- [Final split/regeneration implementation 8662fc2](https://github.com/akidwush/vector-magic-bydika/actions/runs/40476319767):
-  status pending at report preparation; see final update below.
+- [Final split/regeneration implementation 8662fc2 — SUCCESS](https://github.com/akidwush/vector-magic-bydika/actions/runs/40476319767).
+  Completed in 49m 50s; all published job steps succeeded, including raw-artifact
+  upload. Verified on 2026-10-27. The artifact is
+  `real-artwork-raw-8662fc28545a8de56bfba15a0de84d9a8ce63135`.
+  This second independent CI success does not reverse the retained local runtime
+  failure or establish physical Android performance.
 
 The dedicated workflow always uploads `real-artwork-raw-<commit>` with source and
 configuration manifests, binary hashes, all actual SVG downloads, complete raw
