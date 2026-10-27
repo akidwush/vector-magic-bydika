@@ -10,7 +10,7 @@ use crate::ir::{MultiPath, PathCmd, Shape, SubPath, VectorDoc};
 use crate::simplify::CurvePass;
 use visioncortex::PointF64;
 
-use super::face::{assemble, Contour, Face};
+use super::face::{Contour, Face, assemble};
 use super::fit::{FittedGeom, FittedSegment, SegmentFitter};
 use super::graph::BoundaryGraph;
 use super::{LabelMap, Segmentation};
@@ -34,7 +34,11 @@ pub fn compose_mosaic(
     passes: &[Box<dyn CurvePass>],
 ) -> VectorDoc {
     let mut map = LabelMap::from_segmentation(seg);
+    #[cfg(feature = "thin_feature_research")]
+    crate::thin::mosaic("before-color-merge", &map, merge_diff);
     map.merge_similar(merge_diff);
+    #[cfg(feature = "thin_feature_research")]
+    crate::thin::mosaic("after-color-merge", &map, merge_diff);
     let graph = BoundaryGraph::extract(&map);
     let faces = assemble(&graph, &map);
 
@@ -50,7 +54,11 @@ pub fn compose_mosaic(
                 fitter.fit_open(s).geom
             };
             for pass in passes {
-                geom = if ring { pass.ring(geom) } else { pass.open(geom) };
+                geom = if ring {
+                    pass.ring(geom)
+                } else {
+                    pass.open(geom)
+                };
             }
             FittedSegment { geom }
         })

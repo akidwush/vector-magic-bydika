@@ -19,7 +19,9 @@ import { geometry } from "./curve-geometry-metrics.mjs";
 const exec = promisify(execFile),
   hash = (b) => createHash("sha256").update(b).digest("hex");
 const root = resolve(process.env.NEXORA_ART_ROOT),
-  fixtures = resolve("tests/fixtures/real-artwork");
+  fixtures = resolve(
+    process.env.NEXORA_ART_FIXTURES ?? "tests/fixtures/real-artwork",
+  );
 await mkdir(root + "/protocol", { recursive: true });
 for (const name of [
   "real-artwork-analyze.mjs",
@@ -305,9 +307,19 @@ try {
           crops: await screenshot(item, row, source, svg, vr, heat),
           export: conversion.runs[0].export,
         });
-        if (conversion.config.id === "A-auto") {
+        if (
+          (process.env.NEXORA_ART_ROUNDTRIP_CONFIGS ?? "A-auto")
+            .split(",")
+            .includes(conversion.config.id)
+        ) {
           try {
-            const out = root + "/roundtrip/" + item.id + ".svg",
+            const out =
+                root +
+                "/roundtrip/" +
+                (process.env.NEXORA_ART_ROUNDTRIP_CONFIGS
+                  ? conversion.id
+                  : item.id) +
+                ".svg",
               p = root + "/" + conversion.runs[0].export;
             const result = await exec(
               "inkscape",
@@ -321,7 +333,12 @@ try {
               },
             );
             await writeFile(
-              root + "/roundtrip/" + item.id + ".log",
+              root +
+                "/roundtrip/" +
+                (process.env.NEXORA_ART_ROUNDTRIP_CONFIGS
+                  ? conversion.id
+                  : item.id) +
+                ".log",
               result.stdout + result.stderr,
             );
             const rt = await readFile(out, "utf8");
@@ -332,7 +349,12 @@ try {
               roundtripMae: compareRaster(vips, rr, item.width, item.height, {
                 maskApplicable: false,
               }).mae,
-              file: "roundtrip/" + item.id + ".svg",
+              file:
+                "roundtrip/" +
+                (process.env.NEXORA_ART_ROUNDTRIP_CONFIGS
+                  ? conversion.id
+                  : item.id) +
+                ".svg",
             };
           } catch (e) {
             row.inkscape = { status: "FAIL", error: String(e) };

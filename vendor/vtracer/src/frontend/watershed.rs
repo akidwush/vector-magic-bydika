@@ -327,7 +327,32 @@ impl WatershedHierarchy {
         }
 
         // --- Boundary snap, then boundary adjacency ---------------------------
+        #[cfg(feature = "thin_feature_research")]
+        crate::thin::partition("watershed-cut", w, h, &pre, kp, |id| {
+            let i = id as usize;
+            Color::new(
+                (sum[i][0] / area[i]) as u8,
+                (sum[i][1] / area[i]) as u8,
+                (sum[i][2] / area[i]) as u8,
+            )
+        });
         snap_boundaries(img, w, h, &mut pre, &mut area, &mut sum);
+        #[cfg(feature = "thin_feature_research")]
+        crate::thin::partition(
+            "watershed-snapped",
+            w,
+            h,
+            &pre,
+            area.iter().filter(|a| **a > 0).count(),
+            |id| {
+                let i = id as usize;
+                Color::new(
+                    (sum[i][0] / area[i].max(1)) as u8,
+                    (sum[i][1] / area[i].max(1)) as u8,
+                    (sum[i][2] / area[i].max(1)) as u8,
+                )
+            },
+        );
         let mut pairs: Vec<(u32, u32)> = Vec::new();
         for i in 0..n {
             let a = pre[i];
@@ -356,10 +381,18 @@ impl WatershedHierarchy {
             ids[i] = leaf_of[r];
         }
         let k = leaf_root.len();
+        #[cfg(feature = "thin_feature_research")]
+        crate::thin::partition("watershed-area-filtered", w, h, &ids, k, |id| {
+            let i = leaf_root[id as usize] as usize;
+            Color::new(
+                (sum[i][0] / area[i].max(1)) as u8,
+                (sum[i][1] / area[i].max(1)) as u8,
+                (sum[i][2] / area[i].max(1)) as u8,
+            )
+        });
 
-        let mean = |s: &[u64; 3], a: u64| {
-            Color::new((s[0] / a) as u8, (s[1] / a) as u8, (s[2] / a) as u8)
-        };
+        let mean =
+            |s: &[u64; 3], a: u64| Color::new((s[0] / a) as u8, (s[1] / a) as u8, (s[2] / a) as u8);
 
         let mut seg = Segmentation::new(w as u32, h as u32);
         if k == 1 {
@@ -585,9 +618,8 @@ fn snap_boundaries(
         }
         let c = img.get_pixel(x, y);
         let cv = [c.r as i32, c.g as i32, c.b as i32];
-        let dist = |m: &[i32; 3]| {
-            (cv[0] - m[0]).abs() + (cv[1] - m[1]).abs() + (cv[2] - m[2]).abs()
-        };
+        let dist =
+            |m: &[i32; 3]| (cv[0] - m[0]).abs() + (cv[1] - m[1]).abs() + (cv[2] - m[2]).abs();
         let da = dist(&mean[a]);
         // The pixel qualifies as a blend of regions `p` and `q` when its
         // color sits between their means (L1 between-ness plus noise slack).

@@ -118,6 +118,32 @@ pub fn last_corner_evidence() -> Vec<f64> {
     corners::evidence()
 }
 use vtracer::{ColorImage, Config, FitMode};
+
+#[cfg(feature = "thin_feature_research")]
+#[wasm_bindgen]
+pub fn thin_research_configure(mode: u32, capture: bool) {
+    vtracer::thin::configure(mode, capture);
+}
+#[cfg(feature = "thin_feature_research")]
+#[wasm_bindgen]
+pub fn last_region_survival() -> String {
+    vtracer::thin::report()
+}
+#[cfg(feature = "thin_feature_research")]
+#[wasm_bindgen]
+pub fn last_region_rgba(index: usize) -> Vec<u8> {
+    vtracer::thin::rgba(index)
+}
+#[cfg(feature = "thin_feature_research")]
+#[wasm_bindgen]
+pub fn last_region_labels(index: usize) -> Vec<u32> {
+    vtracer::thin::labels(index)
+}
+#[cfg(feature = "thin_feature_research")]
+#[wasm_bindgen]
+pub fn last_region_svg(index: usize) -> String {
+    vtracer::thin::svg(index)
+}
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
@@ -208,6 +234,8 @@ fn run_pipeline(
         width,
         height,
     });
+    #[cfg(feature = "thin_feature_research")]
+    let _thin_source_guard = vtracer::thin::start(img.clone());
     source_fit::reset();
     source_fit::sparse(optimize);
     let prepare_started = now();
@@ -219,6 +247,10 @@ fn run_pipeline(
         None
     };
     let profile = if profile.starts_with("reconstruct") {
+        #[cfg(feature = "thin_feature_research")]
+        if let Some(prepared) = source_prepared.as_ref() {
+            vtracer::thin::image("source-prepared", prepared);
+        }
         if profile == "reconstruct-planar" {
             "intelligent"
         } else if profile == "reconstruct-blend" && source_prepared.is_none() {
@@ -239,9 +271,24 @@ fn run_pipeline(
     #[cfg(feature = "runtime_profile")]
     drop(prepare_scope);
     let preparation_ms = now() - prepare_started;
+    #[cfg(feature = "thin_feature_research")]
+    vtracer::thin::profile(profile);
+    #[cfg(feature = "thin_feature_research")]
+    if vtracer::thin::precision_ablation() {
+        config.color_precision = 8;
+    }
     let mut pipeline = config
         .build()
         .map_err(|e| JsValue::from_str(&e.to_string()))?;
+    #[cfg(feature = "thin_feature_research")]
+    vtracer::thin::note(format!(
+        "{{\"kind\":\"configuration\",\"profile\":\"{profile}\",\"frontend\":\"{:?}\",\"precision\":{},\"speckle\":{},\"layerDifference\":{},\"maxColors\":{}}}",
+        config.clustering,
+        config.color_precision,
+        config.filter_speckle,
+        config.layer_difference,
+        config.max_colors.unwrap_or(0)
+    ));
     if profile == "source"
         || profile == "adaptive"
         || profile == "coverage"
@@ -273,8 +320,12 @@ fn run_pipeline(
             .segment(source_prepared.as_ref().unwrap_or(&img))
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
         segmented = now();
+        #[cfg(feature = "thin_feature_research")]
+        vtracer::thin::segmentation("clustered", &seg);
         for fitter in &pipeline.color_fitters {
             fitter.fit(&mut seg);
+            #[cfg(feature = "thin_feature_research")]
+            vtracer::thin::segmentation("color-fit", &seg);
         }
         let mut map = vtracer::mosaic::LabelMap::from_segmentation(&seg);
         let merge_diff = match &pipeline.compositing {
@@ -293,8 +344,12 @@ fn run_pipeline(
             .segment(source_prepared.as_ref().unwrap_or(&img))
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
         segmented = now();
+        #[cfg(feature = "thin_feature_research")]
+        vtracer::thin::segmentation("clustered", &seg);
         for fitter in &pipeline.color_fitters {
             fitter.fit(&mut seg);
+            #[cfg(feature = "thin_feature_research")]
+            vtracer::thin::segmentation("color-fit", &seg);
         }
         let (doc, stats) =
             planar::compose_optimized(&seg, profile == "intelligent", Some(&img), optimize)
@@ -321,6 +376,8 @@ fn run_pipeline(
             )
             .map_err(|e| JsValue::from_str(&e.to_string()))?
     };
+    #[cfg(feature = "thin_feature_research")]
+    vtracer::thin::vector("composed", &doc, &pipeline.writer);
     inverse::repair(&mut doc).map_err(|e| JsValue::from_str(&e))?;
     #[cfg(feature = "source_geometry")]
     recovery::locate(&doc, &img);
@@ -369,6 +426,8 @@ fn run_pipeline(
         reduce::serialize_lines(&mut doc);
     }
     let refined_at = now();
+    #[cfg(feature = "thin_feature_research")]
+    vtracer::thin::vector("pre-export", &doc, &pipeline.writer);
     let mut svg = pipeline.writer.write(&doc);
     let exported_at = now();
     if profile.starts_with("coverage")

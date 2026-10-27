@@ -81,6 +81,8 @@
 pub mod colorfit;
 pub mod compose;
 pub mod config;
+#[cfg(feature = "thin_feature_research")]
+pub mod thin;
 pub mod error;
 pub mod fitter;
 pub mod frontend;

@@ -1,5 +1,5 @@
 use visioncortex::color_clusters::{
-    Clusters, KeyingAction, Runner, RunnerConfig, HIERARCHICAL_MAX,
+    Clusters, HIERARCHICAL_MAX, KeyingAction, Runner, RunnerConfig,
 };
 use visioncortex::{Color, ColorImage, PointI32};
 
@@ -10,8 +10,8 @@ use crate::error::Error;
 use crate::ir::{Layer, Paint, RegionMask, Segmentation};
 use crate::progress::{Ctx, Phase};
 
-use super::keying::{apply_key, find_unused_color, should_key_image};
 use super::Frontend;
+use super::keying::{apply_key, find_unused_color, should_key_image};
 
 /// Hierarchical color-clustering frontend — the classic VTracer color path.
 ///
@@ -44,6 +44,44 @@ impl Default for ColorClusterFrontend {
 }
 
 impl ColorClusterFrontend {
+    #[cfg(feature = "thin_feature_research")]
+    fn research_segment(
+        &self,
+        img: &ColorImage,
+        ctx: Option<&mut Ctx>,
+    ) -> Result<Segmentation, Error> {
+        let (image, config, width, height) = self.prepare(img)?;
+        let (min, max, diff) = (
+            config.good_min_area,
+            config.good_max_area,
+            config.deepen_diff,
+        );
+        let mut builder = Runner::new(config, image)
+            .builder()
+            .deepen(move |view, patch, neighbours| {
+                crate::thin::deepen(view, patch, neighbours, min, max, diff)
+            })
+            .start();
+        let mut ctx = ctx;
+        let mut captured = false;
+        while !builder.tick() {
+            if !captured && builder.progress() >= 50 {
+                crate::thin::initial(&builder.view());
+                captured = true;
+            }
+            if let Some(ctx) = ctx.as_deref_mut() {
+                ctx.check()?;
+                ctx.report(Phase::Segment, builder.progress() as f32 / 100.0);
+            }
+        }
+        let clusters = builder.result();
+        crate::thin::cluster_layers(&clusters.view());
+        if let Some(ctx) = ctx.as_deref_mut() {
+            ctx.check()?;
+            ctx.report(Phase::Segment, 1.0);
+        }
+        Ok(Self::segmentation_from_clusters(&clusters, width, height))
+    }
     /// Apply transparency keying (if warranted) and build the clustering
     /// inputs: the keyed image, the `RunnerConfig`, and the dimensions. The
     /// caller constructs `Runner::new(config, image)` inline so the runner's
@@ -87,7 +125,11 @@ impl ColorClusterFrontend {
     }
 
     /// Turn finished clusters into the layered [`Segmentation`].
-    fn segmentation_from_clusters(clusters: &Clusters, width: usize, height: usize) -> Segmentation {
+    fn segmentation_from_clusters(
+        clusters: &Clusters,
+        width: usize,
+        height: usize,
+    ) -> Segmentation {
         let view = clusters.view();
         let mut seg = Segmentation::new(width as u32, height as u32);
         // `clusters_output` is top-to-bottom; reverse to get bottom-to-top
@@ -102,7 +144,10 @@ impl ColorClusterFrontend {
             #[cfg(feature = "runtime_work")]
             {
                 crate::runtime_work::count(2, 1);
-                crate::runtime_work::count(3, (cluster.rect.width() * cluster.rect.height()) as u64);
+                crate::runtime_work::count(
+                    3,
+                    (cluster.rect.width() * cluster.rect.height()) as u64,
+                );
             }
             let image = cluster.to_image_with_hole(view.width, false);
             let mask = RegionMask::new(
@@ -112,8 +157,11 @@ impl ColorClusterFrontend {
                     y: cluster.rect.top,
                 },
             );
+            let color = cluster.residue_color();
+            #[cfg(feature = "thin_feature_research")]
+            let color = crate::thin::paint(cluster_index.0 as u32, color);
             seg.layers.push(Layer {
-                paint: Paint::Solid(cluster.residue_color()),
+                paint: Paint::Solid(color),
                 mask,
             });
         }
@@ -123,12 +171,20 @@ impl ColorClusterFrontend {
 
 impl Frontend for ColorClusterFrontend {
     fn segment(&self, img: &ColorImage) -> Result<Segmentation, Error> {
+        #[cfg(feature = "thin_feature_research")]
+        if crate::thin::active() {
+            return self.research_segment(img, None);
+        }
         let (image, config, width, height) = self.prepare(img)?;
         let clusters = Runner::new(config, image).run();
         Ok(Self::segmentation_from_clusters(&clusters, width, height))
     }
 
     fn segment_with(&self, img: &ColorImage, ctx: &mut Ctx) -> Result<Segmentation, Error> {
+        #[cfg(feature = "thin_feature_research")]
+        if crate::thin::active() {
+            return self.research_segment(img, Some(ctx));
+        }
         let (image, config, width, height) = self.prepare(img)?;
 
         // Drive clustering incrementally so we can publish progress and observe

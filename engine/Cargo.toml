@@ -33,3 +33,6 @@ inverse_hotpath = ["source_geometry"]
 
 # Stage J counters; implies existing uncached profiler, never a production default.
 legacy_work = ["runtime_uncached", "vtracer/runtime_work"]
+
+# Region-survival diagnostics and opt-in protection, independent of curve recovery.
+thin_feature_research = ["vtracer/thin_feature_research"]

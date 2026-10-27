@@ -14,7 +14,9 @@ const root = resolve(
   builds = resolve(
     process.env.NEXORA_ART_BUILDS ?? "benchmark-results/stage17a/modules",
   ),
-  fixtureRoot = resolve("tests/fixtures/real-artwork");
+  fixtureRoot = resolve(
+    process.env.NEXORA_ART_FIXTURES ?? "tests/fixtures/real-artwork",
+  );
 await mkdir(root);
 await mkdir(root + "/protocol");
 for (const name of [
@@ -31,7 +33,7 @@ await mkdir(root + "/exports");
 await mkdir(root + "/diagnostics");
 const corpusBytes = await readFile(fixtureRoot + "/manifest.json"),
   corpus = JSON.parse(corpusBytes);
-const allConfigs = [
+const defaultConfigs = [
   {
     id: "A-auto",
     module: "production",
@@ -68,6 +70,18 @@ const allConfigs = [
     sourceRefine: true,
   },
 ];
+const allConfigs = process.env.NEXORA_ART_CONFIGS_FILE
+  ? JSON.parse(await readFile(process.env.NEXORA_ART_CONFIGS_FILE, "utf8"))
+  : defaultConfigs;
+for (const c of allConfigs) {
+  assert(/^[A-Za-z0-9-]+$/.test(c.id) && /^[a-z0-9-]+$/.test(c.module));
+  assert(
+    ["auto", "legacy", "source", "planar", "intelligent"].includes(c.quality),
+  );
+  assert(
+    typeof c.optimize === "boolean" && typeof c.sourceRefine === "boolean",
+  );
+}
 const configs = allConfigs.filter(
   (c) =>
     !process.env.NEXORA_ART_CONFIGS ||
@@ -196,12 +210,20 @@ try {
             terminated: 0,
             hashes: [],
             beats: [],
+            regionResearch: [],
           };
           window.Worker = class extends Native {
             constructor(...args) {
               super(...args);
               window.__art.created++;
-              this.addEventListener("message", () => window.__art.results++);
+              this.addEventListener("message", (event) => {
+                window.__art.results++;
+                if (event.data?.thinResearch)
+                  window.__art.regionResearch.push({
+                    traceId: event.data.id,
+                    ...event.data.thinResearch,
+                  });
+              });
             }
             postMessage(...args) {
               const d = args[0];

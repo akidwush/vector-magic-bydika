@@ -22,3 +22,4 @@ flo_curves = "=0.8.0"
 
 [features]
 runtime_work = []
+thin_feature_research = []

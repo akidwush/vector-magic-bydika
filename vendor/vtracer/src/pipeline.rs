@@ -50,6 +50,8 @@ impl Pipeline {
     ) -> Result<VectorDoc, Error> {
         let mut ctx = Ctx::new(cancel, on_progress);
         let seg = self.frontend.segment_with(img, &mut ctx)?;
+        #[cfg(feature = "thin_feature_research")]
+        crate::thin::segmentation("clustered", &seg);
         // `seg` is owned and about to be consumed, so no clone is needed here.
         self.finish_ctx(seg, &mut ctx)
     }
@@ -108,10 +110,16 @@ impl Pipeline {
     fn finish_ctx(&self, mut seg: Segmentation, ctx: &mut Ctx) -> Result<VectorDoc, Error> {
         for fitter in &self.color_fitters {
             fitter.fit(&mut seg);
+            #[cfg(feature = "thin_feature_research")]
+            crate::thin::segmentation("color-fit", &seg);
             ctx.check()?;
         }
 
-        let mut doc = self.compositing.compose_with(&seg, &self.curve_passes, ctx)?;
+        let mut doc = self
+            .compositing
+            .compose_with(&seg, &self.curve_passes, ctx)?;
+        #[cfg(feature = "thin_feature_research")]
+        crate::thin::vector("curve-fitted", &doc, &self.writer);
 
         let total = self.optimizers.len().max(1);
         for (i, pass) in self.optimizers.iter().enumerate() {
