@@ -513,6 +513,7 @@ manifests and browser diagnostics with `if: always()`:
 - [Final predicate run 40516443065](https://github.com/akidwush/vector-magic-bydika/actions/runs/40516443065): **SUCCESS**, commit `2bceddb43773c4de6e5841c1e21ddaae5720bac6`, classifier `8834add`. Its uploaded artifact is `thin-feature-raw-2bceddb43773c4de6e5841c1e21ddaae5720bac6`.
 
 - [Expanded priority-log / frontend-isolation run 40546814580](https://github.com/akidwush/vector-magic-bydika/actions/runs/40546814580): **IN PROGRESS when recorded**, commit `3f76e4e`; it is not relabelled as the older successful job. Local results above cover
+- [Delivery/caption-alignment run 40552188282](https://github.com/akidwush/vector-magic-bydika/actions/runs/40552188282): **IN PROGRESS when recorded**, delivery commit `5880286`. No completed-PASS claim is made for these pending runs.
   the final diagnostic correction. CI status is observational, not proof of Android
   performance or universal SVG quality.
 
