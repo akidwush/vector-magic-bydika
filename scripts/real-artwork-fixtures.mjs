@@ -227,7 +227,6 @@ add("original-garden", "challenging", [512], {
 const holdout = new Set([
   "original-compass",
   "twemoji-unicorn",
-  "original-anime-side",
   "twemoji-bicycle",
   "original-small-symbols",
   "original-garden",
@@ -321,6 +320,8 @@ for (const row of rows) {
     width: row.size,
     height: row.size,
     split: holdout.has(row.family) ? "holdout" : "development",
+    splitGroup:
+      row.family === "original-anime-side" ? "original-anime" : row.family,
     reference: rawRef,
     sourceReference: reference,
     referenceStatus: row.rasterOnly
@@ -364,6 +365,7 @@ await writeFile(root + "/images/kenney-city-512.png", city);
 rows.push({
   id: "kenney-city-512",
   family: "kenney-city",
+  splitGroup: "kenney-city",
   category: "challenging",
   image: "images/kenney-city-512.png",
   width: cityMeta.width,
@@ -394,10 +396,14 @@ await writeFile(
   root + "/manifest.json",
   JSON.stringify(
     {
-      schema: 1,
+      schema: 2,
+      previousManifestSHA256:
+        "edfa9efa7dfb940fe1171177980e8e7974b2b091561925a0b396fbb47dc320b5",
+      splitCorrection:
+        "Portrait siblings share one template. Both are development; v1 assignment retained in manifest.v1.json. No raster/reference or engine threshold changed.",
       baseline: "ce63c7202f2f0836b2123036b8e24db939ffa420",
       policy:
-        "Evaluation only. Family-disjoint holdout fixed before conversions; never tune engine or anomaly thresholds from holdout. PNG sizes independently rasterized; codecs/noise explicitly derived. References never supplied to engine.",
+        "Evaluation only. Holdout split by independent design group; initial pre-trace split and later template-leakage correction are retained. Never tune engine or anomaly thresholds from holdout. PNG sizes independently rasterized; codecs/noise explicitly derived. References never supplied to engine.",
       external: {
         name: "Twemoji 14.0.2",
         commit: "7a3dad4a4da30497093dab22eafba135f02308e1",

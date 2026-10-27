@@ -5,7 +5,8 @@ import sharp from "sharp";
 const root = "tests/fixtures/real-artwork",
   m = JSON.parse(await readFile(root + "/manifest.json")),
   hash = (b) => createHash("sha256").update(b).digest("hex");
-const families = new Map(),
+const families = new Set(),
+  groups = new Map(),
   ids = new Set(),
   licenses = new Set(["CC0-1.0", "CC-BY-4.0", "MIT"]);
 if (m.images.length < 24 || m.images.length > 36) throw Error("Corpus size");
@@ -14,9 +15,11 @@ for (const row of m.images) {
   ids.add(row.id);
   if (!licenses.has(row.license) || !row.attribution || !row.sourceURL)
     throw Error("Missing legal provenance " + row.id);
-  if (families.has(row.family) && families.get(row.family) !== row.split)
-    throw Error("Family leakage " + row.family);
-  families.set(row.family, row.split);
+  const group = row.splitGroup ?? row.family;
+  if (groups.has(group) && groups.get(group) !== row.split)
+    throw Error("Design group leakage " + group);
+  families.add(row.family);
+  groups.set(group, row.split);
   const bytes = await readFile(root + "/" + row.image);
   if (hash(bytes) !== row.imageSHA256) throw Error("Raster changed " + row.id);
   const md = await sharp(bytes).metadata();
@@ -51,6 +54,7 @@ const result = {
   status: "VERIFIED",
   images: ids.size,
   families: families.size,
+  independentSplitGroups: groups.size,
   holdoutImages: m.images.filter((r) => r.split === "holdout").length,
   licenses: legal,
   manifestSHA256: hash(await readFile(root + "/manifest.json")),

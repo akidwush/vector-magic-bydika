@@ -2,6 +2,7 @@ name: Real artwork quality research
 on:
   push:
     branches: [feat/stage-1-7a-real-artwork-quality]
+    paths-ignore: ["docs/**", "README.md"]
   pull_request:
     branches: [feat/stage-1-7a-real-artwork-quality]
 jobs:

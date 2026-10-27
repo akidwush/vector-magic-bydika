@@ -1,6 +1,7 @@
 // Generated raw summaries stay in the isolated artifact directory, never git scores.
 import { readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
+import { createHash } from "node:crypto";
 import { editability } from "./real-artwork-editability.mjs";
 const root = resolve(process.env.NEXORA_ART_ROOT),
   rows = (await readFile(root + "/analysis/measurements.jsonl", "utf8"))
@@ -14,6 +15,26 @@ const root = resolve(process.env.NEXORA_ART_ROOT),
     .trim()
     .split("\n")
     .map(JSON.parse);
+// A documented metadata-only split correction may reuse immutable v1 exports.
+// No changed raster or unknown corpus manifest may silently enter a comparison.
+const manifestSHA256 = createHash("sha256")
+  .update(await readFile("tests/fixtures/real-artwork/manifest.json"))
+  .digest("hex");
+for (const evidence of [root, process.env.NEXORA_ART_SUPPLEMENT].filter(
+  Boolean,
+)) {
+  const plan = JSON.parse(await readFile(resolve(evidence, "plan.json")));
+  if (
+    ![manifestSHA256, corpus.previousManifestSHA256].includes(plan.corpusSHA256)
+  )
+    throw Error("Undeclared corpus lineage");
+  for (const image of plan.images)
+    if (
+      corpus.images.find((r) => r.id === image.id)?.imageSHA256 !==
+      image.imageSHA256
+    )
+      throw Error("Source image changed since conversion " + image.id);
+}
 for (const row of rows) row.evidenceRoot = root;
 if (process.env.NEXORA_ART_SUPPLEMENT) {
   const supplemental = resolve(process.env.NEXORA_ART_SUPPLEMENT);
@@ -30,6 +51,11 @@ if (process.env.NEXORA_ART_SUPPLEMENT) {
 }
 for (const row of rows)
   if (row.status === "MEASURED") {
+    const item = corpus.images.find((item) => item.id === row.image);
+    if (!item) throw Error("Unknown corpus image " + row.image);
+    row.recordedSplit = row.split;
+    row.split = item.split;
+    row.splitGroup = item.splitGroup ?? item.family;
     Object.assign(
       row.complexity,
       editability(await readFile(row.evidenceRoot + "/" + row.export, "utf8")),
@@ -135,8 +161,12 @@ for (const code of new Set(
     code,
     images: new Set(flagged.map((r) => r.image)).size,
     families: new Set(flagged.map((r) => r.family)).size,
+    independentGroups: new Set(flagged.map((r) => r.splitGroup)).size,
     productionFamilies: new Set(
       flagged.filter((r) => r.config.id === "A-auto").map((r) => r.family),
+    ).size,
+    productionIndependentGroups: new Set(
+      flagged.filter((r) => r.config.id === "A-auto").map((r) => r.splitGroup),
     ).size,
     cases: flagged.length,
     evidence: flagged
@@ -160,6 +190,7 @@ const improvements = corpus.images.map((item) => {
   return {
     image: item.id,
     family: item.family,
+    splitGroup: item.splitGroup ?? item.family,
     split: item.split,
     sourceEligible: c?.runs?.[0]?.refinement?.enabled ?? false,
     fEqualsH: c && d ? c.svgSHA256 === d.svgSHA256 : null,
@@ -204,8 +235,13 @@ const summary = {
       ? "MEASURED"
       : "PARTIAL",
   baseline: corpus.baseline,
+  manifestSHA256,
   images: corpus.images.length,
   families: new Set(corpus.images.map((r) => r.family)).size,
+  independentSplitGroups: new Set(
+    corpus.images.map((r) => r.splitGroup ?? r.family),
+  ).size,
+  splitPolicy: corpus.splitCorrection,
   holdout: corpus.images.filter((r) => r.split === "holdout").length,
   table,
   frequencies,

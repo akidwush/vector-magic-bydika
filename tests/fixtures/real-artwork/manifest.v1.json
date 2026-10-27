@@ -1,0 +1,1429 @@
+{
+  "schema": 1,
+  "baseline": "ce63c7202f2f0836b2123036b8e24db939ffa420",
+  "policy": "Evaluation only. Family-disjoint holdout fixed before conversions; never tune engine or anomaly thresholds from holdout. PNG sizes independently rasterized; codecs/noise explicitly derived. References never supplied to engine.",
+  "external": {
+    "name": "Twemoji 14.0.2",
+    "commit": "7a3dad4a4da30497093dab22eafba135f02308e1",
+    "tag": "v14.0.2",
+    "license": "CC-BY-4.0",
+    "licenseFile": "licenses/TWEMOJI-CC-BY-4.0.txt"
+  },
+  "images": [
+    {
+      "id": "original-ribbon-128",
+      "family": "original-ribbon",
+      "category": "logo-icon",
+      "image": "images/original-ribbon-128.png",
+      "width": 128,
+      "height": 128,
+      "split": "development",
+      "reference": "references/original-ribbon.svg",
+      "sourceReference": "references/original-ribbon.svg",
+      "referenceStatus": "known-vector-with-declared-rendering-transform",
+      "license": "CC0-1.0",
+      "attribution": "Original NEXORA benchmark artwork, dedicated to CC0-1.0.",
+      "sourceURL": "scripts/real-artwork-fixtures.mjs",
+      "imageSHA256": "7c812abc5af991d3b419d5bfff4440be6c7667a8d0c32e720da0eea2cf55eda3",
+      "referenceSHA256": "b80345e88ab41992b27492df72308c7e659dd5399d2adc807ef4d7c922dfd911",
+      "mime": "image/png",
+      "preset": "illustration",
+      "background": [
+        255,
+        255,
+        255
+      ],
+      "rasterization": "independent 4x vector raster via libvips/librsvg, Lanczos3 downsample in encoded channels; not linear-light or native area ground truth",
+      "changes": [
+        "composited on white"
+      ],
+      "rois": [],
+      "cornerReference": null
+    },
+    {
+      "id": "original-ribbon-512",
+      "family": "original-ribbon",
+      "category": "logo-icon",
+      "image": "images/original-ribbon-512.png",
+      "width": 512,
+      "height": 512,
+      "split": "development",
+      "reference": "references/original-ribbon.svg",
+      "sourceReference": "references/original-ribbon.svg",
+      "referenceStatus": "known-vector-with-declared-rendering-transform",
+      "license": "CC0-1.0",
+      "attribution": "Original NEXORA benchmark artwork, dedicated to CC0-1.0.",
+      "sourceURL": "scripts/real-artwork-fixtures.mjs",
+      "imageSHA256": "51407ba298fa60613c7f584e81f7e21549b263baa0a48f0ab228a01c49eaedc0",
+      "referenceSHA256": "b80345e88ab41992b27492df72308c7e659dd5399d2adc807ef4d7c922dfd911",
+      "mime": "image/png",
+      "preset": "illustration",
+      "background": [
+        255,
+        255,
+        255
+      ],
+      "rasterization": "independent 4x vector raster via libvips/librsvg, Lanczos3 downsample in encoded channels; not linear-light or native area ground truth",
+      "changes": [
+        "composited on white"
+      ],
+      "rois": [],
+      "cornerReference": null
+    },
+    {
+      "id": "original-compass-128",
+      "family": "original-compass",
+      "category": "logo-icon",
+      "image": "images/original-compass-128.png",
+      "width": 128,
+      "height": 128,
+      "split": "holdout",
+      "reference": "references/original-compass.svg",
+      "sourceReference": "references/original-compass.svg",
+      "referenceStatus": "known-vector-with-declared-rendering-transform",
+      "license": "CC0-1.0",
+      "attribution": "Original NEXORA benchmark artwork, dedicated to CC0-1.0.",
+      "sourceURL": "scripts/real-artwork-fixtures.mjs",
+      "imageSHA256": "daa0fd7837ff66b1ff97e97b15dbd858775cb860ea2776b2fe69f2d82aca0606",
+      "referenceSHA256": "76cee8d6068c6bbd810a1c78684ec0fdf8e7767407e8461d0f2c6d5dc2d8c564",
+      "mime": "image/png",
+      "preset": "illustration",
+      "background": [
+        255,
+        255,
+        255
+      ],
+      "rasterization": "independent 4x vector raster via libvips/librsvg, Lanczos3 downsample in encoded channels; not linear-light or native area ground truth",
+      "changes": [
+        "composited on white"
+      ],
+      "rois": [],
+      "cornerReference": [
+        [
+          64,
+          11
+        ],
+        [
+          72.41904,
+          43.67465
+        ],
+        [
+          90.87006,
+          37.12994
+        ],
+        [
+          84.32535,
+          55.58096
+        ],
+        [
+          117,
+          64
+        ],
+        [
+          84.32535,
+          72.41904
+        ],
+        [
+          90.87006,
+          90.87006
+        ],
+        [
+          72.41904,
+          84.32535
+        ],
+        [
+          64,
+          117
+        ],
+        [
+          55.58096,
+          84.32535
+        ],
+        [
+          37.12994,
+          90.87006
+        ],
+        [
+          43.67465,
+          72.41904
+        ],
+        [
+          11,
+          64
+        ],
+        [
+          43.67465,
+          55.58096
+        ],
+        [
+          37.12994,
+          37.12994
+        ],
+        [
+          55.58096,
+          43.67465
+        ]
+      ]
+    },
+    {
+      "id": "original-compass-512",
+      "family": "original-compass",
+      "category": "logo-icon",
+      "image": "images/original-compass-512.png",
+      "width": 512,
+      "height": 512,
+      "split": "holdout",
+      "reference": "references/original-compass.svg",
+      "sourceReference": "references/original-compass.svg",
+      "referenceStatus": "known-vector-with-declared-rendering-transform",
+      "license": "CC0-1.0",
+      "attribution": "Original NEXORA benchmark artwork, dedicated to CC0-1.0.",
+      "sourceURL": "scripts/real-artwork-fixtures.mjs",
+      "imageSHA256": "212bea1fb710534a485e60991a4a6a5dbef062e8de0110334ef44c3a680418ea",
+      "referenceSHA256": "76cee8d6068c6bbd810a1c78684ec0fdf8e7767407e8461d0f2c6d5dc2d8c564",
+      "mime": "image/png",
+      "preset": "illustration",
+      "background": [
+        255,
+        255,
+        255
+      ],
+      "rasterization": "independent 4x vector raster via libvips/librsvg, Lanczos3 downsample in encoded channels; not linear-light or native area ground truth",
+      "changes": [
+        "composited on white"
+      ],
+      "rois": [],
+      "cornerReference": [
+        [
+          256,
+          44
+        ],
+        [
+          289.67616,
+          174.6986
+        ],
+        [
+          363.48024,
+          148.51976
+        ],
+        [
+          337.3014,
+          222.32384
+        ],
+        [
+          468,
+          256
+        ],
+        [
+          337.3014,
+          289.67616
+        ],
+        [
+          363.48024,
+          363.48024
+        ],
+        [
+          289.67616,
+          337.3014
+        ],
+        [
+          256,
+          468
+        ],
+        [
+          222.32384,
+          337.3014
+        ],
+        [
+          148.51976,
+          363.48024
+        ],
+        [
+          174.6986,
+          289.67616
+        ],
+        [
+          44,
+          256
+        ],
+        [
+          174.6986,
+          222.32384
+        ],
+        [
+          148.51976,
+          148.51976
+        ],
+        [
+          222.32384,
+          174.6986
+        ]
+      ]
+    },
+    {
+      "id": "original-compass-1024",
+      "family": "original-compass",
+      "category": "logo-icon",
+      "image": "images/original-compass-1024.png",
+      "width": 1024,
+      "height": 1024,
+      "split": "holdout",
+      "reference": "references/original-compass.svg",
+      "sourceReference": "references/original-compass.svg",
+      "referenceStatus": "known-vector-with-declared-rendering-transform",
+      "license": "CC0-1.0",
+      "attribution": "Original NEXORA benchmark artwork, dedicated to CC0-1.0.",
+      "sourceURL": "scripts/real-artwork-fixtures.mjs",
+      "imageSHA256": "b1e582cecba91d93f1d08fc867547ded2695bcc225dfe8a5473a8c0d6e4cb970",
+      "referenceSHA256": "76cee8d6068c6bbd810a1c78684ec0fdf8e7767407e8461d0f2c6d5dc2d8c564",
+      "mime": "image/png",
+      "preset": "illustration",
+      "background": [
+        255,
+        255,
+        255
+      ],
+      "rasterization": "independent 4x vector raster via libvips/librsvg, Lanczos3 downsample in encoded channels; not linear-light or native area ground truth",
+      "changes": [
+        "composited on white"
+      ],
+      "rois": [],
+      "cornerReference": [
+        [
+          512,
+          88
+        ],
+        [
+          579.35232,
+          349.3972
+        ],
+        [
+          726.96048,
+          297.03952
+        ],
+        [
+          674.6028,
+          444.64768
+        ],
+        [
+          936,
+          512
+        ],
+        [
+          674.6028,
+          579.35232
+        ],
+        [
+          726.96048,
+          726.96048
+        ],
+        [
+          579.35232,
+          674.6028
+        ],
+        [
+          512,
+          936
+        ],
+        [
+          444.64768,
+          674.6028
+        ],
+        [
+          297.03952,
+          726.96048
+        ],
+        [
+          349.3972,
+          579.35232
+        ],
+        [
+          88,
+          512
+        ],
+        [
+          349.3972,
+          444.64768
+        ],
+        [
+          297.03952,
+          297.03952
+        ],
+        [
+          444.64768,
+          349.3972
+        ]
+      ]
+    },
+    {
+      "id": "twemoji-palette-512",
+      "family": "twemoji-palette",
+      "category": "logo-icon",
+      "image": "images/twemoji-palette-512.png",
+      "width": 512,
+      "height": 512,
+      "split": "development",
+      "reference": "references/twemoji-palette.svg",
+      "sourceReference": "references/twemoji-palette.svg",
+      "referenceStatus": "known-vector-with-declared-rendering-transform",
+      "license": "CC-BY-4.0",
+      "attribution": "Twemoji graphics, Copyright 2019 Twitter, Inc and other contributors. Rasterization/compression variants by NEXORA; CC-BY 4.0.",
+      "sourceURL": "https://github.com/twitter/twemoji/blob/7a3dad4a4da30497093dab22eafba135f02308e1/assets/svg/1f3a8.svg",
+      "imageSHA256": "647ec10d09962eaf3fc4e9858c6cbe50e523e26e2370e56427e8ed0e487f6118",
+      "referenceSHA256": "236f87cf38405432478a58b369400f8d7ce55ffd2c248a4721d1fccb53f8b347",
+      "mime": "image/png",
+      "preset": "illustration",
+      "background": [
+        255,
+        255,
+        255
+      ],
+      "rasterization": "independent 4x vector raster via libvips/librsvg, Lanczos3 downsample in encoded channels; not linear-light or native area ground truth",
+      "changes": [
+        "composited on white"
+      ],
+      "rois": [],
+      "cornerReference": null
+    },
+    {
+      "id": "twemoji-cat-128",
+      "family": "twemoji-cat",
+      "category": "cartoon",
+      "image": "images/twemoji-cat-128.png",
+      "width": 128,
+      "height": 128,
+      "split": "development",
+      "reference": "references/twemoji-cat.svg",
+      "sourceReference": "references/twemoji-cat.svg",
+      "referenceStatus": "known-vector-with-declared-rendering-transform",
+      "license": "CC-BY-4.0",
+      "attribution": "Twemoji graphics, Copyright 2019 Twitter, Inc and other contributors. Rasterization/compression variants by NEXORA; CC-BY 4.0.",
+      "sourceURL": "https://github.com/twitter/twemoji/blob/7a3dad4a4da30497093dab22eafba135f02308e1/assets/svg/1f431.svg",
+      "imageSHA256": "2644c7b0389d459b07e5d66f39c630e1ed56dadc7137d416b85bd99704810131",
+      "referenceSHA256": "a7f61fb700b3a7d3cd6b6839e8574c330fe7baff59f0a964614a2cb324f95abf",
+      "mime": "image/png",
+      "preset": "illustration",
+      "background": [
+        255,
+        255,
+        255
+      ],
+      "rasterization": "independent 4x vector raster via libvips/librsvg, Lanczos3 downsample in encoded channels; not linear-light or native area ground truth",
+      "changes": [
+        "composited on white"
+      ],
+      "rois": [
+        {
+          "label": "eyes-and-nose",
+          "box": [
+            23,
+            34,
+            82,
+            63
+          ]
+        }
+      ],
+      "cornerReference": null
+    },
+    {
+      "id": "twemoji-cat-512",
+      "family": "twemoji-cat",
+      "category": "cartoon",
+      "image": "images/twemoji-cat-512.png",
+      "width": 512,
+      "height": 512,
+      "split": "development",
+      "reference": "references/twemoji-cat.svg",
+      "sourceReference": "references/twemoji-cat.svg",
+      "referenceStatus": "known-vector-with-declared-rendering-transform",
+      "license": "CC-BY-4.0",
+      "attribution": "Twemoji graphics, Copyright 2019 Twitter, Inc and other contributors. Rasterization/compression variants by NEXORA; CC-BY 4.0.",
+      "sourceURL": "https://github.com/twitter/twemoji/blob/7a3dad4a4da30497093dab22eafba135f02308e1/assets/svg/1f431.svg",
+      "imageSHA256": "7c3d374f7d0bf189ede5dc3b33dbb0cf0c5a8f20c963bd58b7baae7889958521",
+      "referenceSHA256": "a7f61fb700b3a7d3cd6b6839e8574c330fe7baff59f0a964614a2cb324f95abf",
+      "mime": "image/png",
+      "preset": "illustration",
+      "background": [
+        255,
+        255,
+        255
+      ],
+      "rasterization": "independent 4x vector raster via libvips/librsvg, Lanczos3 downsample in encoded channels; not linear-light or native area ground truth",
+      "changes": [
+        "composited on white"
+      ],
+      "rois": [
+        {
+          "label": "eyes-and-nose",
+          "box": [
+            92,
+            136,
+            328,
+            252
+          ]
+        }
+      ],
+      "cornerReference": null
+    },
+    {
+      "id": "twemoji-fox-512",
+      "family": "twemoji-fox",
+      "category": "cartoon",
+      "image": "images/twemoji-fox-512.png",
+      "width": 512,
+      "height": 512,
+      "split": "development",
+      "reference": "references/twemoji-fox.svg",
+      "sourceReference": "references/twemoji-fox.svg",
+      "referenceStatus": "known-vector-with-declared-rendering-transform",
+      "license": "CC-BY-4.0",
+      "attribution": "Twemoji graphics, Copyright 2019 Twitter, Inc and other contributors. Rasterization/compression variants by NEXORA; CC-BY 4.0.",
+      "sourceURL": "https://github.com/twitter/twemoji/blob/7a3dad4a4da30497093dab22eafba135f02308e1/assets/svg/1f98a.svg",
+      "imageSHA256": "4f58e8b1347edcfa7e58c64d16c56f699b69128e926d56bcd8c55aca09df53a2",
+      "referenceSHA256": "5b5b42dd21db3a10ad01b079ccd22da94aa5a00a216fcef3052020354f6a5580",
+      "mime": "image/png",
+      "preset": "illustration",
+      "background": [
+        255,
+        255,
+        255
+      ],
+      "rasterization": "independent 4x vector raster via libvips/librsvg, Lanczos3 downsample in encoded channels; not linear-light or native area ground truth",
+      "changes": [
+        "composited on white"
+      ],
+      "rois": [],
+      "cornerReference": null
+    },
+    {
+      "id": "twemoji-woman-512",
+      "family": "twemoji-woman",
+      "category": "cartoon",
+      "image": "images/twemoji-woman-512.png",
+      "width": 512,
+      "height": 512,
+      "split": "development",
+      "reference": "references/twemoji-woman.svg",
+      "sourceReference": "references/twemoji-woman.svg",
+      "referenceStatus": "known-vector-with-declared-rendering-transform",
+      "license": "CC-BY-4.0",
+      "attribution": "Twemoji graphics, Copyright 2019 Twitter, Inc and other contributors. Rasterization/compression variants by NEXORA; CC-BY 4.0.",
+      "sourceURL": "https://github.com/twitter/twemoji/blob/7a3dad4a4da30497093dab22eafba135f02308e1/assets/svg/1f469.svg",
+      "imageSHA256": "c7c57246452f0470736192c352d5b47e839e894c18e4c4e32ea4863dfe97b1e1",
+      "referenceSHA256": "b143c8e5cabc429a432363bad32b48c7c8fc1814e2722281e50442e0d8402067",
+      "mime": "image/png",
+      "preset": "illustration",
+      "background": [
+        255,
+        255,
+        255
+      ],
+      "rasterization": "independent 4x vector raster via libvips/librsvg, Lanczos3 downsample in encoded channels; not linear-light or native area ground truth",
+      "changes": [
+        "composited on white"
+      ],
+      "rois": [
+        {
+          "label": "face",
+          "box": [
+            116,
+            160,
+            280,
+            252
+          ]
+        }
+      ],
+      "cornerReference": null
+    },
+    {
+      "id": "twemoji-unicorn-512",
+      "family": "twemoji-unicorn",
+      "category": "cartoon",
+      "image": "images/twemoji-unicorn-512.png",
+      "width": 512,
+      "height": 512,
+      "split": "holdout",
+      "reference": "references/twemoji-unicorn.svg",
+      "sourceReference": "references/twemoji-unicorn.svg",
+      "referenceStatus": "known-vector-with-declared-rendering-transform",
+      "license": "CC-BY-4.0",
+      "attribution": "Twemoji graphics, Copyright 2019 Twitter, Inc and other contributors. Rasterization/compression variants by NEXORA; CC-BY 4.0.",
+      "sourceURL": "https://github.com/twitter/twemoji/blob/7a3dad4a4da30497093dab22eafba135f02308e1/assets/svg/1f984.svg",
+      "imageSHA256": "ac393335fe08d88459a76f36922ff532290ec3d5b969392e9753b3aa9237aaaa",
+      "referenceSHA256": "6063b1ca7021881784eb5a8110997357026fb7376785e639850335a9c422a639",
+      "mime": "image/png",
+      "preset": "illustration",
+      "background": [
+        255,
+        255,
+        255
+      ],
+      "rasterization": "independent 4x vector raster via libvips/librsvg, Lanczos3 downsample in encoded channels; not linear-light or native area ground truth",
+      "changes": [
+        "composited on white"
+      ],
+      "rois": [
+        {
+          "label": "horn",
+          "box": [
+            96,
+            0,
+            144,
+            204
+          ]
+        }
+      ],
+      "cornerReference": null
+    },
+    {
+      "id": "original-anime-128",
+      "family": "original-anime",
+      "category": "cartoon",
+      "image": "images/original-anime-128.png",
+      "width": 128,
+      "height": 128,
+      "split": "development",
+      "reference": "references/original-anime.svg",
+      "sourceReference": "references/original-anime.svg",
+      "referenceStatus": "known-vector-with-declared-rendering-transform",
+      "license": "CC0-1.0",
+      "attribution": "Original NEXORA benchmark artwork, dedicated to CC0-1.0.",
+      "sourceURL": "scripts/real-artwork-fixtures.mjs",
+      "imageSHA256": "98b8711e2254f0a735aafb1e47bd5530db8f002d3541f223695e49deb1808f58",
+      "referenceSHA256": "909abf6c5810fb9e9a172dfcb5fb4f9eab1f67419a81e3eb56454a0a37020431",
+      "mime": "image/png",
+      "preset": "illustration",
+      "background": [
+        255,
+        255,
+        255
+      ],
+      "rasterization": "independent 4x vector raster via libvips/librsvg, Lanczos3 downsample in encoded channels; not linear-light or native area ground truth",
+      "changes": [
+        "composited on white"
+      ],
+      "rois": [
+        {
+          "label": "eyes",
+          "box": [
+            26,
+            53,
+            73,
+            24
+          ]
+        },
+        {
+          "label": "mouth",
+          "box": [
+            50,
+            83,
+            29,
+            16
+          ]
+        },
+        {
+          "label": "hair-tips",
+          "box": [
+            20,
+            30,
+            90,
+            32
+          ]
+        }
+      ],
+      "cornerReference": null
+    },
+    {
+      "id": "original-anime-512",
+      "family": "original-anime",
+      "category": "cartoon",
+      "image": "images/original-anime-512.png",
+      "width": 512,
+      "height": 512,
+      "split": "development",
+      "reference": "references/original-anime.svg",
+      "sourceReference": "references/original-anime.svg",
+      "referenceStatus": "known-vector-with-declared-rendering-transform",
+      "license": "CC0-1.0",
+      "attribution": "Original NEXORA benchmark artwork, dedicated to CC0-1.0.",
+      "sourceURL": "scripts/real-artwork-fixtures.mjs",
+      "imageSHA256": "09a2fe55b232c03263aeefbbad6c2308b6e6f70581caa495c16deb2c1ca5b0dd",
+      "referenceSHA256": "909abf6c5810fb9e9a172dfcb5fb4f9eab1f67419a81e3eb56454a0a37020431",
+      "mime": "image/png",
+      "preset": "illustration",
+      "background": [
+        255,
+        255,
+        255
+      ],
+      "rasterization": "independent 4x vector raster via libvips/librsvg, Lanczos3 downsample in encoded channels; not linear-light or native area ground truth",
+      "changes": [
+        "composited on white"
+      ],
+      "rois": [
+        {
+          "label": "eyes",
+          "box": [
+            104,
+            212,
+            292,
+            96
+          ]
+        },
+        {
+          "label": "mouth",
+          "box": [
+            200,
+            332,
+            116,
+            64
+          ]
+        },
+        {
+          "label": "hair-tips",
+          "box": [
+            80,
+            120,
+            360,
+            128
+          ]
+        }
+      ],
+      "cornerReference": null
+    },
+    {
+      "id": "original-anime-side-512",
+      "family": "original-anime-side",
+      "category": "cartoon",
+      "image": "images/original-anime-side-512.png",
+      "width": 512,
+      "height": 512,
+      "split": "holdout",
+      "reference": "references/original-anime-side.svg",
+      "sourceReference": "references/original-anime-side.svg",
+      "referenceStatus": "known-vector-with-declared-rendering-transform",
+      "license": "CC0-1.0",
+      "attribution": "Original NEXORA benchmark artwork, dedicated to CC0-1.0.",
+      "sourceURL": "scripts/real-artwork-fixtures.mjs",
+      "imageSHA256": "7d5cfa190aeb50fcf6bc55d4e99fe8bb21cf658ee4be2783afb6ab11c3c9a688",
+      "referenceSHA256": "4fb719c75125e16c70e2f3f10996cef73498171706628c8dd0c1b4829a92e907",
+      "mime": "image/png",
+      "preset": "illustration",
+      "background": [
+        255,
+        255,
+        255
+      ],
+      "rasterization": "independent 4x vector raster via libvips/librsvg, Lanczos3 downsample in encoded channels; not linear-light or native area ground truth",
+      "changes": [
+        "composited on white"
+      ],
+      "rois": [
+        {
+          "label": "eyes",
+          "box": [
+            104,
+            212,
+            292,
+            96
+          ]
+        },
+        {
+          "label": "hair-ribbon",
+          "box": [
+            316,
+            48,
+            152,
+            100
+          ]
+        }
+      ],
+      "cornerReference": null
+    },
+    {
+      "id": "twemoji-camping-512",
+      "family": "twemoji-camping",
+      "category": "complex-flat",
+      "image": "images/twemoji-camping-512.png",
+      "width": 512,
+      "height": 512,
+      "split": "development",
+      "reference": "references/twemoji-camping.svg",
+      "sourceReference": "references/twemoji-camping.svg",
+      "referenceStatus": "known-vector-with-declared-rendering-transform",
+      "license": "CC-BY-4.0",
+      "attribution": "Twemoji graphics, Copyright 2019 Twitter, Inc and other contributors. Rasterization/compression variants by NEXORA; CC-BY 4.0.",
+      "sourceURL": "https://github.com/twitter/twemoji/blob/7a3dad4a4da30497093dab22eafba135f02308e1/assets/svg/1f3d5.svg",
+      "imageSHA256": "c28315962030c0d7203e2b46f9d8c6a46beb459305321ad09454a7058a0f0a33",
+      "referenceSHA256": "e4cceeed891fc08a88c2b380e26f8ef870a3e9d1e40d3e1a3a6cbc365803483b",
+      "mime": "image/png",
+      "preset": "illustration",
+      "background": [
+        255,
+        255,
+        255
+      ],
+      "rasterization": "independent 4x vector raster via libvips/librsvg, Lanczos3 downsample in encoded channels; not linear-light or native area ground truth",
+      "changes": [
+        "composited on white"
+      ],
+      "rois": [],
+      "cornerReference": null
+    },
+    {
+      "id": "twemoji-rose-512",
+      "family": "twemoji-rose",
+      "category": "complex-flat",
+      "image": "images/twemoji-rose-512.png",
+      "width": 512,
+      "height": 512,
+      "split": "development",
+      "reference": "references/twemoji-rose.svg",
+      "sourceReference": "references/twemoji-rose.svg",
+      "referenceStatus": "known-vector-with-declared-rendering-transform",
+      "license": "CC-BY-4.0",
+      "attribution": "Twemoji graphics, Copyright 2019 Twitter, Inc and other contributors. Rasterization/compression variants by NEXORA; CC-BY 4.0.",
+      "sourceURL": "https://github.com/twitter/twemoji/blob/7a3dad4a4da30497093dab22eafba135f02308e1/assets/svg/1f339.svg",
+      "imageSHA256": "f17e1e74d62ff4cc5d5da128fc24f962fdc3e803cdf54a6fae73c197cc48af0c",
+      "referenceSHA256": "e4811c2a5e7af97359c718a20571660a462910f79d2da7e57cec571b24262048",
+      "mime": "image/png",
+      "preset": "illustration",
+      "background": [
+        255,
+        255,
+        255
+      ],
+      "rasterization": "independent 4x vector raster via libvips/librsvg, Lanczos3 downsample in encoded channels; not linear-light or native area ground truth",
+      "changes": [
+        "composited on white"
+      ],
+      "rois": [],
+      "cornerReference": null
+    },
+    {
+      "id": "twemoji-teddy-512",
+      "family": "twemoji-teddy",
+      "category": "complex-flat",
+      "image": "images/twemoji-teddy-512.png",
+      "width": 512,
+      "height": 512,
+      "split": "development",
+      "reference": "references/twemoji-teddy.svg",
+      "sourceReference": "references/twemoji-teddy.svg",
+      "referenceStatus": "known-vector-with-declared-rendering-transform",
+      "license": "CC-BY-4.0",
+      "attribution": "Twemoji graphics, Copyright 2019 Twitter, Inc and other contributors. Rasterization/compression variants by NEXORA; CC-BY 4.0.",
+      "sourceURL": "https://github.com/twitter/twemoji/blob/7a3dad4a4da30497093dab22eafba135f02308e1/assets/svg/1f9f8.svg",
+      "imageSHA256": "37de38ced161b78508328e5284aa997644653ee383cf0c21af17b47beafa168f",
+      "referenceSHA256": "695cee7e0cbc768ff80e30000d9d7e292ec9d8f85e59bcf779bbe1fa3a21335f",
+      "mime": "image/png",
+      "preset": "illustration",
+      "background": [
+        255,
+        255,
+        255
+      ],
+      "rasterization": "independent 4x vector raster via libvips/librsvg, Lanczos3 downsample in encoded channels; not linear-light or native area ground truth",
+      "changes": [
+        "composited on white"
+      ],
+      "rois": [],
+      "cornerReference": null
+    },
+    {
+      "id": "twemoji-bicycle-512",
+      "family": "twemoji-bicycle",
+      "category": "complex-flat",
+      "image": "images/twemoji-bicycle-512.png",
+      "width": 512,
+      "height": 512,
+      "split": "holdout",
+      "reference": "references/twemoji-bicycle.svg",
+      "sourceReference": "references/twemoji-bicycle.svg",
+      "referenceStatus": "known-vector-with-declared-rendering-transform",
+      "license": "CC-BY-4.0",
+      "attribution": "Twemoji graphics, Copyright 2019 Twitter, Inc and other contributors. Rasterization/compression variants by NEXORA; CC-BY 4.0.",
+      "sourceURL": "https://github.com/twitter/twemoji/blob/7a3dad4a4da30497093dab22eafba135f02308e1/assets/svg/1f6b2.svg",
+      "imageSHA256": "c372b4a5b05b895e46a97fb19992d911bb3a63dcc1b55cd18099d0ac4259c0fa",
+      "referenceSHA256": "3b32b3db910d34dd8bcd6422f1f6720222db46cdce566858c23e29f27632aa02",
+      "mime": "image/png",
+      "preset": "illustration",
+      "background": [
+        255,
+        255,
+        255
+      ],
+      "rasterization": "independent 4x vector raster via libvips/librsvg, Lanczos3 downsample in encoded channels; not linear-light or native area ground truth",
+      "changes": [
+        "composited on white"
+      ],
+      "rois": [
+        {
+          "label": "wheels-and-spokes",
+          "box": [
+            4,
+            140,
+            504,
+            368
+          ]
+        }
+      ],
+      "cornerReference": null
+    },
+    {
+      "id": "twemoji-rocket-1024",
+      "family": "twemoji-rocket",
+      "category": "complex-flat",
+      "image": "images/twemoji-rocket-1024.png",
+      "width": 1024,
+      "height": 1024,
+      "split": "development",
+      "reference": "references/twemoji-rocket.svg",
+      "sourceReference": "references/twemoji-rocket.svg",
+      "referenceStatus": "known-vector-with-declared-rendering-transform",
+      "license": "CC-BY-4.0",
+      "attribution": "Twemoji graphics, Copyright 2019 Twitter, Inc and other contributors. Rasterization/compression variants by NEXORA; CC-BY 4.0.",
+      "sourceURL": "https://github.com/twitter/twemoji/blob/7a3dad4a4da30497093dab22eafba135f02308e1/assets/svg/1f680.svg",
+      "imageSHA256": "7d12b8e4e68caeca707a064b56aa180042e872fc9a3a99314e2ea409bc6c1277",
+      "referenceSHA256": "3892ef66f49ce43d49c8719e9277da0e0e821059f0cc239a549f6629cc12b3cf",
+      "mime": "image/png",
+      "preset": "illustration",
+      "background": [
+        255,
+        255,
+        255
+      ],
+      "rasterization": "independent 4x vector raster via libvips/librsvg, Lanczos3 downsample in encoded channels; not linear-light or native area ground truth",
+      "changes": [
+        "composited on white"
+      ],
+      "rois": [],
+      "cornerReference": null
+    },
+    {
+      "id": "original-garden-512",
+      "family": "original-garden",
+      "category": "complex-flat",
+      "image": "images/original-garden-512.png",
+      "width": 512,
+      "height": 512,
+      "split": "holdout",
+      "reference": "references/original-garden.svg",
+      "sourceReference": "references/original-garden.svg",
+      "referenceStatus": "known-vector-with-declared-rendering-transform",
+      "license": "CC0-1.0",
+      "attribution": "Original NEXORA benchmark artwork, dedicated to CC0-1.0.",
+      "sourceURL": "scripts/real-artwork-fixtures.mjs",
+      "imageSHA256": "171d1897895ccca169e5decb9946627503531d61abc4694551a1fbc5f533b036",
+      "referenceSHA256": "91f22b7741e7c7f288466fb69d827e02f79e28ee6f4377fab0593e3f2d3f3ce2",
+      "mime": "image/png",
+      "preset": "illustration",
+      "background": [
+        255,
+        255,
+        255
+      ],
+      "rasterization": "independent 4x vector raster via libvips/librsvg, Lanczos3 downsample in encoded channels; not linear-light or native area ground truth",
+      "changes": [
+        "composited on white"
+      ],
+      "rois": [
+        {
+          "label": "leaf-gaps",
+          "box": [
+            40,
+            128,
+            432,
+            276
+          ]
+        }
+      ],
+      "cornerReference": null
+    },
+    {
+      "id": "original-signage-128",
+      "family": "original-signage",
+      "category": "typography",
+      "image": "images/original-signage-128.png",
+      "width": 128,
+      "height": 128,
+      "split": "development",
+      "reference": "references/original-signage.svg",
+      "sourceReference": "references/original-signage.svg",
+      "referenceStatus": "known-vector-with-declared-rendering-transform",
+      "license": "CC0-1.0",
+      "attribution": "Original NEXORA benchmark artwork, dedicated to CC0-1.0.",
+      "sourceURL": "scripts/real-artwork-fixtures.mjs",
+      "imageSHA256": "b6660cdbc66e65e7a87d6365e7b71139017736d30550e61959edd52250228151",
+      "referenceSHA256": "7d81b111a8282a0c388c5247deb217f537e0b0e7325811225b7cc0a9054a5895",
+      "mime": "image/png",
+      "preset": "illustration",
+      "background": [
+        255,
+        255,
+        255
+      ],
+      "rasterization": "independent 4x vector raster via libvips/librsvg, Lanczos3 downsample in encoded channels; not linear-light or native area ground truth",
+      "changes": [
+        "composited on white"
+      ],
+      "rois": [
+        {
+          "label": "letter-holes",
+          "box": [
+            7,
+            15,
+            108,
+            100
+          ]
+        }
+      ],
+      "cornerReference": null
+    },
+    {
+      "id": "original-signage-512",
+      "family": "original-signage",
+      "category": "typography",
+      "image": "images/original-signage-512.png",
+      "width": 512,
+      "height": 512,
+      "split": "development",
+      "reference": "references/original-signage.svg",
+      "sourceReference": "references/original-signage.svg",
+      "referenceStatus": "known-vector-with-declared-rendering-transform",
+      "license": "CC0-1.0",
+      "attribution": "Original NEXORA benchmark artwork, dedicated to CC0-1.0.",
+      "sourceURL": "scripts/real-artwork-fixtures.mjs",
+      "imageSHA256": "7480be6999587d5b8dc08e17cc11e0d570f3d70558c08051064ba3e33ae96cab",
+      "referenceSHA256": "7d81b111a8282a0c388c5247deb217f537e0b0e7325811225b7cc0a9054a5895",
+      "mime": "image/png",
+      "preset": "illustration",
+      "background": [
+        255,
+        255,
+        255
+      ],
+      "rasterization": "independent 4x vector raster via libvips/librsvg, Lanczos3 downsample in encoded channels; not linear-light or native area ground truth",
+      "changes": [
+        "composited on white"
+      ],
+      "rois": [
+        {
+          "label": "letter-holes",
+          "box": [
+            28,
+            60,
+            432,
+            400
+          ]
+        }
+      ],
+      "cornerReference": null
+    },
+    {
+      "id": "original-small-symbols-128",
+      "family": "original-small-symbols",
+      "category": "typography",
+      "image": "images/original-small-symbols-128.png",
+      "width": 128,
+      "height": 128,
+      "split": "holdout",
+      "reference": "references/original-small-symbols.svg",
+      "sourceReference": "references/original-small-symbols.svg",
+      "referenceStatus": "known-vector-with-declared-rendering-transform",
+      "license": "CC0-1.0",
+      "attribution": "Original NEXORA benchmark artwork, dedicated to CC0-1.0.",
+      "sourceURL": "scripts/real-artwork-fixtures.mjs",
+      "imageSHA256": "04a50bfa66d7930d6e5b340645e84356cf9fc0da9901f9d3d97d06790defdb0b",
+      "referenceSHA256": "6ad249ce6f9c9ae7899a10c6fbf50b56a9a73dfe112bf12fa001e5512b1e3c99",
+      "mime": "image/png",
+      "preset": "illustration",
+      "background": [
+        255,
+        255,
+        255
+      ],
+      "rasterization": "independent 4x vector raster via libvips/librsvg, Lanczos3 downsample in encoded channels; not linear-light or native area ground truth",
+      "changes": [
+        "composited on white"
+      ],
+      "rois": [
+        {
+          "label": "thin-glyphs",
+          "box": [
+            5,
+            8,
+            117,
+            113
+          ]
+        }
+      ],
+      "cornerReference": null
+    },
+    {
+      "id": "original-small-symbols-512",
+      "family": "original-small-symbols",
+      "category": "typography",
+      "image": "images/original-small-symbols-512.png",
+      "width": 512,
+      "height": 512,
+      "split": "holdout",
+      "reference": "references/original-small-symbols.svg",
+      "sourceReference": "references/original-small-symbols.svg",
+      "referenceStatus": "known-vector-with-declared-rendering-transform",
+      "license": "CC0-1.0",
+      "attribution": "Original NEXORA benchmark artwork, dedicated to CC0-1.0.",
+      "sourceURL": "scripts/real-artwork-fixtures.mjs",
+      "imageSHA256": "0f9dc0b656b19e50e958e97b57f7042a76005985ac87b9b97a81db769c905d57",
+      "referenceSHA256": "6ad249ce6f9c9ae7899a10c6fbf50b56a9a73dfe112bf12fa001e5512b1e3c99",
+      "mime": "image/png",
+      "preset": "illustration",
+      "background": [
+        255,
+        255,
+        255
+      ],
+      "rasterization": "independent 4x vector raster via libvips/librsvg, Lanczos3 downsample in encoded channels; not linear-light or native area ground truth",
+      "changes": [
+        "composited on white"
+      ],
+      "rois": [
+        {
+          "label": "thin-glyphs",
+          "box": [
+            20,
+            32,
+            468,
+            452
+          ]
+        }
+      ],
+      "cornerReference": null
+    },
+    {
+      "id": "original-anime-128-jpeg",
+      "family": "original-anime",
+      "category": "challenging",
+      "variant": "jpeg",
+      "format": "jpeg",
+      "image": "images/original-anime-128-jpeg.jpg",
+      "width": 128,
+      "height": 128,
+      "split": "development",
+      "reference": "references/original-anime.svg",
+      "sourceReference": "references/original-anime.svg",
+      "referenceStatus": "known-vector-with-declared-rendering-transform",
+      "license": "CC0-1.0",
+      "attribution": "Original NEXORA benchmark artwork, dedicated to CC0-1.0.",
+      "sourceURL": "scripts/real-artwork-fixtures.mjs",
+      "imageSHA256": "afab9c94c6118035b9dd4bcff3fb8e4fc98ab07d7ee11699fb9cadcf0f3e5a24",
+      "referenceSHA256": "909abf6c5810fb9e9a172dfcb5fb4f9eab1f67419a81e3eb56454a0a37020431",
+      "mime": "image/jpeg",
+      "preset": "illustration",
+      "background": [
+        255,
+        255,
+        255
+      ],
+      "rasterization": "independent 4x vector raster via libvips/librsvg, Lanczos3 downsample in encoded channels; not linear-light or native area ground truth",
+      "changes": [
+        "composited on white",
+        "jpeg"
+      ],
+      "rois": [
+        {
+          "label": "eyes",
+          "box": [
+            26,
+            53,
+            73,
+            24
+          ]
+        },
+        {
+          "label": "mouth",
+          "box": [
+            50,
+            83,
+            29,
+            16
+          ]
+        },
+        {
+          "label": "hair-tips",
+          "box": [
+            20,
+            30,
+            90,
+            32
+          ]
+        }
+      ],
+      "cornerReference": null
+    },
+    {
+      "id": "original-anime-512-webp",
+      "family": "original-anime",
+      "category": "challenging",
+      "variant": "webp",
+      "format": "webp",
+      "image": "images/original-anime-512-webp.webp",
+      "width": 512,
+      "height": 512,
+      "split": "development",
+      "reference": "references/original-anime.svg",
+      "sourceReference": "references/original-anime.svg",
+      "referenceStatus": "known-vector-with-declared-rendering-transform",
+      "license": "CC0-1.0",
+      "attribution": "Original NEXORA benchmark artwork, dedicated to CC0-1.0.",
+      "sourceURL": "scripts/real-artwork-fixtures.mjs",
+      "imageSHA256": "7d7a9090e91f553d1b4372be1a075d1616bc5e79721bfc5c7b40f0563ca50d64",
+      "referenceSHA256": "909abf6c5810fb9e9a172dfcb5fb4f9eab1f67419a81e3eb56454a0a37020431",
+      "mime": "image/webp",
+      "preset": "illustration",
+      "background": [
+        255,
+        255,
+        255
+      ],
+      "rasterization": "independent 4x vector raster via libvips/librsvg, Lanczos3 downsample in encoded channels; not linear-light or native area ground truth",
+      "changes": [
+        "composited on white",
+        "webp"
+      ],
+      "rois": [
+        {
+          "label": "eyes",
+          "box": [
+            104,
+            212,
+            292,
+            96
+          ]
+        },
+        {
+          "label": "mouth",
+          "box": [
+            200,
+            332,
+            116,
+            64
+          ]
+        },
+        {
+          "label": "hair-tips",
+          "box": [
+            80,
+            120,
+            360,
+            128
+          ]
+        }
+      ],
+      "cornerReference": null
+    },
+    {
+      "id": "original-anime-512-partial",
+      "family": "original-anime",
+      "category": "challenging",
+      "variant": "partial",
+      "transparent": true,
+      "image": "images/original-anime-512-partial.png",
+      "width": 512,
+      "height": 512,
+      "split": "development",
+      "reference": "references/original-anime.svg",
+      "sourceReference": "references/original-anime.svg",
+      "referenceStatus": "known-vector-with-declared-rendering-transform",
+      "license": "CC0-1.0",
+      "attribution": "Original NEXORA benchmark artwork, dedicated to CC0-1.0.",
+      "sourceURL": "scripts/real-artwork-fixtures.mjs",
+      "imageSHA256": "bf8da434faeb8872a583bbee246e374d5a44f5f3f7951c6ae672e629a5e8935f",
+      "referenceSHA256": "909abf6c5810fb9e9a172dfcb5fb4f9eab1f67419a81e3eb56454a0a37020431",
+      "mime": "image/png",
+      "preset": "illustration",
+      "background": null,
+      "rasterization": "independent 4x vector raster via libvips/librsvg, Lanczos3 downsample in encoded channels; not linear-light or native area ground truth",
+      "changes": [
+        "group opacity 0.68 on transparent background",
+        "partial"
+      ],
+      "rois": [
+        {
+          "label": "eyes",
+          "box": [
+            104,
+            212,
+            292,
+            96
+          ]
+        },
+        {
+          "label": "mouth",
+          "box": [
+            200,
+            332,
+            116,
+            64
+          ]
+        },
+        {
+          "label": "hair-tips",
+          "box": [
+            80,
+            120,
+            360,
+            128
+          ]
+        }
+      ],
+      "cornerReference": null
+    },
+    {
+      "id": "original-garden-512-low-contrast",
+      "family": "original-garden",
+      "category": "challenging",
+      "variant": "low-contrast",
+      "image": "images/original-garden-512-low-contrast.png",
+      "width": 512,
+      "height": 512,
+      "split": "holdout",
+      "reference": "references/original-garden.svg",
+      "sourceReference": "references/original-garden.svg",
+      "referenceStatus": "known-vector-with-declared-rendering-transform",
+      "license": "CC0-1.0",
+      "attribution": "Original NEXORA benchmark artwork, dedicated to CC0-1.0.",
+      "sourceURL": "scripts/real-artwork-fixtures.mjs",
+      "imageSHA256": "5a9040241f9ad794570675d4eb2dfdf959a8f374ae4987b2018380f10f4e2e21",
+      "referenceSHA256": "91f22b7741e7c7f288466fb69d827e02f79e28ee6f4377fab0593e3f2d3f3ce2",
+      "mime": "image/png",
+      "preset": "illustration",
+      "background": [
+        255,
+        255,
+        255
+      ],
+      "rasterization": "independent 4x vector raster via libvips/librsvg, Lanczos3 downsample in encoded channels; not linear-light or native area ground truth",
+      "changes": [
+        "composited on white",
+        "low-contrast"
+      ],
+      "rois": [
+        {
+          "label": "leaf-gaps",
+          "box": [
+            40,
+            128,
+            432,
+            276
+          ]
+        }
+      ],
+      "cornerReference": null
+    },
+    {
+      "id": "twemoji-fox-128-jpeg",
+      "family": "twemoji-fox",
+      "category": "challenging",
+      "variant": "jpeg",
+      "format": "jpeg",
+      "image": "images/twemoji-fox-128-jpeg.jpg",
+      "width": 128,
+      "height": 128,
+      "split": "development",
+      "reference": "references/twemoji-fox.svg",
+      "sourceReference": "references/twemoji-fox.svg",
+      "referenceStatus": "known-vector-with-declared-rendering-transform",
+      "license": "CC-BY-4.0",
+      "attribution": "Twemoji graphics, Copyright 2019 Twitter, Inc and other contributors. Rasterization/compression variants by NEXORA; CC-BY 4.0.",
+      "sourceURL": "https://github.com/twitter/twemoji/blob/7a3dad4a4da30497093dab22eafba135f02308e1/assets/svg/1f98a.svg",
+      "imageSHA256": "692a5df8105babc3336f5f52ea178d721434f75b2634970f9d761609c5cf70a3",
+      "referenceSHA256": "5b5b42dd21db3a10ad01b079ccd22da94aa5a00a216fcef3052020354f6a5580",
+      "mime": "image/jpeg",
+      "preset": "illustration",
+      "background": [
+        255,
+        255,
+        255
+      ],
+      "rasterization": "independent 4x vector raster via libvips/librsvg, Lanczos3 downsample in encoded channels; not linear-light or native area ground truth",
+      "changes": [
+        "composited on white",
+        "jpeg"
+      ],
+      "rois": [],
+      "cornerReference": null
+    },
+    {
+      "id": "original-garden-512-noise",
+      "family": "original-garden",
+      "category": "challenging",
+      "variant": "noise",
+      "rasterOnly": true,
+      "image": "images/original-garden-512-noise.png",
+      "width": 512,
+      "height": 512,
+      "split": "holdout",
+      "reference": null,
+      "sourceReference": "references/original-garden.svg",
+      "referenceStatus": "reference-withheld-after-raster-degradation",
+      "license": "CC0-1.0",
+      "attribution": "Original NEXORA benchmark artwork, dedicated to CC0-1.0.",
+      "sourceURL": "scripts/real-artwork-fixtures.mjs",
+      "imageSHA256": "f5a54f0747a341823c3272f58732c9bb6e9ceabaa188c8510b8facbc0041e4f6",
+      "referenceSHA256": "91f22b7741e7c7f288466fb69d827e02f79e28ee6f4377fab0593e3f2d3f3ce2",
+      "mime": "image/png",
+      "preset": "illustration",
+      "background": [
+        255,
+        255,
+        255
+      ],
+      "rasterization": "independent 4x vector raster via libvips/librsvg, Lanczos3 downsample in encoded channels; not linear-light or native area ground truth",
+      "changes": [
+        "composited on white",
+        "noise"
+      ],
+      "rois": [
+        {
+          "label": "leaf-gaps",
+          "box": [
+            40,
+            128,
+            432,
+            276
+          ]
+        }
+      ],
+      "cornerReference": null
+    },
+    {
+      "id": "kenney-city-512",
+      "family": "kenney-city",
+      "category": "challenging",
+      "image": "images/kenney-city-512.png",
+      "width": 512,
+      "height": 287,
+      "split": "holdout",
+      "reference": null,
+      "sourceReference": null,
+      "referenceStatus": "natural-raster-only-no-vector-reference",
+      "license": "MIT",
+      "attribution": "Copyright (c) 2025 Kenney. Screenshot is associated documentation of Starter Kit City Builder; repository license retained. README identifies sprites/models as CC0.",
+      "sourceURL": "https://github.com/KenneyNL/Starter-Kit-City-Builder/blob/4535092b740b378b700efd9df9e27a631815b84a/screenshots/screenshot.png",
+      "sourceImage": "raster-originals/kenney-city.png",
+      "sourceSHA256": "bd95124ffee827ff7f0ea9f86e8a7e92db6920abc8827a4d76d242ad9cd30c08",
+      "imageSHA256": "b57f7d13360395e22982dd960ae40ece532fa6f316ffe29514275463e31afde2",
+      "mime": "image/png",
+      "preset": "illustration",
+      "background": null,
+      "maskApplicable": false,
+      "rasterization": "Downsized original raster, not independently vector-rasterized. No geometric ground truth.",
+      "changes": [
+        "aspect-preserving downsizing to 512px width"
+      ],
+      "rois": [],
+      "cornerReference": null
+    }
+  ]
+}

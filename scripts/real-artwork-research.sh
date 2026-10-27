@@ -7,6 +7,7 @@ mkdir -p "$(dirname "$root")"; mkdir "$root" || exit 1
 root=$(cd "$root" && pwd)
 status=0
 record(){ local name=$1; shift; local code=0; "$@" > "$root/$name.log" 2>&1 || code=$?; printf '%s\t%s\n' "$name" "$code" >> "$root/exit-status.tsv"; if [[ $code != 0 ]]; then status=1; fi; }
+record regeneration env NEXORA_ART_REGEN_ROOT="$root/regeneration" node scripts/real-artwork-regeneration.mjs
 record legal env NEXORA_ART_LEGAL="$root/legal.json" node scripts/real-artwork-verify.mjs
 record wasm bash scripts/build-wasm.sh
 record rust cargo test --manifest-path engine/Cargo.toml --locked

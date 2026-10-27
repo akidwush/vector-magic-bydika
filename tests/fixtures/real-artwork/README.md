@@ -1,7 +1,11 @@
 # Stage 1.7A artwork corpus
 
-31 evaluation images, 18 artwork families; 12 holdout images. Split assignment is
-by artwork family and fixed before tracing. Holdout is not used to tune engine
+31 evaluation images, 18 asset families, 17 independent design groups; 11 strict
+holdout images. The initial pre-trace manifest is preserved as `manifest.v1.json`.
+Review found two portrait siblings sharing a template across the initial split;
+schema 2 moves the side portrait into the same development group. No raster,
+reference or engine threshold changed. Reports retain recorded and effective splits.
+Holdout is not used to tune engine
 or diagnostic thresholds. This is a small flat-art corpus, not a representative
 sample of all professional anime, photographs or vector-design workflows.
 
