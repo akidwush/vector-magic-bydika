@@ -4,6 +4,8 @@ import { resolve, extname } from "node:path";
 import { createServer } from "node:http";
 import { createHash } from "node:crypto";
 import { chromium, expect } from "@playwright/test";
+const moduleName = process.env.NEXORA_THIN_CANDIDATE_ID ?? "thin-structural";
+const prefix = "/app/" + moduleName + "/";
 const root = resolve(process.env.NEXORA_THIN_WORKER_PROOF),
   modules = resolve(process.env.NEXORA_ART_BUILDS),
   evaluation = resolve(process.env.NEXORA_THIN_EVALUATION),
@@ -26,8 +28,8 @@ const rows = (await readFile(evaluation + "/conversions.jsonl", "utf8"))
 const server = createServer(async (req, res) => {
   try {
     const u = new URL(req.url, "http://localhost").pathname,
-      relative = u.replace(/^\/app\/thin-structural\//, "") || "index.html";
-    if (!u.startsWith("/app/thin-structural/")) throw Error();
+      relative = u.slice(prefix.length) || "index.html";
+    if (!u.startsWith(prefix)) throw Error();
     const p = resolve(
       modules,
       (process.env.NEXORA_THIN_CANDIDATE_ID ?? "thin-structural") + "/app",
@@ -117,9 +119,7 @@ try {
     };
     setInterval(() => window.__thinLife.beats.push(performance.now()), 100);
   });
-  await page.goto(
-    `http://127.0.0.1:${server.address().port}/app/thin-structural/`,
-  );
+  await page.goto(`http://127.0.0.1:${server.address().port}${prefix}`);
   async function select(id) {
     await page
       .getByLabel("Pilih gambar", { exact: true })
