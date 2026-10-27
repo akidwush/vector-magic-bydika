@@ -8,7 +8,9 @@ const root = process.env.NEXORA_THIN_EVALUATION,
   fixtures = process.env.NEXORA_ART_FIXTURES ?? "tests/fixtures/real-artwork";
 if (!root || !diagnosis)
   throw Error("Completed exports and diagnostic capture required");
-const out = diagnosis + "/exported-local-proof";
+const out =
+  process.env.NEXORA_THIN_LOCAL_PROOF_ROOT ??
+  diagnosis + "/exported-local-proof";
 await mkdir(out);
 const rows = (await readFile(root + "/analysis/measurements.jsonl", "utf8"))
     .trim()
@@ -20,7 +22,8 @@ const rows = (await readFile(root + "/analysis/measurements.jsonl", "utf8"))
     executablePath: process.env.NEXORA_CHROMIUM_PATH,
   }),
   page = await browser.newPage(),
-  results = [];
+  results = [],
+  incomplete = [];
 try {
   for (const file of (await readdir(diagnosis + "/exports")).filter((f) =>
     f.endsWith("-diagnostic.json"),
@@ -33,10 +36,19 @@ try {
         .raw()
         .toBuffer();
     const candidates = diag.events.filter((e) => e.kind === "protection");
+    if (diag.protected > candidates.length)
+      incomplete.push({
+        image: id,
+        protected: diag.protected,
+        captured: candidates.length,
+        omitted: diag.omitted,
+        reason:
+          "Bounded native event log cannot attribute every accepted region",
+      });
     if (!candidates.length) continue;
     const pair = [];
     for (const config of [
-      "A-auto",
+      process.env.NEXORA_THIN_BASELINE_ID ?? "A-auto",
       process.env.NEXORA_THIN_CANDIDATE_ID ?? "thin-structural",
     ]) {
       const row = rows.find((r) => r.image === id && r.config.id === config),
@@ -165,7 +177,12 @@ await writeFile(
   out + "/local-verdict.json",
   JSON.stringify(
     {
-      status: failures.length ? "REJECT_CANDIDATE" : "LOCAL_NONREGRESSION",
+      status: incomplete.length
+        ? "INCOMPLETE_DIAGNOSTICS"
+        : failures.length
+          ? "REJECT_CANDIDATE"
+          : "LOCAL_NONREGRESSION",
+      incomplete,
       failures,
       policy:
         "Strict local source reconstruction; no historical gate changed. Measurement-only mode preserves the rejected full-model evidence.",
@@ -174,7 +191,10 @@ await writeFile(
     2,
   ),
 );
-if (failures.length && process.env.NEXORA_THIN_LOCAL_STRICT === "1")
+if (
+  (failures.length || incomplete.length) &&
+  process.env.NEXORA_THIN_LOCAL_STRICT === "1"
+)
   process.exitCode = 1;
 
 console.log(

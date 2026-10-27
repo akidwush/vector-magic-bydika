@@ -117,3 +117,14 @@ could equally be a true counter or a compression speckle; the raster alone canno
 certify intent. Mode 4 retains the baseline on that ambiguity. Mode 3's compact
 counter ablation remains unchanged. Tests cover both this rejection and retention
 of a genuinely extended 2px gap. The new family remains untouched at this freeze.
+
+## Bounded diagnostic attribution correction
+
+The noisy planar control executes 143,793 hierarchy predicates. Its original
+16,384-event log filled before two late protections, so that supplementary local
+attribution was correctly reclassified as incomplete rather than a pass. The
+logger now reserves 128 slots for up to 64 certificates and their matching
+keep/parent records, retaining the same total event/memory cap. Ordinary events
+can still be omitted and their count remains explicit. No classifier, paint,
+geometry or acceptance input depends on event storage. A dedicated exhaustion
+unit test and replay-to-download hash checks verify this observational correction.

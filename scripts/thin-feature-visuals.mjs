@@ -5,7 +5,7 @@ import { chromium } from "@playwright/test";
 const root = process.env.NEXORA_THIN_EVALUATION,
   fixtures = process.env.NEXORA_ART_FIXTURES ?? "tests/fixtures/real-artwork";
 if (!root) throw Error("Completed evaluation required");
-const out = root + "/thin-visuals";
+const out = process.env.NEXORA_THIN_VISUAL_ROOT ?? root + "/thin-visuals";
 await mkdir(out);
 const rows = (await readFile(root + "/analysis/measurements.jsonl", "utf8"))
     .trim()
@@ -28,7 +28,11 @@ const sha = (b) => createHash("sha256").update(b).digest("hex"),
 try {
   for (const id of ids) {
     const item = manifest.images.find((r) => r.id === id),
-      b = rows.find((r) => r.image === id && r.config.id === "A-auto"),
+      b = rows.find(
+        (r) =>
+          r.image === id &&
+          r.config.id === (process.env.NEXORA_THIN_BASELINE_ID ?? "A-auto"),
+      ),
       c = rows.find(
         (r) =>
           r.image === id &&
@@ -59,7 +63,7 @@ try {
         h = zoom === 1 ? item.height : 256;
       await page.setViewportSize({ width: 3 * w + 56, height: h + 128 });
       await page.setContent(
-        `<style>body{font:13px sans-serif;background:#e9e9ec;margin:12px;color:#151522}main{display:flex;gap:12px}.view{position:relative;overflow:hidden;background:white;width:${w}px;height:${h}px;outline:1px solid #aaa}.view img{position:absolute;width:${item.width * zoom}px;height:${item.height * zoom}px;left:${zoom === 1 ? 0 : w / 2 - center[0] * zoom}px;top:${zoom === 1 ? 0 : h / 2 - center[1] * zoom}px}section:first-child img{image-rendering:pixelated}h1{font-size:16px}p{margin:4px 0 8px}</style><h1>${id} · ${zoom * 100}% · ${item.width}×${item.height}</h1><p>Same viewport and source coordinates. Zoom center from recorded baseline tile or source-support ROI; source pixels shown without interpolation.</p><main>${data.map((src, i) => `<section><p>${["Original raster", "Stage 1.7A Auto download", "Frozen 1.7B research download"][i]}</p><div class="view"><img src="${src}"></div></section>`).join("")}</main>`,
+        `<style>body{font:13px sans-serif;background:#e9e9ec;margin:12px;color:#151522}main{display:flex;gap:12px}.view{position:relative;overflow:hidden;background:white;width:${w}px;height:${h}px;outline:1px solid #aaa}.view img{position:absolute;width:${item.width * zoom}px;height:${item.height * zoom}px;left:${zoom === 1 ? 0 : w / 2 - center[0] * zoom}px;top:${zoom === 1 ? 0 : h / 2 - center[1] * zoom}px}section:first-child img{image-rendering:pixelated}h1{font-size:16px}p{margin:4px 0 8px}</style><h1>${id} · ${zoom * 100}% · ${item.width}×${item.height}</h1><p>Same viewport and source coordinates. Zoom center from recorded baseline tile or source-support ROI; source pixels shown without interpolation.</p><main>${data.map((src, i) => `<section><p>${["Original raster", b.config.id + " · " + b.config.quality + " download", c.config.id + " · " + c.config.quality + " download"][i]}</p><div class="view"><img src="${src}"></div></section>`).join("")}</main>`,
       );
       await page
         .locator("img")

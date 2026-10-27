@@ -35,14 +35,21 @@ record full-diagnosis env NEXORA_THIN_CANDIDATE_ID=thin-structural NEXORA_THIN_M
 record full-lifecycle env NEXORA_THIN_DIAG_ROOT="$root/full-diagnosis" node scripts/thin-feature-lifecycle.mjs
 record candidate-diagnosis env NEXORA_THIN_CANDIDATE_ID=thin-negative NEXORA_THIN_MODE=4 NEXORA_THIN_DIAG_ROOT="$root/candidate-diagnosis" NEXORA_THIN_MODULE="$root/modules/research" NEXORA_THIN_BASELINE_RUN="$root/evaluation" node scripts/thin-feature-diagnose.mjs
 record candidate-lifecycle env NEXORA_THIN_DIAG_ROOT="$root/candidate-diagnosis" node scripts/thin-feature-lifecycle.mjs
+replay_ids=$(node --input-type=module -e 'import{readFileSync}from"node:fs";console.log(JSON.parse(readFileSync(process.argv[1])).images.map(r=>r.id).join(","))' "$root/corpus/manifest.json")
+record candidate-replay env NEXORA_THIN_CAPTURE=0 NEXORA_THIN_IMAGES="$replay_ids" NEXORA_THIN_MODE=4 NEXORA_THIN_CANDIDATE_ID=thin-negative NEXORA_ART_FIXTURES="$root/corpus" NEXORA_THIN_DIAG_ROOT="$root/candidate-replay" NEXORA_THIN_MODULE="$root/modules/research" NEXORA_THIN_BASELINE_RUN="$root/evaluation" node scripts/thin-feature-diagnose.mjs
 record full-local env NEXORA_THIN_EVALUATION="$root/evaluation" NEXORA_ART_FIXTURES="$root/corpus" NEXORA_THIN_LOCAL_DIAG_ROOT="$root/full-diagnosis" node scripts/thin-feature-local-proof.mjs
 record candidate-local env NEXORA_THIN_LOCAL_STRICT=1 NEXORA_THIN_CANDIDATE_ID=thin-negative NEXORA_THIN_EVALUATION="$root/evaluation" NEXORA_ART_FIXTURES="$root/corpus" NEXORA_THIN_LOCAL_DIAG_ROOT="$root/candidate-diagnosis" node scripts/thin-feature-local-proof.mjs
+record frontend-isolation env NEXORA_THIN_FRONTEND_ROOT="$root/frontend-isolation" NEXORA_ART_FIXTURES="$root/corpus" NEXORA_ART_BUILDS="$root/modules" NEXORA_THIN_MODULE="$root/modules/research" bash scripts/thin-feature-frontend-isolation.sh
 record candidate-worker env NEXORA_THIN_CANDIDATE_ID=thin-negative NEXORA_THIN_MODE=4 NEXORA_THIN_WORKER_PROOF="$root/candidate-worker" NEXORA_THIN_EVALUATION="$root/evaluation" NEXORA_ART_BUILDS="$root/modules" NEXORA_ART_FIXTURES="$root/corpus" node scripts/thin-feature-worker-proof.mjs
 # Historical gates stay unchanged and blocking, including known timing failures.
 record historical env NEXORA_RESEARCH_STAGE=stage17b NEXORA_INVERSE_HOTPATH=1 NEXORA_PROOF_DIR="$root/historical" bash scripts/source-target-research.sh
 record protected env NEXORA_PROOF_DIR="$root/protected" bash scripts/inverse-hotpath-proof.sh
 record enabled env NEXORA_THIN_MODE=4 NEXORA_THIN_ENABLED="$root/enabled" NEXORA_THIN_F_BASELINE="$root/protected/F" bash scripts/thin-feature-enabled.sh
+mkdir "$root/enabled-budget"
+ln -s "$root/enabled" "$root/enabled-budget/runtime-identity"
+record enabled-budget env NEXORA_PROOF_DIR="$root/enabled-budget" node scripts/inverse-hotpath-budget-gate.mjs
 record experimental-browser env NEXORA_THIN_BROWSER="$root/experimental-browser" NEXORA_THIN_BROWSER_MODULE="$root/enabled/candidate" bash scripts/thin-feature-browser.sh
+record experimental-offline env NEXORA_ART_VERIFY="$root/experimental-browser" bash scripts/real-artwork-offline-quality.sh
 record visuals env NEXORA_THIN_CANDIDATE_ID=thin-negative NEXORA_THIN_EVALUATION="$root/evaluation" NEXORA_ART_FIXTURES="$root/corpus" node scripts/thin-feature-visuals.mjs
 record review env NEXORA_THIN_STRICT_SOURCE=1 NEXORA_THIN_CANDIDATE_ID=thin-negative NEXORA_THIN_EXPECT_IMAGES=39 NEXORA_THIN_EXPECT_CONFIGS=4 NEXORA_THIN_EVALUATION="$root/evaluation" node scripts/thin-feature-review.mjs
 record final-wasm bash scripts/build-wasm.sh

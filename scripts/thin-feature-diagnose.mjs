@@ -19,6 +19,11 @@ const root = resolve(process.env.NEXORA_THIN_DIAG_ROOT),
 await mkdir(root);
 await mkdir(root + "/exports");
 await mkdir(root + "/frames");
+await mkdir(root + "/protocol");
+await writeFile(
+  root + "/protocol/thin-feature-diagnose.mjs",
+  await readFile(new URL(import.meta.url)),
+);
 const fixtures =
   process.env.NEXORA_ART_FIXTURES ?? "tests/fixtures/real-artwork";
 const corpus = JSON.parse(await readFile(fixtures + "/manifest.json"));
@@ -77,8 +82,13 @@ await writeFile(
     {
       base: "ca3871e14ca633aad09503e78681631348d71b75",
       wasmSHA256: hash(await readFile(moduleRoot + "/nexora_wasm_bg.wasm")),
+      glueSHA256: hash(await readFile(moduleRoot + "/nexora_wasm.js")),
+      corpusSHA256: hash(await readFile(fixtures + "/manifest.json")),
       scriptSHA256: hash(await readFile(new URL(import.meta.url))),
       ids,
+      baselineConfig: process.env.NEXORA_THIN_BASELINE_ID ?? "A-auto",
+      candidateConfig: process.env.NEXORA_THIN_CANDIDATE_ID ?? null,
+      capture: process.env.NEXORA_THIN_CAPTURE !== "0",
       mode: Number(process.env.NEXORA_THIN_MODE ?? 0),
       policy:
         "Diagnostic binding replay; source and baseline hashes checked. Snapshot cost is not production timing. No references read.",
@@ -95,10 +105,21 @@ try {
     const source = await readFile(fixtures + "/" + item.image);
     if (hash(source) !== item.imageSHA256) throw Error("Source changed");
     const baseline = old.find(
-      (r) => r.image === id && r.config.id === "A-auto",
+      (r) =>
+        r.image === id &&
+        r.config.id === (process.env.NEXORA_THIN_BASELINE_ID ?? "A-auto"),
     );
     const result = await page.evaluate(
-      async ({ encoded, mime, decode, validate, profile, mode }) => {
+      async ({
+        encoded,
+        mime,
+        decode,
+        validate,
+        profile,
+        mode,
+        capture,
+        preset,
+      }) => {
         const decoder = await import("data:text/javascript;base64," + decode);
         const input = await decoder.decode(
           new File(
@@ -110,12 +131,12 @@ try {
         );
         const wasm = await import("/nexora_wasm.js");
         await wasm.default();
-        wasm.thin_research_configure(mode, true);
+        wasm.thin_research_configure(mode, capture);
         const svg = wasm.trace_quality(
           input.rgba,
           input.width,
           input.height,
-          "illustration",
+          preset,
           "reduce-" + profile,
         );
         const data = JSON.parse(wasm.last_region_survival());
@@ -158,6 +179,8 @@ try {
         profile: baseline.runs[0].perf.profile,
         validate: Buffer.from(validate).toString("base64"),
         mode: Number(process.env.NEXORA_THIN_MODE ?? 0),
+        capture: process.env.NEXORA_THIN_CAPTURE !== "0",
+        preset: item.preset,
       },
     );
     await writeFile(
