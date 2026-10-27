@@ -1,6 +1,6 @@
 # Stage 1.7B source-only fixtures
 
-The three original design families and all derived rasters are dedicated to
+The four original design families and all derived rasters are dedicated to
 **CC0-1.0**. They contain outlined geometry, not a font or competitor's artwork.
 This dedication applies to the artwork only, not the application's unlicensed
 original source code.

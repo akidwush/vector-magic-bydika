@@ -126,7 +126,10 @@ const actualOriginalRepair = pairs.filter(
 );
 const unseen = pairs.filter(
   (r) =>
-    ["stencil-kite", "ribbon-garden"].includes(r.family) &&
+    (process.env.NEXORA_THIN_CANDIDATE_ID === "thin-negative"
+      ? ["orbital-badge"]
+      : ["stencil-kite", "ribbon-garden"]
+    ).includes(r.family) &&
     !r.unchanged &&
     r.delta.mae < 0 &&
     r.delta.chromiumMae < 0,
