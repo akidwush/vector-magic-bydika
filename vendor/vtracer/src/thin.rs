@@ -255,7 +255,20 @@ pub fn note(value: String) {
     STATE.with(|s| {
         let mut s = s.borrow_mut();
         if s.capture || value.starts_with("{\"kind\":\"configuration\"") {
-            if s.events.len() < MAX_EVENTS {
+            // Preserve source certificates and their exact keep/parent records
+            // even when early rejected speckles exhaust the ordinary log. The
+            // existing 16K total cap is unchanged; classifier decisions do not
+            // depend on either the events or omission counter.
+            let priority = s.capture
+                && (s.mode == 3 || s.mode == 4)
+                && (value.starts_with("{\"kind\":\"protection\"")
+                    || value.contains("\"legacyKeep\":false,\"kept\":true"));
+            let limit = if priority {
+                MAX_EVENTS
+            } else {
+                MAX_EVENTS - 128
+            };
+            if s.events.len() < limit {
                 s.events.push(value)
             } else {
                 s.omitted += 1;
@@ -716,6 +729,36 @@ mod tests {
         let result = STATE.with(|s| s.borrow().frames.last().unwrap().rgba.clone());
         drop(guard);
         result
+    }
+    #[test]
+    fn bounded_log_reserves_certificates_and_parent_decisions() {
+        configure(4, true);
+        for _ in 0..MAX_EVENTS + 100 {
+            note("{\"kind\":\"ordinary-rejection\"}".into());
+        }
+        for _ in 0..64 {
+            note("{\"kind\":\"protection\"}".into());
+            note("{\"kind\":\"deepen\",\"legacyKeep\":false,\"kept\":true}".into());
+        }
+        STATE.with(|s| {
+            let s = s.borrow();
+            assert_eq!(s.events.len(), MAX_EVENTS);
+            assert_eq!(
+                s.events
+                    .iter()
+                    .filter(|e| e.starts_with("{\"kind\":\"protection\""))
+                    .count(),
+                64
+            );
+            assert_eq!(
+                s.events
+                    .iter()
+                    .filter(|e| e.contains("\"kept\":true"))
+                    .count(),
+                64
+            );
+            assert_eq!(s.omitted, 228);
+        });
     }
     #[test]
     fn negative_only_ablation_does_not_promote_colored_ridges() {
