@@ -103,3 +103,6 @@ pub use session::Session;
 
 // Re-export the visioncortex value types callers need at the boundary.
 pub use visioncortex::{Color, ColorImage, PointF64, PointI32};
+
+#[cfg(feature = "runtime_work")]
+pub mod runtime_work;

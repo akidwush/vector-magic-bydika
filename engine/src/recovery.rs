@@ -122,6 +122,7 @@ pub fn locate(doc: &VectorDoc, img: &ColorImage) {
             let mut matches = 0;
             for (i, s) in doc.shapes.iter().enumerate() {
                 for (j, p) in s.path.subpaths.iter().enumerate() {
+                    legacy_count!(8, 1);
                     if *p == ctx.path {
                         found = Some((i, j));
                         matches += 1;
@@ -151,6 +152,7 @@ pub fn locate(doc: &VectorDoc, img: &ColorImage) {
                 if let Some(key) = canonical(&ctx.path) {
                     for (i, s) in doc.shapes.iter().enumerate() {
                         for (j, path) in s.path.subpaths.iter().enumerate() {
+                            legacy_count!(8, 1);
                             if canonical(path).is_some_and(|p| p == key) {
                                 found = Some((i, j));
                                 matches += 1;
@@ -1348,10 +1350,12 @@ fn span_recover(cs: &mut Vec<C>, ss: &[Sample], img: &ColorImage, matte: &Matte)
             continue;
         }
         let p95 = errors[((errors.len() - 1) as f64 * 0.95) as usize];
+        legacy_count!(9, 1);
         spans.push((p95 + max, edges));
     }
     spans.sort_by(|a, b| b.0.total_cmp(&a.0));
     for (rank, (_, edges)) in spans.into_iter().take(4).enumerate() {
+        legacy_count!(10, 1);
         count(14, 1.);
         let before_span = cs.clone();
         let mut fixed = hard.clone();

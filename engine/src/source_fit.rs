@@ -1174,6 +1174,7 @@ pub fn optimize(
     };
     let polygon = if subsampled { None } else { polygon };
     for model in [generic, ellipse, polygon].into_iter().flatten() {
+        legacy_count!(7, 1);
         let Some((model, path)) = quantized(model, img) else {
             continue;
         };

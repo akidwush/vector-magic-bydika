@@ -53,6 +53,8 @@ impl ColorClusterFrontend {
             return Err(Error::EmptyImage);
         }
 
+        #[cfg(feature = "runtime_work")]
+        crate::runtime_work::count(0, (img.width * img.height) as u64);
         let width = img.width;
         let height = img.height;
         let mut img = img.clone();
@@ -97,6 +99,11 @@ impl ColorClusterFrontend {
             // holes here would leave the layer below exposed as hairline seams.
             // The mosaic flatten is unaffected — a higher layer still wins per
             // pixel — so a solid parent gives the same partition.
+            #[cfg(feature = "runtime_work")]
+            {
+                crate::runtime_work::count(2, 1);
+                crate::runtime_work::count(3, (cluster.rect.width() * cluster.rect.height()) as u64);
+            }
             let image = cluster.to_image_with_hole(view.width, false);
             let mask = RegionMask::new(
                 image,
@@ -129,7 +136,11 @@ impl Frontend for ColorClusterFrontend {
         // resulting clusters are identical to the blocking path.
         let mut builder = Runner::new(config, image).start();
         ctx.report(Phase::Segment, 0.0);
-        while !builder.tick() {
+        while {
+            #[cfg(feature = "runtime_work")]
+            crate::runtime_work::count(1, 1);
+            !builder.tick()
+        } {
             ctx.check()?;
             ctx.report(Phase::Segment, builder.progress() as f32 / 100.0);
         }

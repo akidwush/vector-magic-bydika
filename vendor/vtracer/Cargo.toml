@@ -19,3 +19,6 @@ path = "src/lib.rs"
 visioncortex = "=0.9.3"
 flo_curves = "=0.8.0"
 
+
+[features]
+runtime_work = []

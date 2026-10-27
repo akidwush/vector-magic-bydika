@@ -350,6 +350,7 @@ pub(crate) fn displacement_bound(a: &G, b: &G, limit: f64) -> bool {
             let n = (distance(w[0], w[1]) / 0.5).ceil().max(1.) as usize;
             for i in 0..=n {
                 samples += 1;
+                legacy_count!(5, 1);
                 if samples > 32768 {
                     return false;
                 }
@@ -365,6 +366,7 @@ pub(crate) fn displacement_bound(a: &G, b: &G, limit: f64) -> bool {
                         if let Some(edges) = grid.get(&(key.0 + x, key.1 + y)) {
                             for &(u, v) in edges {
                                 checks += 1;
+                                legacy_count!(6, 1);
                                 if checks > 2_000_000 {
                                     return false;
                                 }
@@ -655,6 +657,7 @@ pub fn refine(seg: &Segment, img: &ColorImage, old: &G, ss: &[Sample]) -> Option
                         let mut chosen = candidate.clone();
                         let mut chosen_loss = local_best;
                         for sign in [-1., 1.] {
+                            legacy_count!(11, 1);
                             let mut trial = candidate.clone();
                             let G::Beziers(ref mut c) = trial else {
                                 unreachable!()
@@ -694,6 +697,7 @@ pub fn refine(seg: &Segment, img: &ColorImage, old: &G, ss: &[Sample]) -> Option
                     let mut value = loss(&candidate, ss, 0.001);
                     let mut chosen = candidate.clone();
                     for sign in [-1., 1.] {
+                        legacy_count!(11, 1);
                         let mut trial = candidate.clone();
                         let G::Beziers(ref mut cs) = trial else {
                             unreachable!()
@@ -812,6 +816,7 @@ pub fn refine(seg: &Segment, img: &ColorImage, old: &G, ss: &[Sample]) -> Option
                     let mut current = loss(&candidate, &local, 0.002);
                     let mut chosen = candidate.clone();
                     for sign in [-1., 1.] {
+                        legacy_count!(11, 1);
                         let mut trial = candidate.clone();
                         let G::Beziers(ref mut cs) = trial else {
                             unreachable!()

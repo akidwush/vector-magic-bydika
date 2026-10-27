@@ -30,3 +30,6 @@ runtime_uncached = ["runtime_profile"]
 
 # Source-exact inverse scoring experiment; no global cache or geometry changes.
 inverse_hotpath = ["source_geometry"]
+
+# Stage J counters; implies existing uncached profiler, never a production default.
+legacy_work = ["runtime_uncached", "vtracer/runtime_work"]

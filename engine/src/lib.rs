@@ -1,3 +1,21 @@
+macro_rules! legacy_count {
+    ($i:expr,$n:expr) => {
+        #[cfg(feature = "legacy_work")]
+        crate::legacy_work::count($i, $n as u64);
+    };
+}
+#[cfg(feature = "legacy_work")]
+mod legacy_work;
+#[cfg(feature = "legacy_work")]
+#[wasm_bindgen]
+pub fn last_legacy_work() -> Vec<f64> {
+    legacy_work::values()
+}
+#[cfg(feature = "legacy_work")]
+#[wasm_bindgen]
+pub fn legacy_work_names() -> String {
+    legacy_work::names()
+}
 // Compiles to no statements or argument evaluation outside diagnostic builds.
 macro_rules! runtime_scope {
     ($i:expr) => {
@@ -112,6 +130,8 @@ pub fn last_source_models() -> u32 {
 pub fn trace(rgba: Vec<u8>, width: usize, height: usize, preset: &str) -> Result<String, JsValue> {
     #[cfg(feature = "runtime_profile")]
     runtime_profile::reset();
+    #[cfg(feature = "legacy_work")]
+    legacy_work::reset();
     runtime_scope!(0);
     if width == 0
         || height == 0
@@ -384,6 +404,8 @@ pub fn trace_quality(
 ) -> Result<String, JsValue> {
     #[cfg(feature = "runtime_profile")]
     runtime_profile::reset();
+    #[cfg(feature = "legacy_work")]
+    legacy_work::reset();
     runtime_scope!(0);
     if width == 0
         || height == 0
@@ -551,6 +573,8 @@ struct RegionFitter {
 impl vtracer::fitter::CurveFitter for RegionFitter {
     fn fit_region(&self, mask: &vtracer::ir::RegionMask) -> Vec<vtracer::fitter::FittedGeom> {
         runtime_scope!(31);
+        legacy_count!(0, 1);
+        legacy_count!(1, mask.width() * mask.height());
         let mut output = Vec::new();
         for cluster in mask.image.to_clusters(false).iter() {
             let component = vtracer::ir::RegionMask::new(
@@ -560,6 +584,8 @@ impl vtracer::fitter::CurveFitter for RegionFitter {
                     y: mask.offset.y + cluster.rect.top,
                 },
             );
+            legacy_count!(2, 1);
+            legacy_count!(3, component.width() * component.height());
             let baseline = self.fit_component(&component);
             output.extend(if let Some(img) = &self.source {
                 inverse::component(
@@ -585,6 +611,7 @@ impl RegionFitter {
             && w as f64 / h as f64 >= 0.5
             && w as f64 / h as f64 <= 2.0;
         if round {
+            legacy_count!(4, w * h);
             let mut intersection = 0usize;
             let mut union = 0usize;
             for y in 0..h {

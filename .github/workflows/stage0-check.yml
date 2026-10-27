@@ -1,7 +1,7 @@
 name: NEXORA Stage 1
 on:
   push:
-    branches: [main, feat/stage-1-2-subpixel-coverage, feat/stage-1-2b-locked-shared-edges, feat/stage-1-3-corner-bezier, feat/source-guided-quality, feat/stage-1-4-curve-optimization, feat/stage-1-5-source-refinement, feat/stage-1-6-analytical-coverage, feat/stage-1-6b-source-geometry, feat/stage-1-6b-recovery, feat/stage-1-6c-low-resolution-geometry, feat/stage-1-6d-false-corner-recovery, feat/stage-1-6e-sharp-apex-recovery, feat/stage-1-6f-large-apex-recovery, feat/stage-1-6g-runtime-stabilization, feat/stage-1-6h-inverse-hotpath, feat/stage-1-6i-runtime-forensics]
+    branches: [main, feat/stage-1-2-subpixel-coverage, feat/stage-1-2b-locked-shared-edges, feat/stage-1-3-corner-bezier, feat/source-guided-quality, feat/stage-1-4-curve-optimization, feat/stage-1-5-source-refinement, feat/stage-1-6-analytical-coverage, feat/stage-1-6b-source-geometry, feat/stage-1-6b-recovery, feat/stage-1-6c-low-resolution-geometry, feat/stage-1-6d-false-corner-recovery, feat/stage-1-6e-sharp-apex-recovery, feat/stage-1-6f-large-apex-recovery, feat/stage-1-6g-runtime-stabilization, feat/stage-1-6h-inverse-hotpath, feat/stage-1-6i-runtime-forensics, feat/stage-1-6j-latency-root-cause]
   pull_request:
 jobs:
   validate:
@@ -44,13 +44,13 @@ jobs:
       - run: node scripts/source-refinement-quality-gate.mjs 2>&1 | tee -a "$RUNNER_TEMP/nexora-validation.log"
       - run: node scripts/subpixel-proof.mjs 2>&1 | tee -a "$RUNNER_TEMP/nexora-validation.log"
       - name: Test source geometry research feature
-        if: github.ref == 'refs/heads/feat/stage-1-6b-source-geometry' || github.ref == 'refs/heads/feat/stage-1-6b-recovery' || github.head_ref == 'feat/stage-1-6b-recovery' || github.ref == 'refs/heads/feat/stage-1-6c-low-resolution-geometry' || github.head_ref == 'feat/stage-1-6c-low-resolution-geometry' || github.ref == 'refs/heads/feat/stage-1-6d-false-corner-recovery' || github.head_ref == 'feat/stage-1-6d-false-corner-recovery' || github.ref == 'refs/heads/feat/stage-1-6e-sharp-apex-recovery' || github.head_ref == 'feat/stage-1-6e-sharp-apex-recovery' || github.ref == 'refs/heads/feat/stage-1-6f-large-apex-recovery' || github.head_ref == 'feat/stage-1-6f-large-apex-recovery' || github.ref == 'refs/heads/feat/stage-1-6g-runtime-stabilization' || github.head_ref == 'feat/stage-1-6g-runtime-stabilization' || github.ref == 'refs/heads/feat/stage-1-6h-inverse-hotpath' || github.head_ref == 'feat/stage-1-6h-inverse-hotpath' || github.ref == 'refs/heads/feat/stage-1-6i-runtime-forensics' || github.head_ref == 'feat/stage-1-6i-runtime-forensics'
+        if: github.ref == 'refs/heads/feat/stage-1-6b-source-geometry' || github.ref == 'refs/heads/feat/stage-1-6b-recovery' || github.head_ref == 'feat/stage-1-6b-recovery' || github.ref == 'refs/heads/feat/stage-1-6c-low-resolution-geometry' || github.head_ref == 'feat/stage-1-6c-low-resolution-geometry' || github.ref == 'refs/heads/feat/stage-1-6d-false-corner-recovery' || github.head_ref == 'feat/stage-1-6d-false-corner-recovery' || github.ref == 'refs/heads/feat/stage-1-6e-sharp-apex-recovery' || github.head_ref == 'feat/stage-1-6e-sharp-apex-recovery' || github.ref == 'refs/heads/feat/stage-1-6f-large-apex-recovery' || github.head_ref == 'feat/stage-1-6f-large-apex-recovery' || github.ref == 'refs/heads/feat/stage-1-6g-runtime-stabilization' || github.head_ref == 'feat/stage-1-6g-runtime-stabilization' || github.ref == 'refs/heads/feat/stage-1-6h-inverse-hotpath' || github.head_ref == 'feat/stage-1-6h-inverse-hotpath' || github.ref == 'refs/heads/feat/stage-1-6i-runtime-forensics' || github.ref == 'refs/heads/feat/stage-1-6j-latency-root-cause' || github.head_ref == 'feat/stage-1-6i-runtime-forensics' || github.head_ref == 'feat/stage-1-6j-latency-root-cause'
         run: cargo test --manifest-path engine/Cargo.toml --locked --features source_geometry 2>&1 | tee -a "$RUNNER_TEMP/nexora-validation.log"
       - name: Source geometry promotion gate (must block rejected candidates)
-        if: github.ref == 'refs/heads/feat/stage-1-6b-source-geometry' || github.ref == 'refs/heads/feat/stage-1-6b-recovery' || github.head_ref == 'feat/stage-1-6b-recovery' || github.ref == 'refs/heads/feat/stage-1-6c-low-resolution-geometry' || github.head_ref == 'feat/stage-1-6c-low-resolution-geometry' || github.ref == 'refs/heads/feat/stage-1-6d-false-corner-recovery' || github.head_ref == 'feat/stage-1-6d-false-corner-recovery' || github.ref == 'refs/heads/feat/stage-1-6e-sharp-apex-recovery' || github.head_ref == 'feat/stage-1-6e-sharp-apex-recovery' || github.ref == 'refs/heads/feat/stage-1-6f-large-apex-recovery' || github.head_ref == 'feat/stage-1-6f-large-apex-recovery' || github.ref == 'refs/heads/feat/stage-1-6g-runtime-stabilization' || github.head_ref == 'feat/stage-1-6g-runtime-stabilization' || github.ref == 'refs/heads/feat/stage-1-6h-inverse-hotpath' || github.head_ref == 'feat/stage-1-6h-inverse-hotpath' || github.ref == 'refs/heads/feat/stage-1-6i-runtime-forensics' || github.head_ref == 'feat/stage-1-6i-runtime-forensics'
+        if: github.ref == 'refs/heads/feat/stage-1-6b-source-geometry' || github.ref == 'refs/heads/feat/stage-1-6b-recovery' || github.head_ref == 'feat/stage-1-6b-recovery' || github.ref == 'refs/heads/feat/stage-1-6c-low-resolution-geometry' || github.head_ref == 'feat/stage-1-6c-low-resolution-geometry' || github.ref == 'refs/heads/feat/stage-1-6d-false-corner-recovery' || github.head_ref == 'feat/stage-1-6d-false-corner-recovery' || github.ref == 'refs/heads/feat/stage-1-6e-sharp-apex-recovery' || github.head_ref == 'feat/stage-1-6e-sharp-apex-recovery' || github.ref == 'refs/heads/feat/stage-1-6f-large-apex-recovery' || github.head_ref == 'feat/stage-1-6f-large-apex-recovery' || github.ref == 'refs/heads/feat/stage-1-6g-runtime-stabilization' || github.head_ref == 'feat/stage-1-6g-runtime-stabilization' || github.ref == 'refs/heads/feat/stage-1-6h-inverse-hotpath' || github.head_ref == 'feat/stage-1-6h-inverse-hotpath' || github.ref == 'refs/heads/feat/stage-1-6i-runtime-forensics' || github.ref == 'refs/heads/feat/stage-1-6j-latency-root-cause' || github.head_ref == 'feat/stage-1-6i-runtime-forensics' || github.head_ref == 'feat/stage-1-6j-latency-root-cause'
         env:
-          NEXORA_RESEARCH_STAGE: ${{ (github.ref == 'refs/heads/feat/stage-1-6h-inverse-hotpath' || github.head_ref == 'feat/stage-1-6h-inverse-hotpath' || github.ref == 'refs/heads/feat/stage-1-6i-runtime-forensics' || github.head_ref == 'feat/stage-1-6i-runtime-forensics') && 'stage16h' || 'stage16g' }}
-          NEXORA_INVERSE_HOTPATH: ${{ (github.ref == 'refs/heads/feat/stage-1-6h-inverse-hotpath' || github.head_ref == 'feat/stage-1-6h-inverse-hotpath' || github.ref == 'refs/heads/feat/stage-1-6i-runtime-forensics' || github.head_ref == 'feat/stage-1-6i-runtime-forensics') && '1' || '0' }}
+          NEXORA_RESEARCH_STAGE: ${{ (github.ref == 'refs/heads/feat/stage-1-6h-inverse-hotpath' || github.head_ref == 'feat/stage-1-6h-inverse-hotpath' || github.ref == 'refs/heads/feat/stage-1-6i-runtime-forensics' || github.ref == 'refs/heads/feat/stage-1-6j-latency-root-cause' || github.head_ref == 'feat/stage-1-6i-runtime-forensics' || github.head_ref == 'feat/stage-1-6j-latency-root-cause') && 'stage16h' || 'stage16g' }}
+          NEXORA_INVERSE_HOTPATH: ${{ (github.ref == 'refs/heads/feat/stage-1-6h-inverse-hotpath' || github.head_ref == 'feat/stage-1-6h-inverse-hotpath' || github.ref == 'refs/heads/feat/stage-1-6i-runtime-forensics' || github.ref == 'refs/heads/feat/stage-1-6j-latency-root-cause' || github.head_ref == 'feat/stage-1-6i-runtime-forensics' || github.head_ref == 'feat/stage-1-6j-latency-root-cause') && '1' || '0' }}
         run: bash scripts/source-target-research.sh 2>&1 | tee -a "$RUNNER_TEMP/nexora-validation.log"
       - name: Publish failed validation details
         if: failure()
@@ -77,7 +77,7 @@ jobs:
             dist/
 
   runtime-research:
-    if: github.ref == 'refs/heads/feat/stage-1-6g-runtime-stabilization' || github.head_ref == 'feat/stage-1-6g-runtime-stabilization' || github.ref == 'refs/heads/feat/stage-1-6h-inverse-hotpath' || github.head_ref == 'feat/stage-1-6h-inverse-hotpath' || github.ref == 'refs/heads/feat/stage-1-6i-runtime-forensics' || github.head_ref == 'feat/stage-1-6i-runtime-forensics'
+    if: github.ref == 'refs/heads/feat/stage-1-6g-runtime-stabilization' || github.head_ref == 'feat/stage-1-6g-runtime-stabilization' || github.ref == 'refs/heads/feat/stage-1-6h-inverse-hotpath' || github.head_ref == 'feat/stage-1-6h-inverse-hotpath' || github.ref == 'refs/heads/feat/stage-1-6i-runtime-forensics' || github.ref == 'refs/heads/feat/stage-1-6j-latency-root-cause' || github.head_ref == 'feat/stage-1-6i-runtime-forensics' || github.head_ref == 'feat/stage-1-6j-latency-root-cause'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -98,14 +98,14 @@ jobs:
       - run: cargo test --manifest-path engine/Cargo.toml --locked --features runtime_profile
       - run: cargo test --manifest-path engine/Cargo.toml --locked --features runtime_uncached
       - run: cargo test --manifest-path engine/Cargo.toml --locked --features large_apex,inverse_hotpath
-        if: github.ref == 'refs/heads/feat/stage-1-6h-inverse-hotpath' || github.head_ref == 'feat/stage-1-6h-inverse-hotpath' || github.ref == 'refs/heads/feat/stage-1-6i-runtime-forensics' || github.head_ref == 'feat/stage-1-6i-runtime-forensics'
+        if: github.ref == 'refs/heads/feat/stage-1-6h-inverse-hotpath' || github.head_ref == 'feat/stage-1-6h-inverse-hotpath' || github.ref == 'refs/heads/feat/stage-1-6i-runtime-forensics' || github.ref == 'refs/heads/feat/stage-1-6j-latency-root-cause' || github.head_ref == 'feat/stage-1-6i-runtime-forensics' || github.head_ref == 'feat/stage-1-6j-latency-root-cause'
       - run: bash scripts/build-wasm.sh
-        if: github.ref == 'refs/heads/feat/stage-1-6h-inverse-hotpath' || github.head_ref == 'feat/stage-1-6h-inverse-hotpath' || github.ref == 'refs/heads/feat/stage-1-6i-runtime-forensics' || github.head_ref == 'feat/stage-1-6i-runtime-forensics'
+        if: github.ref == 'refs/heads/feat/stage-1-6h-inverse-hotpath' || github.head_ref == 'feat/stage-1-6h-inverse-hotpath' || github.ref == 'refs/heads/feat/stage-1-6i-runtime-forensics' || github.ref == 'refs/heads/feat/stage-1-6j-latency-root-cause' || github.head_ref == 'feat/stage-1-6i-runtime-forensics' || github.head_ref == 'feat/stage-1-6j-latency-root-cause'
       - run: bash scripts/runtime-research.sh
         env:
-          NEXORA_RUNTIME_STAGE: ${{ (github.ref == 'refs/heads/feat/stage-1-6h-inverse-hotpath' || github.head_ref == 'feat/stage-1-6h-inverse-hotpath' || github.ref == 'refs/heads/feat/stage-1-6i-runtime-forensics' || github.head_ref == 'feat/stage-1-6i-runtime-forensics') && '16h' || '16g' }}
+          NEXORA_RUNTIME_STAGE: ${{ (github.ref == 'refs/heads/feat/stage-1-6h-inverse-hotpath' || github.head_ref == 'feat/stage-1-6h-inverse-hotpath' || github.ref == 'refs/heads/feat/stage-1-6i-runtime-forensics' || github.ref == 'refs/heads/feat/stage-1-6j-latency-root-cause' || github.head_ref == 'feat/stage-1-6i-runtime-forensics' || github.head_ref == 'feat/stage-1-6j-latency-root-cause') && '16h' || '16g' }}
       - run: bash scripts/inverse-hotpath-proof.sh
-        if: github.ref == 'refs/heads/feat/stage-1-6h-inverse-hotpath' || github.head_ref == 'feat/stage-1-6h-inverse-hotpath' || github.ref == 'refs/heads/feat/stage-1-6i-runtime-forensics' || github.head_ref == 'feat/stage-1-6i-runtime-forensics'
+        if: github.ref == 'refs/heads/feat/stage-1-6h-inverse-hotpath' || github.head_ref == 'feat/stage-1-6h-inverse-hotpath' || github.ref == 'refs/heads/feat/stage-1-6i-runtime-forensics' || github.ref == 'refs/heads/feat/stage-1-6j-latency-root-cause' || github.head_ref == 'feat/stage-1-6i-runtime-forensics' || github.head_ref == 'feat/stage-1-6j-latency-root-cause'
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -116,7 +116,7 @@ jobs:
           if-no-files-found: warn
 
   cross-harness-research:
-    if: github.ref == 'refs/heads/feat/stage-1-6i-runtime-forensics' || github.head_ref == 'feat/stage-1-6i-runtime-forensics'
+    if: github.ref == 'refs/heads/feat/stage-1-6i-runtime-forensics' || github.ref == 'refs/heads/feat/stage-1-6j-latency-root-cause' || github.head_ref == 'feat/stage-1-6i-runtime-forensics' || github.head_ref == 'feat/stage-1-6j-latency-root-cause'
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
@@ -142,3 +142,50 @@ jobs:
           name: cross-harness-raw-${{ github.sha }}
           path: benchmark-results/stage16i/
           if-no-files-found: warn
+
+  legacy-cpu-forensics:
+    if: github.ref == 'refs/heads/feat/stage-1-6j-latency-root-cause' || github.head_ref == 'feat/stage-1-6j-latency-root-cause'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.99.1"
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: engine
+      - run: cargo install wasm-bindgen-cli --version 0.2.126 --locked
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: node --test scripts/tests/runtime-legacy.test.mjs
+      - run: cargo test --manifest-path engine/Cargo.toml --locked --features legacy_work,inverse_hotpath
+      - name: Pinned F and H binaries (isolated)
+        run: |
+          mkdir -p benchmark-results/stage16j
+          NEXORA_CROSS_ROOT="$PWD/benchmark-results/stage16j/modules" bash scripts/runtime-cross-builds.sh
+      - name: Exact callback, controls and bounded sampling
+        env:
+          NEXORA_CROSS_BUILDS: benchmark-results/stage16j/modules
+          NEXORA_LEGACY_ROOT: benchmark-results/stage16j/legacy-primary
+        run: node scripts/runtime-legacy-cpu-forensics.mjs
+      - name: Extended counters (distinct diagnostic binaries)
+        run: |
+          NEXORA_LEGACY_BUILDS=benchmark-results/stage16j/diagnostic-modules bash scripts/runtime-legacy-diagnostic-builds.sh
+          NEXORA_CROSS_BUILDS=benchmark-results/stage16j/diagnostic-modules NEXORA_LEGACY_MODULES=diagnostic-reference,diagnostic-hotpath NEXORA_LEGACY_ROOT=benchmark-results/stage16j/legacy-diagnostic NEXORA_LEGACY_SESSIONS=2 NEXORA_LEGACY_DETAIL=1 node scripts/runtime-legacy-cpu-forensics.mjs
+      - name: Download control on normal production build
+        run: |
+          bash scripts/build-wasm.sh
+          npm run build
+          NEXORA_DOWNLOAD_ROOT=benchmark-results/stage16j/download node scripts/runtime-download-diagnosis.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: legacy-cpu-raw-${{ github.sha }}
+          path: benchmark-results/stage16j/
+          if-no-files-found: error
