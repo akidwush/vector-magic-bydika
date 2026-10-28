@@ -534,7 +534,7 @@ mod local_cut_budget_tests {
         let map = LabelMap::from_segmentation(&tree.cut(&img, 0, 4));
         assert!(report().contains("\"cutProtected\":1"));
         assert_eq!(
-            map.paints.len(),
+            map.labels.iter().copied().collect::<std::collections::BTreeSet<_>>().len(),
             2,
             "one retained tree edge, not a global high-detail cut"
         );
