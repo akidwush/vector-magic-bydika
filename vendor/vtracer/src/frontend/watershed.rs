@@ -305,6 +305,10 @@ impl WatershedHierarchy {
             let target = (2f64).powf(detail as f64 / 25.5).round() as usize;
             let target = target.clamp(1, m);
             let lambda = self.pers[self.order[m - target] as usize];
+            #[cfg(feature = "watershed_region_research")]
+            crate::region_research::event(format!(
+                "{{\"reason\":\"WATERSHED_CUT_LEVEL\",\"detail\":{detail},\"target\":{target},\"lambda\":{lambda},\"minArea\":{min_area}}}"
+            ));
             for &k in &self.order {
                 if self.pers[k as usize] > lambda {
                     break;
@@ -325,6 +329,7 @@ impl WatershedHierarchy {
                             v[i],
                             v[j],
                             self.pers[k as usize],
+                            |p, side| uf.find(p as u32) == if side { rp } else { rq },
                         ) {
                             continue;
                         }

@@ -388,9 +388,40 @@ fn run_pipeline_once(
             vtracer::compose::Compositing::Mosaic { merge_diff, .. } => *merge_diff,
             _ => 0,
         };
+        #[cfg(feature = "watershed_region_research")]
+        let reuse_partition =
+            vtracer::region_research::active(1) || vtracer::region_research::active(2);
+        #[cfg(feature = "watershed_region_research")]
+        if reuse_partition {
+            vtracer::thin::mosaic("before-color-merge", &map, merge_diff);
+        }
         map.merge_similar(merge_diff);
+        #[cfg(feature = "watershed_region_research")]
+        if reuse_partition {
+            vtracer::thin::mosaic("after-color-merge", &map, merge_diff);
+        }
+        let mut doc = {
+            #[cfg(feature = "watershed_region_research")]
+            if reuse_partition {
+                if let vtracer::compose::Compositing::Mosaic { fitter, .. } = &pipeline.compositing
+                {
+                    vtracer::mosaic::compose_label_map(
+                        &map,
+                        fitter.as_ref(),
+                        &pipeline.curve_passes,
+                    )
+                } else {
+                    pipeline.compositing.compose(&seg, &pipeline.curve_passes)
+                }
+            } else {
+                pipeline.compositing.compose(&seg, &pipeline.curve_passes)
+            }
+            #[cfg(not(feature = "watershed_region_research"))]
+            {
+                pipeline.compositing.compose(&seg, &pipeline.curve_passes)
+            }
+        };
         source_map = Some(map);
-        let mut doc = pipeline.compositing.compose(&seg, &pipeline.curve_passes);
         for pass in &pipeline.optimizers {
             pass.run(&mut doc);
         }

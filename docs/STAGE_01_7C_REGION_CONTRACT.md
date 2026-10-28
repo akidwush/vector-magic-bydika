@@ -12,7 +12,7 @@ No filenames, references, expected coordinates or other resolutions are inputs.
 Cut/detail, palette, fitter, precision and historical gates unchanged. Encoded-RGB
 support (not perceptual delta-E): <=2.5 level local variation, >=6 level separation,
 
-> =16 pixels per current root,7 transects at radii1/2. Source support is not proof of
+> =16 pixels per current root,7 transects at radii1/2/3. Source support is not proof of
 > semantic identity. Final local/neighbor reconstruction, topology and complexity
 > must pass or restore immutable baseline.
 
@@ -22,3 +22,30 @@ Every union decision uses current membership and weighted paints.
 Botanical is development, harbour held out until rule freeze. Pale garden and
 orbital badge are requested previously observed cases, not new blind holdouts.
 Reject local paint damage, codec fragmentation, topology/alpha or old gate failures.
+
+## Composition ownership correction
+
+Audit of the prototype found two `merge_similar` calls in source-blend: one for
+source correspondence, one inside the compositor. Shared evidence budgets could
+make those calls produce different partitions. The research integration therefore
+passes the already merged map to the existing graph/fitter/face composer. There
+is one authoritative partition per candidate; no veto decision is cached over a
+membership change. Disabled/default mode retains the previous caller behavior.
+This correction follows code-path evidence, not holdout reference outcomes.
+
+## Final shared-edge acceptance
+
+Actual serialized pale-garden output revealed non-identical incident face atoms
+already in baseline. Composition is canonical, but later source-blend coverage
+refinement can independently move faces. Stage C does not rewrite that old pass.
+A changed candidate must now have exact oppositely directed shared atoms in its
+FINAL IR (zero unmatched internal atoms, closed paths, bounded/finites), otherwise
+it rolls back before expensive paint rendering. The separate actual-download
+check normalizes only decimal parser arithmetic to six places. Existing baseline
+defects remain reported; retaining them is not a repair. This guard follows a
+measured architecture defect, not a relaxation of source or topology gates.
+
+Ownership is verified for every sampled side at CURRENT union-find roots, not
+just at the seed edge. The44 charged source observations cover two local core
+samples and7x3x2 transects. Alternate cut-window centers also recheck ownership.
+A similar-colored third face cannot lend evidence to a different root.

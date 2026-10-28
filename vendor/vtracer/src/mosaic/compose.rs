@@ -45,6 +45,16 @@ pub fn compose_mosaic(
         feature = "watershed_region_research"
     ))]
     crate::thin::mosaic("after-color-merge", &map, merge_diff);
+    compose_label_map(&map, fitter, passes)
+}
+
+/// Compose an already merged partition. Research integrations can reuse this
+/// exact map for correspondence and export instead of repeating stateful vetoes.
+pub fn compose_label_map(
+    map: &LabelMap,
+    fitter: &dyn SegmentFitter,
+    passes: &[Box<dyn CurvePass>],
+) -> VectorDoc {
     let graph = BoundaryGraph::extract(&map);
     let faces = assemble(&graph, &map);
 

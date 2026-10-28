@@ -71,12 +71,89 @@ pub fn run(
     vtracer::thin::restore_snapshot(captured);
     let t = super::now();
     FAILURE.with(|s| s.borrow_mut().clear());
-    let result = bd.zip(cd).and_then(|(b, c)| compare(&b, &c, &img));
+    let result = bd.zip(cd).and_then(|(b, c)| {
+        if !shared_partition(&c) {
+            FAILURE.with(|s| *s.borrow_mut() = "FINAL_SHARED_EDGE_MISMATCH".into());
+            None
+        } else {
+            compare(&b, &c, &img)
+        }
+    });
     let accepted = result.as_ref().is_some_and(|r| r.accepted);
     let detail=result.map(|r|format!("{{\"baselineMAE\":{},\"candidateMAE\":{},\"changedTiles\":{},\"worseTiles\":{},\"samples\":{}}}",r.before,r.after,r.changed,r.worse,r.samples)).unwrap_or_else(||format!("{{\"rejected\":\"{}\"}}",FAILURE.with(|s|s.borrow().clone())));
     let ms = super::now() - t;
     REPORT.with(|s|*s.borrow_mut()=format!("{{\"verdict\":\"{}\",\"candidateMs\":{candidate_ms},\"baselineReplayMs\":{baseline_ms},\"validationMs\":{ms},\"paint\":{detail},\"evidence\":{evidence}}}",if accepted{"ACCEPTED"}else{"ROLLBACK"}));
     Ok(if accepted { candidate } else { baseline })
+}
+// Validate FINAL IR, after all source/coverage/reducer operations. A correct
+// initial graph alone cannot certify later independently moved face boundaries.
+fn shared_partition(doc: &VectorDoc) -> bool {
+    use std::collections::BTreeMap;
+    use vtracer::PointF64 as P;
+    let mut atoms = BTreeMap::<Vec<u64>, (usize, i32)>::new();
+    let mut count = 0;
+    let frame = |ps: &[P]| {
+        ps.iter().all(|p| p.x == 0.)
+            || ps.iter().all(|p| p.y == 0.)
+            || ps.iter().all(|p| p.x == doc.width as f64)
+            || ps.iter().all(|p| p.y == doc.height as f64)
+    };
+    for shape in &doc.shapes {
+        for sub in &shape.path.subpaths {
+            let mut start = None;
+            let mut current = P { x: 0., y: 0. };
+            for command in &sub.commands {
+                let points = match *command {
+                    PathCmd::MoveTo(p) => {
+                        start = Some(p);
+                        current = p;
+                        continue;
+                    }
+                    PathCmd::LineTo(p) => {
+                        let ps = vec![current, p];
+                        current = p;
+                        ps
+                    }
+                    PathCmd::CubicTo(a, b, p) => {
+                        let ps = vec![current, a, b, p];
+                        current = p;
+                        ps
+                    }
+                    PathCmd::Close => {
+                        let Some(p) = start else {
+                            return false;
+                        };
+                        let ps = vec![current, p];
+                        current = p;
+                        ps
+                    }
+                };
+                count += 1;
+                if count > 16_384 || points.iter().any(|p| !p.x.is_finite() || !p.y.is_finite()) {
+                    return false;
+                }
+                if points.iter().all(|p| *p == points[0]) || frame(&points) {
+                    continue;
+                }
+                let key = |ps: Vec<P>| {
+                    ps.into_iter()
+                        .flat_map(|p| [p.x, p.y])
+                        .map(|v| if v == 0. { 0 } else { v.to_bits() })
+                        .collect::<Vec<_>>()
+                };
+                let a = key(points.clone());
+                let b = key(points.into_iter().rev().collect());
+                let (dir, k) = if a < b { (1, a) } else { (-1, b) };
+                let e = atoms.entry(k).or_default();
+                e.0 += 1;
+                e.1 += dir;
+            }
+            if sub.commands.last() != Some(&PathCmd::Close) {
+                return false;
+            }
+        }
+    }
+    atoms.values().all(|&(n, d)| n == 2 && d == 0)
 }
 struct Comparison {
     accepted: bool,
@@ -100,13 +177,23 @@ fn fail(reason: String) -> Option<Vec<[f64; 4]>> {
 // The existing fitter flattener has a per-curve-model cap of8192. A compound
 // SVG path can contain many such fitted models. Reuse it in fixed64-cubic
 // chunks, preserving subdivision and summation order; total remains capped.
-fn flatten_path(g:&vtracer::mosaic::FittedGeom)->Option<Vec<vtracer::PointF64>>{
+fn flatten_path(g: &vtracer::mosaic::FittedGeom) -> Option<Vec<vtracer::PointF64>> {
     use vtracer::mosaic::FittedGeom as G;
-    match g{G::Polyline(_)=>super::inverse::flatten(g,0.001),G::Beziers(cs)=>{
-        let mut out=Vec::new();for chunk in cs.chunks(64){let ps=super::inverse::flatten(&G::Beziers(chunk.to_vec()),0.001)?;
-            let skip=usize::from(!out.is_empty());out.extend(ps.into_iter().skip(skip));if out.len()>65_536{return None;}
-        }Some(out)
-    }}
+    match g {
+        G::Polyline(_) => super::inverse::flatten(g, 0.001),
+        G::Beziers(cs) => {
+            let mut out = Vec::new();
+            for chunk in cs.chunks(64) {
+                let ps = super::inverse::flatten(&G::Beziers(chunk.to_vec()), 0.001)?;
+                let skip = usize::from(!out.is_empty());
+                out.extend(ps.into_iter().skip(skip));
+                if out.len() > 65_536 {
+                    return None;
+                }
+            }
+            Some(out)
+        }
+    }
 }
 fn render(d: &VectorDoc, img: &ColorImage) -> Option<Vec<[f64; 4]>> {
     // Full image <=512², but only samples inside each shape's bbox enter the
@@ -135,8 +222,14 @@ fn render(d: &VectorDoc, img: &ColorImage) -> Option<Vec<[f64; 4]>> {
             if sub.commands.last() != Some(&PathCmd::Close) {
                 return fail("OPEN_SUBPATH".into());
             }
-            let model=super::source_fit::from_path(sub).or_else(||{FAILURE.with(|s|*s.borrow_mut()="INVALID_SUBPATH".into());None})?;
-            let poly=flatten_path(&model).or_else(||{FAILURE.with(|s|*s.borrow_mut()="VALIDATION_FLATTEN_LIMIT".into());None})?;
+            let model = super::source_fit::from_path(sub).or_else(|| {
+                FAILURE.with(|s| *s.borrow_mut() = "INVALID_SUBPATH".into());
+                None
+            })?;
+            let poly = flatten_path(&model).or_else(|| {
+                FAILURE.with(|s| *s.borrow_mut() = "VALIDATION_FLATTEN_LIMIT".into());
+                None
+            })?;
             total_edges += poly.len();
             if total_edges > 65_536 {
                 return fail(format!("FLATTEN_BUDGET:{total_edges}"));
@@ -284,6 +377,28 @@ mod tests {
             pixels: (0..256).flat_map(|_| [252, 252, 252, 255]).collect(),
         };
         (d, i)
+    }
+    #[test]
+    fn final_partition_rejects_independent_overlay_and_accepts_exact_reverse() {
+        let (mut d, _) = scene(252);
+        let inner = rect(4., 4., 8., 8., 240);
+        d.shapes.push(inner.clone());
+        assert!(!shared_partition(&d));
+        let p = |x, y| PointF64 { x, y };
+        d.shapes[0].path.subpaths.push(SubPath {
+            commands: vec![
+                PathCmd::MoveTo(p(4., 4.)),
+                PathCmd::LineTo(p(4., 12.)),
+                PathCmd::LineTo(p(12., 12.)),
+                PathCmd::LineTo(p(12., 4.)),
+                PathCmd::Close,
+            ],
+        });
+        assert!(shared_partition(&d));
+        if let PathCmd::LineTo(ref mut q) = d.shapes[1].path.subpaths[0].commands[1] {
+            q.x += 0.001;
+        }
+        assert!(!shared_partition(&d));
     }
     #[test]
     fn exact_green_paint_improvement_passes() {

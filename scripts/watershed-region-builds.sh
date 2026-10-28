@@ -15,6 +15,8 @@ trap cleanup EXIT
 git worktree add --detach "$work" ad770ad49b6168a75c1751bfbed412aad824fc15
 CARGO_TARGET_DIR="$PWD/engine/target" cargo build --manifest-path "$work/engine/Cargo.toml" --locked --release --target wasm32-unknown-unknown -j2
 wasm-bindgen engine/target/wasm32-unknown-unknown/release/nexora_wasm.wasm --target web --out-dir "$root/baseline"
+CARGO_TARGET_DIR="$PWD/engine/target" cargo build --manifest-path "$work/engine/Cargo.toml" --locked --release --target wasm32-unknown-unknown --features thin_feature_research -j2
+wasm-bindgen engine/target/wasm32-unknown-unknown/release/nexora_wasm.wasm --target web --out-dir "$root/thin-source"
 cargo build --manifest-path engine/Cargo.toml --locked --release --target wasm32-unknown-unknown --features watershed_region_research -j2
 wasm-bindgen engine/target/wasm32-unknown-unknown/release/nexora_wasm.wasm --target web --out-dir "$root/research"
 NEXORA_WATERSHED_BUILDS="$root" node scripts/watershed-region-builds.mjs

@@ -19,7 +19,7 @@ pub mod face;
 mod fit;
 mod graph;
 
-pub use compose::{compose_fitted, compose_mosaic};
+pub use compose::{compose_fitted, compose_label_map, compose_mosaic};
 pub use fit::{
     FittedGeom, FittedSegment, PixelSegmentFitter, PolygonSegmentFitter, SegmentFitter,
     SplineSegmentFitter,
@@ -235,7 +235,17 @@ impl LabelMap {
                             }
                         }
                         if crate::region_research::merge_veto(
-                            ra, rb, area[ia], area[ib], sum[ia], sum[ib], &edges, max_diff,
+                            ra,
+                            rb,
+                            area[ia],
+                            area[ib],
+                            sum[ia],
+                            sum[ib],
+                            &edges,
+                            max_diff,
+                            |p, side| {
+                                find(&mut parent, self.labels[p]) == if side { ra } else { rb }
+                            },
                         ) {
                             continue;
                         }

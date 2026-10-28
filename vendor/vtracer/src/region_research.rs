@@ -121,24 +121,31 @@ fn linf(a: [f64; 3], b: [f64; 3]) -> f64 {
 }
 /// Stable two-sided observations at radii one and two, along seven parallel
 /// transects. Same-color/gradient samples and a single anomalous pixel fail.
-fn support(img: &ColorImage, p: usize, q: usize, a: [f64; 3], b: [f64; 3]) -> usize {
+fn support(
+    img: &ColorImage,
+    p: usize,
+    q: usize,
+    a: [f64; 3],
+    b: [f64; 3],
+    owner: &mut dyn FnMut(usize, bool) -> bool,
+) -> usize {
     let w = img.width as i32;
     let h = img.height as i32;
     let (px, py) = ((p % img.width) as i32, (p / img.width) as i32);
     let (qx, qy) = ((q % img.width) as i32, (q / img.width) as i32);
     let (dx, dy) = (qx - px, qy - py);
     let (tx, ty) = (-dy, dx);
-    let at = |x: i32, y: i32| -> Option<[f64; 3]> {
-        if x < 0 || y < 0 || x >= w || y >= h {
+    let mut at = |x: i32, y: i32, side: bool| -> Option<[f64; 3]> {
+        if x < 0 || y < 0 || x >= w || y >= h || !owner((y * w + x) as usize, side) {
             None
         } else {
             Some(rgb(img, (y * w + x) as usize))
         }
     };
-    let Some(ca) = at(px - 2 * dx, py - 2 * dy) else {
+    let Some(ca) = at(px - 2 * dx, py - 2 * dy, true) else {
         return 0;
     };
-    let Some(cb) = at(qx + 2 * dx, qy + 2 * dy) else {
+    let Some(cb) = at(qx + 2 * dx, qy + 2 * dy, false) else {
         return 0;
     };
     if linf(ca, cb) < 6. || (0..3).map(|k| (ca[k] - cb[k]) * (a[k] - b[k])).sum::<f64>() <= 0. {
@@ -148,8 +155,8 @@ fn support(img: &ColorImage, p: usize, q: usize, a: [f64; 3], b: [f64; 3]) -> us
     for t in -3..=3 {
         let mut good = true;
         for r in 1..=3 {
-            let c = at(px + t * tx - r * dx, py + t * ty - r * dy);
-            let d = at(qx + t * tx + r * dx, qy + t * ty + r * dy);
+            let c = at(px + t * tx - r * dx, py + t * ty - r * dy, true);
+            let d = at(qx + t * tx + r * dx, qy + t * ty + r * dy, false);
             if !matches!((c,d),(Some(c),Some(d))if linf(c,ca)<=2.5&&linf(d,cb)<=2.5&&linf(c,d)>=6.)
             {
                 good = false;
@@ -175,6 +182,7 @@ pub fn cut_veto(
     va: [u64; 3],
     vb: [u64; 3],
     persistence: u64,
+    mut owner: impl FnMut(usize, bool) -> bool,
 ) -> bool {
     if !active(2) || aa < 16 || ab < 16 || persistence == 0 {
         return false;
@@ -190,7 +198,7 @@ pub fn cut_veto(
     }) {
         return false;
     }
-    if !charge(5 * 42) {
+    if !charge(5 * 44) {
         return false;
     }
     let Some(img) = source() else { return false };
@@ -210,7 +218,7 @@ pub fn cut_veto(
                 None
             } else {
                 let p = (ny as usize) * w + nx as usize;
-                Some(support(&img, p, p + delta, a, b))
+                Some(support(&img, p, p + delta, a, b, &mut owner))
             }
         })
         .max()
@@ -236,13 +244,14 @@ pub fn merge_veto(
     sb: [u64; 3],
     edges: &[(usize, usize)],
     threshold: i32,
+    mut owner: impl FnMut(usize, bool) -> bool,
 ) -> bool {
     if !active(1)
         || aa < 16
         || ab < 16
         || edges.len() < 12
         || edges.len() > 8192
-        || !charge(edges.len().min(256) * 42)
+        || !charge(edges.len().min(256) * 44)
     {
         return false;
     }
@@ -257,7 +266,7 @@ pub fn merge_veto(
     for &(p, q) in edges.iter().step_by((edges.len() / 128).max(1)).take(256) {
         // Paints are part of the evidence: retaining an identical or distorted
         // palette color cannot pass just because source pixels differ.
-        if support(&img, p, q, ca, cb) >= 5 {
+        if support(&img, p, q, ca, cb, &mut owner) >= 5 {
             supported += 1;
         }
         for (i, c) in [(p, ca), (q, cb)] {
@@ -342,7 +351,8 @@ mod tests {
             [252 * 512; 3],
             [240 * 512; 3],
             &es,
-            40
+            40,
+            |i, side| (i % 32 < 16) == side
         ));
         configure(2);
         assert!(!merge_veto(
@@ -353,7 +363,8 @@ mod tests {
             [252 * 512; 3],
             [240 * 512; 3],
             &es,
-            40
+            40,
+            |i, side| (i % 32 < 16) == side
         ));
     }
     #[test]
@@ -369,7 +380,8 @@ mod tests {
             [246 * 512; 3],
             [246 * 512; 3],
             &es,
-            40
+            40,
+            |i, side| (i % 32 < 16) == side
         ));
     }
     #[test]
@@ -385,7 +397,8 @@ mod tests {
             [252 * 512; 3],
             [240 * 512; 3],
             &es,
-            40
+            40,
+            |i, side| (i % 32 < 16) == side
         ));
     }
     #[test]
@@ -415,7 +428,8 @@ mod tests {
             [228 * 512; 3],
             [244 * 512; 3],
             &es,
-            50
+            50,
+            |i, side| (i % 32 < 16) == side
         ));
     }
     #[test]
@@ -432,9 +446,57 @@ mod tests {
 }
 
 #[cfg(test)]
-mod partition_tests{
- use super::*;use crate::{frontend::watershed::WatershedHierarchy,mosaic::LabelMap,ir::Paint};
- fn scene()->Arc<ColorImage>{Arc::new(ColorImage{width:32,height:32,pixels:(0..1024).flat_map(|p|{let c=if p%32<16{252}else{240};[c,c,c,255]}).collect()})}
- #[test]fn retains_an_existing_tree_split_without_changing_detail(){let img=scene();let tree=WatershedHierarchy::build(&img).unwrap();configure(0);let a={let _s=start(img.clone());LabelMap::from_segmentation(&tree.cut(&img,0,4))};configure(2);let b={let _s=start(img.clone());LabelMap::from_segmentation(&tree.cut(&img,0,4))};assert_eq!(a.paints.len(),1);assert!(b.labels[0]!=b.labels[31]);assert!(report().contains("\"cutProtected\":1"));}
- #[test]fn protected_map_has_dense_ids_correct_paints_and_complete_ownership(){let img=scene();configure(1);let _g=start(img);let mut map=LabelMap{width:32,height:32,labels:(0..1024).map(|p|if p%32<16{0}else{1}).collect(),paints:vec![Paint::Solid(visioncortex::Color::new(252,252,252)),Paint::Solid(visioncortex::Color::new(240,240,240))]};map.merge_similar(40);assert_eq!(map.paints.len(),2);assert!(map.labels.iter().all(|l|(*l as usize)<map.paints.len()));assert_eq!(map.paints[map.labels[0]as usize].color().r,252);assert_eq!(map.paints[map.labels[31]as usize].color().r,240);}
+mod partition_tests {
+    use super::*;
+    use crate::{frontend::WatershedHierarchy, ir::Paint, mosaic::LabelMap};
+    fn scene() -> Arc<ColorImage> {
+        Arc::new(ColorImage {
+            width: 32,
+            height: 32,
+            pixels: (0..1024)
+                .flat_map(|p| {
+                    let c = if p % 32 < 16 { 252 } else { 240 };
+                    [c, c, c, 255]
+                })
+                .collect(),
+        })
+    }
+    #[test]
+    fn retains_an_existing_tree_split_without_changing_detail() {
+        let img = scene();
+        let tree = WatershedHierarchy::build(&img).unwrap();
+        configure(0);
+        let a = {
+            let _s = start(img.clone());
+            LabelMap::from_segmentation(&tree.cut(&img, 0, 4))
+        };
+        configure(2);
+        let b = {
+            let _s = start(img.clone());
+            LabelMap::from_segmentation(&tree.cut(&img, 0, 4))
+        };
+        assert_eq!(a.paints.len(), 1);
+        assert!(b.labels[0] != b.labels[31]);
+        assert!(report().contains("\"cutProtected\":1"));
+    }
+    #[test]
+    fn protected_map_has_dense_ids_correct_paints_and_complete_ownership() {
+        let img = scene();
+        configure(1);
+        let _g = start(img);
+        let mut map = LabelMap {
+            width: 32,
+            height: 32,
+            labels: (0..1024).map(|p| if p % 32 < 16 { 0 } else { 1 }).collect(),
+            paints: vec![
+                Paint::Solid(visioncortex::Color::new(252, 252, 252)),
+                Paint::Solid(visioncortex::Color::new(240, 240, 240)),
+            ],
+        };
+        map.merge_similar(40);
+        assert_eq!(map.paints.len(), 2);
+        assert!(map.labels.iter().all(|l| (*l as usize) < map.paints.len()));
+        assert_eq!(map.paints[map.labels[0] as usize].color().r, 252);
+        assert_eq!(map.paints[map.labels[31] as usize].color().r, 240);
+    }
 }

@@ -12,32 +12,41 @@ const variants = [
   ["mosaic", 1],
   ["watershed", 2],
   ["combined", 3],
+  ["thin-negative", "thin4"],
 ];
 for (const [name, mode] of variants) {
   const dir = root + "/" + name;
   if (mode !== null) {
     await mkdir(dir);
     for (const f of ["nexora_wasm.js", "nexora_wasm_bg.wasm"])
-      await cp(root + "/research/" + f, dir + "/" + f);
+      await cp(
+        root + (mode === "thin4" ? "/thin-source/" : "/research/") + f,
+        dir + "/" + f,
+      );
     let glue = await readFile(dir + "/nexora_wasm.js", "utf8"),
       end = "export { initSync, __wbg_init as default };";
     if (!glue.includes(end)) throw Error("glue changed");
     glue = glue.replace(
       end,
-      `export {initSync};export default async function regionInit(...args){const core=await __wbg_init(...args);watershed_research_configure(${mode});thin_research_configure(0,false);
-if(typeof WorkerGlobalScope!=='undefined'&&globalThis instanceof WorkerGlobalScope&&!globalThis.__regionPost){globalThis.__regionPost=true;const native=globalThis.postMessage.bind(globalThis);globalThis.postMessage=(m,...opts)=>native(m?.result?{...m,thinResearch:{...JSON.parse(last_region_survival()),watershed:JSON.parse(last_watershed_regions())}}:m,...opts);}return core;}`,
+      `export {initSync};export default async function regionInit(...args){const core=await __wbg_init(...args);${mode === "thin4" ? "thin_research_configure(4,false);" : `watershed_research_configure(${mode});thin_research_configure(0,false);`}
+if(typeof WorkerGlobalScope!=='undefined'&&globalThis instanceof WorkerGlobalScope&&!globalThis.__regionPost){globalThis.__regionPost=true;const native=globalThis.postMessage.bind(globalThis);globalThis.postMessage=(m,...opts)=>native(m?.result?{...m,thinResearch:{...JSON.parse(last_region_survival()),watershed:typeof last_watershed_regions === "function"?JSON.parse(last_watershed_regions()):null}}:m,...opts);}return core;}`,
     );
     await writeFile(dir + "/nexora_wasm.js", glue);
   }
   const m = {
     baseline: "ad770ad49b6168a75c1751bfbed412aad824fc15",
     sourceCommit:
-      mode === null
+      mode === null || mode === "thin4"
         ? "ad770ad49b6168a75c1751bfbed412aad824fc15"
         : execFileSync("git", ["rev-parse", "HEAD"], {
             encoding: "utf8",
           }).trim(),
-    features: mode === null ? [] : ["watershed_region_research"],
+    features:
+      mode === null
+        ? []
+        : mode === "thin4"
+          ? ["thin_feature_research"]
+          : ["watershed_region_research"],
     mode,
     capture: false,
     wasmSHA256: sha(await readFile(dir + "/nexora_wasm_bg.wasm")),
