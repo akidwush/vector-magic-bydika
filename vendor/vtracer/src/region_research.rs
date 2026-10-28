@@ -6,6 +6,8 @@ use visioncortex::ColorImage;
 pub const MAX_PIXELS: usize = 512 * 512;
 pub const MAX_TRIALS: usize = 128;
 pub const MAX_SPLITS: usize = 24;
+/// One existing below-cut distinction per candidate, not a global fine cut.
+pub const MAX_CUT_SPLITS: usize = 1;
 pub const MAX_EXAMINED: usize = 1_000_000;
 #[derive(Default)]
 struct State {
@@ -184,7 +186,12 @@ pub fn cut_veto(
     persistence: u64,
     mut owner: impl FnMut(usize, bool) -> bool,
 ) -> bool {
-    if !active(2) || aa < 16 || ab < 16 || persistence == 0 {
+    if !active(2)
+        || STATE.with(|s| s.borrow().cut >= MAX_CUT_SPLITS)
+        || aa < 16
+        || ab < 16
+        || persistence == 0
+    {
         return false;
     }
     let a = sa.map(|v| v as f64 / aa as f64);
@@ -223,7 +230,7 @@ pub fn cut_veto(
         })
         .max()
         .unwrap_or(0);
-    let keep = supported >= 5 && STATE.with(|s| s.borrow().cut < MAX_SPLITS);
+    let keep = supported >= 5 && STATE.with(|s| s.borrow().cut < MAX_CUT_SPLITS);
     event(format!(
         "{{\"reason\":\"WATERSHED_CUT_MERGE\",\"pixels\":[{p},{q}],\"area\":[{aa},{ab}],\"means\":[{a:?},{b:?}],\"persistence\":{persistence},\"supported\":{supported},\"protected\":{keep}}}"
     ));
@@ -498,5 +505,38 @@ mod partition_tests {
         assert!(map.labels.iter().all(|l| (*l as usize) < map.paints.len()));
         assert_eq!(map.paints[map.labels[0] as usize].color().r, 252);
         assert_eq!(map.paints[map.labels[31] as usize].color().r, 240);
+    }
+}
+
+#[cfg(test)]
+mod local_cut_budget_tests {
+    use super::*;
+    use crate::{frontend::WatershedHierarchy, mosaic::LabelMap};
+    #[test]
+    fn multiple_supported_splits_still_make_one_local_candidate() {
+        let img = Arc::new(ColorImage {
+            width: 48,
+            height: 32,
+            pixels: (0..48 * 32)
+                .flat_map(|i| {
+                    let c = match i % 48 {
+                        0..16 => 252,
+                        16..32 => 240,
+                        _ => 228,
+                    };
+                    [c, c, c, 255]
+                })
+                .collect(),
+        });
+        configure(2);
+        let _g = start(img.clone());
+        let tree = WatershedHierarchy::build(&img).unwrap();
+        let map = LabelMap::from_segmentation(&tree.cut(&img, 0, 4));
+        assert!(report().contains("\"cutProtected\":1"));
+        assert_eq!(
+            map.paints.len(),
+            2,
+            "one retained tree edge, not a global high-detail cut"
+        );
     }
 }

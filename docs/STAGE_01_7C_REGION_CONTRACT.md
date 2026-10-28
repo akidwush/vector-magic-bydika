@@ -49,3 +49,21 @@ Ownership is verified for every sampled side at CURRENT union-find roots, not
 just at the seed edge. The44 charged source observations cover two local core
 samples and7x3x2 transects. Alternate cut-window centers also recheck ownership.
 A similar-colored third face cannot lend evidence to a different root.
+
+Budget reporting uses charged logical work, not every physical pixel read of the
+underlying engine. Source preflight and hierarchy statistics are separate bounded
+linear passes; paint scoring adds at most65536RGB reads beyond support probes.
+A post-freeze diagnostic-only correction names the existing complexity rejection
+and reports its original counts. The inequalities and acceptance behavior do not
+change. SVG identity must be replayed against the frozen actual-download corpus.
+
+## Local Watershed candidate scheduling
+
+The many-split planner stress experiment failed final shared-geometry validation.
+To isolate local region construction, the follow-up candidate retains at most ONE
+source-certified below-cut MST distinction; ordinary cut/detail, all confidence
+thresholds, final shared-edge and paint/complexity inequalities remain unchanged.
+This is a smaller intervention budget, not a looser acceptance path. The rounded
+planner is retained as a negative control; a separately rendered square-header
+variant isolates the preexisting curved-face refinement problem. Neither is
+presented as blind real-artwork generalization or as the pale-garden repair.

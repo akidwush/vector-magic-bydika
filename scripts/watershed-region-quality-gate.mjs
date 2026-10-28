@@ -9,6 +9,13 @@ const root = process.env.NEXORA_ART_ROOT,
   issues = [],
   changed = [],
   ids = [...new Set(rows.map((r) => r.image))];
+const plan = JSON.parse(await readFile(root + "/plan.json"));
+for (const image of plan.images) {
+  for (const config of plan.configs) {
+    if (!rows.some((r) => r.image === image.id && r.config === config.id))
+      issues.push(image.id + ":" + config.id + ": missing actual measurement");
+  }
+}
 for (const id of ids) {
   const a = rows.find((r) => r.image === id && r.config === "A-auto");
   if (!a) {

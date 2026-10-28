@@ -296,6 +296,15 @@ fn render(d: &VectorDoc, img: &ColorImage) -> Option<Vec<[f64; 4]>> {
 }
 fn compare(b: &VectorDoc, c: &VectorDoc, img: &ColorImage) -> Option<Comparison> {
     if c.shapes.len() > b.shapes.len() + 24 || command_count(c) > command_count(b) * 2 + 128 {
+        FAILURE.with(|s| {
+            *s.borrow_mut() = format!(
+                "COMPLEXITY_GROWTH:shapes={}:{}:commands={}:{}",
+                b.shapes.len(),
+                c.shapes.len(),
+                command_count(b),
+                command_count(c)
+            )
+        });
         return None;
     }
     let a = render(b, img)?;
@@ -431,6 +440,14 @@ mod tests {
         let r = compare(&d, &d, &i).unwrap();
         assert!(!r.accepted);
         assert_eq!(r.changed, 0);
+    }
+    #[test]
+    fn complexity_rejection_has_a_reason_without_changing_acceptance() {
+        let (b, i) = scene(252);
+        let mut c = b.clone();
+        c.shapes = vec![rect(0., 0., 1., 1., 252); 26];
+        assert!(compare(&b, &c, &i).is_none());
+        assert!(FAILURE.with(|s| s.borrow().starts_with("COMPLEXITY_GROWTH:shapes=1:26")));
     }
     #[test]
     fn pathological_shape_count_fails_closed() {

@@ -25,11 +25,13 @@ record corpus env NEXORA_WATERSHED_CORPUS="$root/corpus" node scripts/watershed-
 record modules env NEXORA_WATERSHED_BUILDS="$root/modules" bash scripts/watershed-region-builds.sh
 record artwork env NEXORA_ART_ROOT="$root/evaluation" NEXORA_ART_FIXTURES="$root/corpus" NEXORA_ART_BUILDS="$root/modules" NEXORA_ART_CONFIGS_FILE="$root/modules/configs.json" NEXORA_ART_CONFIGS=A-auto,observe,combined,thin-negative node scripts/real-artwork-benchmark.mjs
 record measurements env NEXORA_ART_ROOT="$root/evaluation" NEXORA_ART_FIXTURES="$root/corpus" node scripts/watershed-region-measure.mjs
+record final-paint env NEXORA_ART_ROOT="$root/evaluation" NEXORA_ART_FIXTURES="$root/corpus" node scripts/watershed-region-final-paint.mjs
 record quality env NEXORA_ART_ROOT="$root/evaluation" node scripts/watershed-region-quality-gate.mjs
 record worker env NEXORA_THIN_WORKER_PROOF="$root/worker" NEXORA_THIN_EVALUATION="$root/evaluation" NEXORA_ART_BUILDS="$root/modules" NEXORA_ART_FIXTURES="$root/corpus" node scripts/watershed-region-worker-proof.mjs
 record ablation env NEXORA_ART_ROOT="$root/ablation" NEXORA_ART_FIXTURES="$root/corpus" NEXORA_ART_BUILDS="$root/modules" NEXORA_ART_CONFIGS_FILE="$root/modules/configs.json" NEXORA_ART_CONFIGS=A-auto,mosaic,watershed,combined NEXORA_ART_IMAGES=original-garden-512-low-contrast,original-garden-512,original-small-symbols-128,orbital-badge-128,orbital-badge-512,paper-botanical-128,paper-botanical-512 node scripts/real-artwork-benchmark.mjs
 record ablation-measure env NEXORA_ART_ROOT="$root/ablation" NEXORA_ART_FIXTURES="$root/corpus" node scripts/watershed-region-measure.mjs
 record diagnosis env NEXORA_THIN_DIAG_ROOT="$root/diagnosis" NEXORA_THIN_MODULE="$root/modules/research" NEXORA_THIN_BASELINE_RUN="$root/evaluation" NEXORA_THIN_MODE=0 NEXORA_THIN_IMAGES=original-garden-512-low-contrast,original-small-symbols-128,paper-botanical-128 node scripts/watershed-region-diagnose.mjs
+record transitions env NEXORA_THIN_DIAG_ROOT="$root/diagnosis" NEXORA_ART_FIXTURES="$root/corpus" node scripts/watershed-region-transitions.mjs
 record historical env NEXORA_RESEARCH_STAGE=stage17c NEXORA_INVERSE_HOTPATH=1 NEXORA_PROOF_DIR="$root/historical" bash scripts/source-target-research.sh
 record protected env NEXORA_PROOF_DIR="$root/protected" bash scripts/inverse-hotpath-proof.sh
 record enabled env NEXORA_WATERSHED_ENABLED="$root/enabled" NEXORA_WATERSHED_F="$root/protected/F" bash scripts/watershed-region-enabled.sh
