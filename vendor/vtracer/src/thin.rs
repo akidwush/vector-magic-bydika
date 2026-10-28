@@ -10,6 +10,12 @@ use visioncortex::color_clusters::{Cluster, ClustersView, NeighbourInfo};
 
 const CAPTURE_BYTES: usize = 24 * 1024 * 1024;
 const MAX_EVENTS: usize = 16384;
+// Stage C needs two Mosaic ownership frames; byte cap remains24MiB.
+const MAX_FRAMES: usize = if cfg!(feature = "watershed_region_research") {
+    9
+} else {
+    8
+};
 
 #[derive(Default)]
 struct Capture {
@@ -127,7 +133,9 @@ fn room(bytes: usize) -> bool {
     })
 }
 pub fn image(name: &'static str, img: &ColorImage) {
-    if !enabled_capture() || STATE.with(|s| s.borrow().frames.len() >= 8) || !room(img.pixels.len())
+    if !enabled_capture()
+        || STATE.with(|s| s.borrow().frames.len() >= MAX_FRAMES)
+        || !room(img.pixels.len())
     {
         return;
     }
@@ -144,7 +152,7 @@ pub fn initial(view: &ClustersView<'_>) {
         return;
     }
     let n = view.width as usize * view.height as usize;
-    if STATE.with(|s| s.borrow().frames.len() >= 8) || !room(n * 8) {
+    if STATE.with(|s| s.borrow().frames.len() >= MAX_FRAMES) || !room(n * 8) {
         return;
     }
     let mut rgba = vec![0; n * 4];
@@ -170,7 +178,7 @@ pub fn segmentation(name: &'static str, seg: &Segmentation) {
         return;
     }
     let n = seg.width as usize * seg.height as usize;
-    if STATE.with(|s| s.borrow().frames.len() >= 8) || !room(n * 8) {
+    if STATE.with(|s| s.borrow().frames.len() >= MAX_FRAMES) || !room(n * 8) {
         return;
     }
     let mut rgba = vec![0; n * 4];
@@ -211,7 +219,7 @@ pub fn partition(
     color: impl Fn(u32) -> visioncortex::Color,
 ) {
     if !enabled_capture()
-        || STATE.with(|s| s.borrow().frames.len() >= 8)
+        || STATE.with(|s| s.borrow().frames.len() >= MAX_FRAMES)
         || !room(width * height * 8)
     {
         return;
@@ -249,6 +257,32 @@ pub fn mosaic(stage: &str, map: &crate::mosaic::LabelMap, threshold: i32) {
             "{{\"kind\":\"mosaic\",\"stage\":\"{stage}\",\"region\":{id},\"area\":{pixels},\"color\":[{},{},{}],\"mergeDiff\":{threshold}}}",
             c.r, c.g, c.b
         ));
+    }
+    #[cfg(feature = "watershed_region_research")]
+    if let Some(name) = match stage {
+        "before-color-merge" => Some("mosaic-before-merge"),
+        "after-color-merge" => Some("mosaic-after-merge"),
+        _ => None,
+    } {
+        partition(
+            name,
+            map.width as usize,
+            map.height as usize,
+            &map.labels,
+            area.iter().filter(|&&a| a > 0).count(),
+            |id| {
+                if id == crate::mosaic::OUTSIDE {
+                    visioncortex::Color {
+                        r: 0,
+                        g: 0,
+                        b: 0,
+                        a: 0,
+                    }
+                } else {
+                    map.paints[id as usize].color()
+                }
+            },
+        );
     }
 }
 pub fn note(value: String) {

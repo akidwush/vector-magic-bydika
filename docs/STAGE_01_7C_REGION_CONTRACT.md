@@ -67,3 +67,8 @@ This is a smaller intervention budget, not a looser acceptance path. The rounded
 planner is retained as a negative control; a separately rendered square-header
 variant isolates the preexisting curved-face refinement problem. Neither is
 presented as blind real-artwork generalization or as the pale-garden repair.
+
+Stage C diagnostics capture the actual before/after Mosaic ownership maps, not
+only region counts. They allow9frames while retaining the same24MiB byte ceiling;
+Stage B-only builds retain8frames. Capture is still off in ordinary benchmarking
+and production. This read-only correction must preserve all output hashes.

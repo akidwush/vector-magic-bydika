@@ -534,9 +534,47 @@ mod local_cut_budget_tests {
         let map = LabelMap::from_segmentation(&tree.cut(&img, 0, 4));
         assert!(report().contains("\"cutProtected\":1"));
         assert_eq!(
-            map.labels.iter().copied().collect::<std::collections::BTreeSet<_>>().len(),
+            map.labels
+                .iter()
+                .copied()
+                .collect::<std::collections::BTreeSet<_>>()
+                .len(),
             2,
             "one retained tree edge, not a global high-detail cut"
         );
+    }
+}
+
+#[cfg(test)]
+mod mosaic_capture_tests {
+    use super::*;
+    use crate::{ir::Paint, mosaic::LabelMap, thin};
+    #[test]
+    fn captures_both_actual_mosaic_ownership_maps_without_a_second_merge() {
+        let img = Arc::new(ColorImage {
+            width: 32,
+            height: 32,
+            pixels: vec![255; 4096],
+        });
+        thin::configure(0, true);
+        let _guard = thin::start(img);
+        configure(0);
+        let mut map = LabelMap {
+            width: 32,
+            height: 32,
+            labels: (0..1024).map(|p| u32::from(p % 32 >= 16)).collect(),
+            paints: vec![
+                Paint::Solid(visioncortex::Color::new(252, 252, 252)),
+                Paint::Solid(visioncortex::Color::new(240, 240, 240)),
+            ],
+        };
+        thin::mosaic("before-color-merge", &map, 40);
+        map.merge_similar(40);
+        thin::mosaic("after-color-merge", &map, 40);
+        let report = thin::report();
+        assert!(report.contains("mosaic-before-merge"));
+        assert!(report.contains("mosaic-after-merge"));
+        assert_eq!(thin::labels(1)[31], 1);
+        assert_eq!(thin::labels(2)[31], 0);
     }
 }

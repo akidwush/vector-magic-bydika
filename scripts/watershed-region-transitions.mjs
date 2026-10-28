@@ -13,6 +13,8 @@ const reasons = {
   "color-fit": "PALETTE_COLOR_COLLAPSE",
   "mosaic-before-color-merge": "UNDETERMINED",
   "mosaic-after-color-merge": "MOSAIC_ADJACENCY_MERGE",
+  "mosaic-before-merge": "UNDETERMINED",
+  "mosaic-after-merge": "MOSAIC_ADJACENCY_MERGE",
 };
 for (const item of summary) {
   const record = JSON.parse(await readFile(root + "/" + item.id + ".json")),
