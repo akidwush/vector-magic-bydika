@@ -36,3 +36,6 @@ legacy_work = ["runtime_uncached", "vtracer/runtime_work"]
 
 # Region-survival diagnostics and opt-in protection, independent of curve recovery.
 thin_feature_research = ["vtracer/thin_feature_research"]
+
+# Independent, opt-in source-verified Watershed/Mosaic region experiment.
+watershed_region_research = ["vtracer/watershed_region_research"]

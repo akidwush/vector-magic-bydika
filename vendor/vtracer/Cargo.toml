@@ -23,3 +23,6 @@ flo_curves = "=0.8.0"
 [features]
 runtime_work = []
 thin_feature_research = []
+
+# Independent, opt-in source-verified Watershed/Mosaic region experiment.
+watershed_region_research = []

@@ -697,7 +697,7 @@ pub fn report() -> String {
         format!("{{\"mode\":{},\"width\":{},\"height\":{},\"captureBytes\":{},\"omitted\":{},\"evaluated\":{},\"protected\":{},\"chargedCandidatePixels\":{},\"negativeProbeCellBudget\":{},\"negativeProbePixelsVisited\":{},\"negativeProbes\":{},\"negativePaints\":{},\"cacheEntries\":{},\"eligible\":{},\"sourceRetained\":{},\"frames\":[{frames}],\"vectors\":[{vectors}],\"events\":[{}]}}",s.mode,s.width,s.height,s.bytes,s.omitted,s.evaluated,s.protected,s.charged_pixels,s.negative_work[0],s.negative_work[1],s.negative_work[2],s.negative_paint_count,s.negative_paints.len(),s.eligible,s.source.is_some(),s.events.join(","))})
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "thin_feature_research"))]
 mod tests {
     use super::*;
     use crate::frontend::{ColorClusterFrontend, Frontend};
@@ -1008,4 +1008,17 @@ mod tests {
             STATE.with(|s| s.borrow().frames.last().unwrap().rgba.clone())
         );
     }
+}
+
+// Move diagnostic ownership while the final-paint validator replays baseline.
+// SourceGuard has already cleared the source Arc; no cross-image cache is kept.
+#[cfg(feature = "watershed_region_research")]
+pub struct Snapshot(Research);
+#[cfg(feature = "watershed_region_research")]
+pub fn take_snapshot() -> Snapshot {
+    STATE.with(|s| Snapshot(std::mem::take(&mut *s.borrow_mut())))
+}
+#[cfg(feature = "watershed_region_research")]
+pub fn restore_snapshot(snapshot: Snapshot) {
+    STATE.with(|s| *s.borrow_mut() = snapshot.0);
 }

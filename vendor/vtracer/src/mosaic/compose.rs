@@ -34,10 +34,16 @@ pub fn compose_mosaic(
     passes: &[Box<dyn CurvePass>],
 ) -> VectorDoc {
     let mut map = LabelMap::from_segmentation(seg);
-    #[cfg(feature = "thin_feature_research")]
+    #[cfg(any(
+        feature = "thin_feature_research",
+        feature = "watershed_region_research"
+    ))]
     crate::thin::mosaic("before-color-merge", &map, merge_diff);
     map.merge_similar(merge_diff);
-    #[cfg(feature = "thin_feature_research")]
+    #[cfg(any(
+        feature = "thin_feature_research",
+        feature = "watershed_region_research"
+    ))]
     crate::thin::mosaic("after-color-merge", &map, merge_diff);
     let graph = BoundaryGraph::extract(&map);
     let faces = assemble(&graph, &map);

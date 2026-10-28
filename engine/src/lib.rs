@@ -119,27 +119,42 @@ pub fn last_corner_evidence() -> Vec<f64> {
 }
 use vtracer::{ColorImage, Config, FitMode};
 
-#[cfg(feature = "thin_feature_research")]
+#[cfg(any(
+    feature = "thin_feature_research",
+    feature = "watershed_region_research"
+))]
 #[wasm_bindgen]
 pub fn thin_research_configure(mode: u32, capture: bool) {
     vtracer::thin::configure(mode, capture);
 }
-#[cfg(feature = "thin_feature_research")]
+#[cfg(any(
+    feature = "thin_feature_research",
+    feature = "watershed_region_research"
+))]
 #[wasm_bindgen]
 pub fn last_region_survival() -> String {
     vtracer::thin::report()
 }
-#[cfg(feature = "thin_feature_research")]
+#[cfg(any(
+    feature = "thin_feature_research",
+    feature = "watershed_region_research"
+))]
 #[wasm_bindgen]
 pub fn last_region_rgba(index: usize) -> Vec<u8> {
     vtracer::thin::rgba(index)
 }
-#[cfg(feature = "thin_feature_research")]
+#[cfg(any(
+    feature = "thin_feature_research",
+    feature = "watershed_region_research"
+))]
 #[wasm_bindgen]
 pub fn last_region_labels(index: usize) -> Vec<u32> {
     vtracer::thin::labels(index)
 }
-#[cfg(feature = "thin_feature_research")]
+#[cfg(any(
+    feature = "thin_feature_research",
+    feature = "watershed_region_research"
+))]
 #[wasm_bindgen]
 pub fn last_region_svg(index: usize) -> String {
     vtracer::thin::svg(index)
@@ -216,7 +231,25 @@ pub fn last_topology() -> Vec<f64> {
     LAST_TOPOLOGY.with(|s| s.borrow().clone())
 }
 
+#[cfg(feature = "watershed_region_research")]
+mod region_validation;
 fn run_pipeline(
+    config: Config,
+    rgba: Vec<u8>,
+    width: usize,
+    height: usize,
+    profile: &str,
+) -> Result<String, JsValue> {
+    #[cfg(feature = "watershed_region_research")]
+    {
+        region_validation::run(config, rgba, width, height, profile)
+    }
+    #[cfg(not(feature = "watershed_region_research"))]
+    {
+        run_pipeline_once(config, rgba, width, height, profile)
+    }
+}
+fn run_pipeline_once(
     mut config: Config,
     rgba: Vec<u8>,
     width: usize,
@@ -234,8 +267,13 @@ fn run_pipeline(
         width,
         height,
     });
-    #[cfg(feature = "thin_feature_research")]
+    #[cfg(any(
+        feature = "thin_feature_research",
+        feature = "watershed_region_research"
+    ))]
     let _thin_source_guard = vtracer::thin::start(img.clone());
+    #[cfg(feature = "watershed_region_research")]
+    let _region_source_guard = vtracer::region_research::start(img.clone());
     source_fit::reset();
     source_fit::sparse(optimize);
     let prepare_started = now();
@@ -247,7 +285,10 @@ fn run_pipeline(
         None
     };
     let profile = if profile.starts_with("reconstruct") {
-        #[cfg(feature = "thin_feature_research")]
+        #[cfg(any(
+            feature = "thin_feature_research",
+            feature = "watershed_region_research"
+        ))]
         if let Some(prepared) = source_prepared.as_ref() {
             vtracer::thin::image("source-prepared", prepared);
         }
@@ -271,16 +312,25 @@ fn run_pipeline(
     #[cfg(feature = "runtime_profile")]
     drop(prepare_scope);
     let preparation_ms = now() - prepare_started;
-    #[cfg(feature = "thin_feature_research")]
+    #[cfg(any(
+        feature = "thin_feature_research",
+        feature = "watershed_region_research"
+    ))]
     vtracer::thin::profile(profile);
-    #[cfg(feature = "thin_feature_research")]
+    #[cfg(any(
+        feature = "thin_feature_research",
+        feature = "watershed_region_research"
+    ))]
     if vtracer::thin::precision_ablation() {
         config.color_precision = 8;
     }
     let mut pipeline = config
         .build()
         .map_err(|e| JsValue::from_str(&e.to_string()))?;
-    #[cfg(feature = "thin_feature_research")]
+    #[cfg(any(
+        feature = "thin_feature_research",
+        feature = "watershed_region_research"
+    ))]
     vtracer::thin::note(format!(
         "{{\"kind\":\"configuration\",\"profile\":\"{profile}\",\"frontend\":\"{:?}\",\"precision\":{},\"speckle\":{},\"layerDifference\":{},\"maxColors\":{}}}",
         config.clustering,
@@ -320,11 +370,17 @@ fn run_pipeline(
             .segment(source_prepared.as_ref().unwrap_or(&img))
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
         segmented = now();
-        #[cfg(feature = "thin_feature_research")]
+        #[cfg(any(
+            feature = "thin_feature_research",
+            feature = "watershed_region_research"
+        ))]
         vtracer::thin::segmentation("clustered", &seg);
         for fitter in &pipeline.color_fitters {
             fitter.fit(&mut seg);
-            #[cfg(feature = "thin_feature_research")]
+            #[cfg(any(
+                feature = "thin_feature_research",
+                feature = "watershed_region_research"
+            ))]
             vtracer::thin::segmentation("color-fit", &seg);
         }
         let mut map = vtracer::mosaic::LabelMap::from_segmentation(&seg);
@@ -344,11 +400,17 @@ fn run_pipeline(
             .segment(source_prepared.as_ref().unwrap_or(&img))
             .map_err(|e| JsValue::from_str(&e.to_string()))?;
         segmented = now();
-        #[cfg(feature = "thin_feature_research")]
+        #[cfg(any(
+            feature = "thin_feature_research",
+            feature = "watershed_region_research"
+        ))]
         vtracer::thin::segmentation("clustered", &seg);
         for fitter in &pipeline.color_fitters {
             fitter.fit(&mut seg);
-            #[cfg(feature = "thin_feature_research")]
+            #[cfg(any(
+                feature = "thin_feature_research",
+                feature = "watershed_region_research"
+            ))]
             vtracer::thin::segmentation("color-fit", &seg);
         }
         let (doc, stats) =
@@ -376,7 +438,10 @@ fn run_pipeline(
             )
             .map_err(|e| JsValue::from_str(&e.to_string()))?
     };
-    #[cfg(feature = "thin_feature_research")]
+    #[cfg(any(
+        feature = "thin_feature_research",
+        feature = "watershed_region_research"
+    ))]
     vtracer::thin::vector("composed", &doc, &pipeline.writer);
     inverse::repair(&mut doc).map_err(|e| JsValue::from_str(&e))?;
     #[cfg(feature = "source_geometry")]
@@ -426,8 +491,13 @@ fn run_pipeline(
         reduce::serialize_lines(&mut doc);
     }
     let refined_at = now();
-    #[cfg(feature = "thin_feature_research")]
+    #[cfg(any(
+        feature = "thin_feature_research",
+        feature = "watershed_region_research"
+    ))]
     vtracer::thin::vector("pre-export", &doc, &pipeline.writer);
+    #[cfg(feature = "watershed_region_research")]
+    region_validation::record(&doc);
     let mut svg = pipeline.writer.write(&doc);
     let exported_at = now();
     if profile.starts_with("coverage")
@@ -733,4 +803,20 @@ pub fn alpha_experiment(
         },
     )
     .map_err(|e| JsValue::from_str(&e.to_string()))
+}
+
+#[cfg(feature = "watershed_region_research")]
+#[wasm_bindgen]
+pub fn watershed_research_configure(mode: u32) {
+    vtracer::region_research::configure(mode);
+}
+#[cfg(feature = "watershed_region_research")]
+#[wasm_bindgen]
+pub fn last_watershed_regions() -> String {
+    let validation = region_validation::report();
+    if validation.is_empty() {
+        vtracer::region_research::report()
+    } else {
+        validation
+    }
 }

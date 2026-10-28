@@ -285,6 +285,22 @@ impl WatershedHierarchy {
         // image) is practically uncapped: λ = min persistence, keeping every
         // basin above the zero-persistence trivia.
         let mut uf = Uf::new(n);
+        #[cfg(feature = "watershed_region_research")]
+        let mut evidence = if crate::region_research::active(2) {
+            let mut a = vec![1u64; n];
+            let mut sums = vec![[0u64; 3]; n];
+            let mut sq = vec![[0u64; 3]; n];
+            for i in 0..n {
+                let c = img.get_pixel(i % w, i / w);
+                for (ch, v) in [c.r, c.g, c.b].into_iter().enumerate() {
+                    sums[i][ch] = v as u64;
+                    sq[i][ch] = (v as u64).pow(2);
+                }
+            }
+            Some((std::mem::take(&mut a), sums, sq))
+        } else {
+            None
+        };
         if m > 0 {
             let target = (2f64).powf(detail as f64 / 25.5).round() as usize;
             let target = target.clamp(1, m);
@@ -296,6 +312,28 @@ impl WatershedHierarchy {
                 let (p, q) = self.mst[k as usize];
                 let (rp, rq) = (uf.find(p), uf.find(q));
                 if rp != rq {
+                    #[cfg(feature = "watershed_region_research")]
+                    if let Some((a, s, v)) = evidence.as_mut() {
+                        let (i, j) = (rp as usize, rq as usize);
+                        if crate::region_research::cut_veto(
+                            p,
+                            q,
+                            a[i],
+                            a[j],
+                            s[i],
+                            s[j],
+                            v[i],
+                            v[j],
+                            self.pers[k as usize],
+                        ) {
+                            continue;
+                        }
+                        a[i] += a[j];
+                        for c in 0..3 {
+                            s[i][c] += s[j][c];
+                            v[i][c] += v[j][c];
+                        }
+                    }
                     uf.link(rp, rq);
                 }
             }
@@ -327,7 +365,10 @@ impl WatershedHierarchy {
         }
 
         // --- Boundary snap, then boundary adjacency ---------------------------
-        #[cfg(feature = "thin_feature_research")]
+        #[cfg(any(
+            feature = "thin_feature_research",
+            feature = "watershed_region_research"
+        ))]
         crate::thin::partition("watershed-cut", w, h, &pre, kp, |id| {
             let i = id as usize;
             Color::new(
@@ -337,7 +378,10 @@ impl WatershedHierarchy {
             )
         });
         snap_boundaries(img, w, h, &mut pre, &mut area, &mut sum);
-        #[cfg(feature = "thin_feature_research")]
+        #[cfg(any(
+            feature = "thin_feature_research",
+            feature = "watershed_region_research"
+        ))]
         crate::thin::partition(
             "watershed-snapped",
             w,
@@ -381,7 +425,10 @@ impl WatershedHierarchy {
             ids[i] = leaf_of[r];
         }
         let k = leaf_root.len();
-        #[cfg(feature = "thin_feature_research")]
+        #[cfg(any(
+            feature = "thin_feature_research",
+            feature = "watershed_region_research"
+        ))]
         crate::thin::partition("watershed-area-filtered", w, h, &ids, k, |id| {
             let i = leaf_root[id as usize] as usize;
             Color::new(

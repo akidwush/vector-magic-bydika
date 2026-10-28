@@ -81,8 +81,6 @@
 pub mod colorfit;
 pub mod compose;
 pub mod config;
-#[cfg(feature = "thin_feature_research")]
-pub mod thin;
 pub mod error;
 pub mod fitter;
 pub mod frontend;
@@ -94,6 +92,11 @@ pub mod progress;
 pub mod session;
 pub mod simplify;
 pub mod svg;
+#[cfg(any(
+    feature = "thin_feature_research",
+    feature = "watershed_region_research"
+))]
+pub mod thin;
 
 pub use config::{Clustering, Config, FitMode, Hierarchical, Preset, SegmentKey};
 pub use error::Error;
@@ -108,3 +111,6 @@ pub use visioncortex::{Color, ColorImage, PointF64, PointI32};
 
 #[cfg(feature = "runtime_work")]
 pub mod runtime_work;
+
+#[cfg(feature = "watershed_region_research")]
+pub mod region_research;

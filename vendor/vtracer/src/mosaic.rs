@@ -19,12 +19,12 @@ pub mod face;
 mod fit;
 mod graph;
 
-pub use compose::{compose_mosaic, compose_fitted};
+pub use compose::{compose_fitted, compose_mosaic};
 pub use fit::{
     FittedGeom, FittedSegment, PixelSegmentFitter, PolygonSegmentFitter, SegmentFitter,
     SplineSegmentFitter,
 };
-pub use graph::{BoundaryGraph, Node, Segment, SegRef};
+pub use graph::{BoundaryGraph, Node, SegRef, Segment};
 
 use crate::ir::{Paint, Segmentation};
 
@@ -164,12 +164,41 @@ impl LabelMap {
         // closest links; ties break on ids for determinism.
         pairs.sort_by_key(|&(a, b)| {
             (
-                diff(&sum[a as usize], area[a as usize], &sum[b as usize], area[b as usize]),
+                diff(
+                    &sum[a as usize],
+                    area[a as usize],
+                    &sum[b as usize],
+                    area[b as usize],
+                ),
                 a,
                 b,
             )
         });
 
+        #[cfg(feature = "watershed_region_research")]
+        let source_edges: Vec<(usize, usize)> = if crate::region_research::active(1) {
+            let mut es = Vec::new();
+            let w = self.width as usize;
+            for i in 0..self.labels.len() {
+                for q in [
+                    (i % w + 1 < w).then_some(i + 1),
+                    (i + w < self.labels.len()).then_some(i + w),
+                ]
+                .into_iter()
+                .flatten()
+                {
+                    if self.labels[i] != OUTSIDE
+                        && self.labels[q] != OUTSIDE
+                        && self.labels[i] != self.labels[q]
+                    {
+                        es.push((i, q));
+                    }
+                }
+            }
+            es
+        } else {
+            Vec::new()
+        };
         let mut parent: Vec<RegionId> = (0..n as RegionId).collect();
         fn find(parent: &mut [RegionId], mut i: RegionId) -> RegionId {
             while parent[i as usize] != i {
@@ -192,6 +221,25 @@ impl LabelMap {
                 }
                 let (ia, ib) = (ra as usize, rb as usize);
                 if diff(&sum[ia], area[ia], &sum[ib], area[ib]) <= max_diff {
+                    #[cfg(feature = "watershed_region_research")]
+                    if !source_edges.is_empty() && crate::region_research::scan(source_edges.len())
+                    {
+                        let mut edges = Vec::new();
+                        for &(p, q) in &source_edges {
+                            let x = find(&mut parent, self.labels[p]);
+                            let y = find(&mut parent, self.labels[q]);
+                            if x == ra && y == rb {
+                                edges.push((p, q));
+                            } else if x == rb && y == ra {
+                                edges.push((q, p));
+                            }
+                        }
+                        if crate::region_research::merge_veto(
+                            ra, rb, area[ia], area[ib], sum[ia], sum[ib], &edges, max_diff,
+                        ) {
+                            continue;
+                        }
+                    }
                     parent[ib] = ra;
                     for k in 0..3 {
                         sum[ia][k] += sum[ib][k];
@@ -230,7 +278,7 @@ impl LabelMap {
 
 #[cfg(test)]
 mod tests {
-    use super::face::{assemble, Face};
+    use super::face::{Face, assemble};
     use super::graph::BoundaryGraph;
     use super::*;
     use crate::ir::Paint;
@@ -258,9 +306,20 @@ mod tests {
                 for (i, sref) in contour.0.iter().enumerate() {
                     let pts = &graph.segments[sref.seg as usize].points;
                     let ordered: Vec<PointF64> = if sref.forward {
-                        pts.iter().map(|p| PointF64 { x: p.x as f64, y: p.y as f64 }).collect()
+                        pts.iter()
+                            .map(|p| PointF64 {
+                                x: p.x as f64,
+                                y: p.y as f64,
+                            })
+                            .collect()
                     } else {
-                        pts.iter().rev().map(|p| PointF64 { x: p.x as f64, y: p.y as f64 }).collect()
+                        pts.iter()
+                            .rev()
+                            .map(|p| PointF64 {
+                                x: p.x as f64,
+                                y: p.y as f64,
+                            })
+                            .collect()
                     };
                     if i == 0 {
                         ring.extend(ordered);
@@ -452,12 +511,7 @@ mod tests {
     fn spline_segments_pin_endpoints_to_lattice() {
         use super::fit::{FittedGeom, SegmentFitter, SplineSegmentFitter};
         // A shape with junctions so there are open (non-ring) segments.
-        let map = grid(4, 4, vec![
-            0, 0, 1, 1,
-            0, 0, 1, 1,
-            2, 2, 1, 1,
-            2, 2, 2, 2,
-        ]);
+        let map = grid(4, 4, vec![0, 0, 1, 1, 0, 0, 1, 1, 2, 2, 1, 1, 2, 2, 2, 2]);
         let graph = BoundaryGraph::extract(&map);
         let fitter = SplineSegmentFitter::default();
         let mut checked = 0;
@@ -466,10 +520,16 @@ mod tests {
                 continue;
             }
             let fitted = fitter.fit_open(seg);
-            let start = PointF64 { x: seg.points[0].x as f64, y: seg.points[0].y as f64 };
+            let start = PointF64 {
+                x: seg.points[0].x as f64,
+                y: seg.points[0].y as f64,
+            };
             let end = {
                 let p = seg.points[seg.points.len() - 1];
-                PointF64 { x: p.x as f64, y: p.y as f64 }
+                PointF64 {
+                    x: p.x as f64,
+                    y: p.y as f64,
+                }
             };
             match fitted.geom {
                 FittedGeom::Beziers(b) => {
@@ -492,12 +552,7 @@ mod tests {
         use crate::simplify::{CurvePass, SimplifyCurves};
         // Simplification runs per shared segment; junction nodes must not
         // move or the faces meeting there would disagree.
-        let map = grid(4, 4, vec![
-            0, 0, 1, 1,
-            0, 0, 1, 1,
-            2, 2, 1, 1,
-            2, 2, 2, 2,
-        ]);
+        let map = grid(4, 4, vec![0, 0, 1, 1, 0, 0, 1, 1, 2, 2, 1, 1, 2, 2, 2, 2]);
         let graph = BoundaryGraph::extract(&map);
         let fitter = SplineSegmentFitter::default();
         let pass = SimplifyCurves {
@@ -509,10 +564,16 @@ mod tests {
             if seg.is_ring() {
                 continue;
             }
-            let start = PointF64 { x: seg.points[0].x as f64, y: seg.points[0].y as f64 };
+            let start = PointF64 {
+                x: seg.points[0].x as f64,
+                y: seg.points[0].y as f64,
+            };
             let end = {
                 let p = seg.points[seg.points.len() - 1];
-                PointF64 { x: p.x as f64, y: p.y as f64 }
+                PointF64 {
+                    x: p.x as f64,
+                    y: p.y as f64,
+                }
             };
             match pass.open(fitter.fit_open(seg).geom) {
                 FittedGeom::Beziers(b) => {
@@ -631,17 +692,18 @@ mod tests {
             }
             seg.layers.push(Layer {
                 paint: Paint::Solid(Color::new(g, g, g)),
-                mask: RegionMask::new(
-                    image,
-                    visioncortex::PointI32 { x: i * 2, y: 0 },
-                ),
+                mask: RegionMask::new(image, visioncortex::PointI32 { x: i * 2, y: 0 }),
             });
         }
 
         let unmerged = compose_mosaic(&seg, &PixelSegmentFitter, 0, &[]);
         let merged = compose_mosaic(&seg, &PixelSegmentFitter, 16, &[]);
         assert_eq!(unmerged.shapes.len(), 3);
-        assert_eq!(merged.shapes.len(), 1, "gradient strips coalesce into one face");
+        assert_eq!(
+            merged.shapes.len(),
+            1,
+            "gradient strips coalesce into one face"
+        );
         assert_eq!(merged.shapes[0].paint.color().r, 102, "area-weighted mean");
     }
 
@@ -650,7 +712,9 @@ mod tests {
         // Deterministic LCG; connectivity not required.
         let mut state: u64 = 0x1234_5678_9abc_def0;
         let mut next = || {
-            state = state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            state = state
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
             (state >> 33) as u32
         };
         for _ in 0..40 {
