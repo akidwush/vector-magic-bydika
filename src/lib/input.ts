@@ -118,13 +118,18 @@ export async function decode(file: File, allowResize: boolean) {
     const width = Math.max(1, Math.floor(bitmap.width * factor));
     const height = Math.max(1, Math.floor(bitmap.height * factor));
     const canvas = document.createElement("canvas");
-    canvas.width = width;
-    canvas.height = height;
-    const ctx = canvas.getContext("2d", { willReadFrequently: true });
-    if (!ctx) throw new Error("Canvas tidak tersedia.");
-    ctx.drawImage(bitmap, 0, 0, width, height);
-    const rgba = ctx.getImageData(0, 0, width, height).data;
-    canvas.width = canvas.height = 0;
+    let rgba: Uint8ClampedArray;
+    try {
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
+      if (!ctx) throw new Error("Canvas tidak tersedia.");
+      ctx.drawImage(bitmap, 0, 0, width, height);
+      rgba = ctx.getImageData(0, 0, width, height).data;
+    } finally {
+      // Release the backing store even if drawing/readback fails on the device.
+      canvas.width = canvas.height = 0;
+    }
     return {
       rgba,
       width,

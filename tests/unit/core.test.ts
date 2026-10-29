@@ -85,12 +85,13 @@ describe("worker lifecycle", () => {
   afterEach(() => vi.unstubAllGlobals());
   it("terminates cancelled jobs and rejects stale replies", async () => {
     const workers: FakeWorker[] = [];
-    class FakeWorker {
+    class FakeWorker extends EventTarget {
       onmessage?: (event: { data: unknown }) => void;
       onerror?: (event: { message: string }) => void;
       postMessage = vi.fn();
       terminate = vi.fn();
       constructor() {
+        super();
         workers.push(this);
       }
     }

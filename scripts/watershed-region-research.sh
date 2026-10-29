@@ -16,6 +16,16 @@ record(){
   if [[ $code != 0 ]];then
     status=1
     tail -60 "$root/$name.log"
+    if [[ ${GITHUB_ACTIONS:-} == true ]];then
+      # Public run annotations remain readable when detailed job logs need login.
+      # Escape workflow-command data so a log line cannot create another command.
+      local annotation
+      annotation=$(tail -30 "$root/$name.log")
+      annotation=${annotation//'%'/'%25'}
+      annotation=${annotation//$'\r'/'%0D'}
+      annotation=${annotation//$'\n'/'%0A'}
+      printf '::error title=Stage 1.7C %s exit %s::%s\n' "$name" "$code" "$annotation"
+    fi
     if [[ -n ${GITHUB_STEP_SUMMARY:-} ]];then
       { printf '\n<details><summary>%s failure</summary>\n\n```text\n' "$name";tail -60 "$root/$name.log";printf '\n```\n</details>\n\n'; } >> "$GITHUB_STEP_SUMMARY"
     fi
