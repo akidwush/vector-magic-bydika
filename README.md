@@ -5,6 +5,22 @@ a tested ImageTracerJS fallback, three presets, original/vector comparison and l
 No account, tracing API, server upload, or paid runtime. Not affiliated with Vector Magic.
 Quality equivalence is not claimed; Photo is a baseline.
 
+## Audit 29 October 2026
+
+The [current audit and implemented fixes](docs/AUDIT_2026_10_29_AND_RELIABILITY_REPORT.md)
+distinguish normal production behavior from experimental research. Important
+remaining limitations are loss of thin details/negative spaces, low-contrast
+region merging, codec fragmentation and uncertain runtime on real Android devices.
+Synthetic geometry improvements do not establish general artwork quality.
+
+The audit fixes Worker transport/startup failure cleanup, duplicate-result idle
+timers and decode Canvas cleanup. Research features remain off by default.
+Stage [1.7B](docs/STAGE_01_7B_THIN_FEATURE_PRESERVATION_REPORT.md) and
+[1.7C](docs/STAGE_01_7C_WATERSHED_REGION_RECOVERY_REPORT.md) remain **PARTIAL**;
+their selected region recoveries are not globally enabled. Historical CI/runtime
+failures remain recorded. The static Vector Magic binary report is context,
+not proof of proprietary algorithms or a matched quality comparison.
+
 ## Stage 1.6E — source-verified sharp apex research
 
 The experimental already-G0 fallback fits incident handles jointly at a
